@@ -58,12 +58,11 @@ int pool_mgr_active_balance(int pool);
 int pool_mgr_display_pool(int pool);
 bool pool_mgr_using_fallback(void);
 int pool_mgr_pool_errors(void);
-void pool_mgr_rerun_verification(int pool);
 
-/* the statistics and the coinbase verification state; NULL before the
- * manager exists */
-const pool_stats_t *pool_mgr_stats(void);
-const pool_coinbase_t *pool_mgr_coinbase(void);
+/* the statistics: aggregated, and of one pool (zeros before the manager
+ * exists) */
+void pool_mgr_summary(pool_stats_summary_t *out);
+void pool_mgr_pool_stats(int pool, pool_stats_pool_t *out);
 
 /* ping of the pool the v1 API shows: round trip (ms), loss (0..1) */
 double pool_mgr_ping_rtt(void);

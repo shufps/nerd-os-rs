@@ -11,8 +11,8 @@ use core::ffi::{c_char, c_int, CStr};
 
 use crate::jobs;
 use crate::log::log;
-use crate::pool_coinbase::ffi::Handle as Coinbase;
-use crate::pool_stats::ffi::Handle as Stats;
+use crate::pool_coinbase::Handle as Coinbase;
+use crate::pool_stats::Handle as Stats;
 use crate::stratum_v1::method::*;
 use crate::stratum_v1::{Message, MiningNotify};
 use crate::stratum_v2::session::{event_kind, CEvent};
@@ -233,8 +233,8 @@ pub(crate) mod ffi {
     pub unsafe extern "C" fn pool_dispatch_v1(
         hooks: *const V1Hooks,
         session: *mut V1Session,
-        stats: *const Stats,
-        coinbase: *const Coinbase,
+        stats: &Stats,
+        coinbase: &Coinbase,
         pool: c_int,
         tag: *const c_char,
         line: *const c_char,
@@ -247,7 +247,7 @@ pub(crate) mod ffi {
         let ok = (*session).with(|s| s.parse(CStr::from_ptr(line).to_bytes(), &mut m));
         log_parsed(ok, &m);
         let tag = tag_or(tag, c"stratum");
-        handle_v1(&*hooks, &*stats, &*coinbase, pool, tag, &m, ok, now_us);
+        handle_v1(&*hooks, stats, coinbase, pool, tag, &m, ok, now_us);
         crate::stratum_v1::ffi::stratum_v1_message_free(&mut m);
     }
 
@@ -259,7 +259,7 @@ pub(crate) mod ffi {
     pub unsafe extern "C" fn pool_drain_v2(
         hooks: *const V2Hooks,
         session: *mut V2Session,
-        stats: *const Stats,
+        stats: &Stats,
         pool: c_int,
         tag: *const c_char,
         last_submit_us: u64,
@@ -267,7 +267,7 @@ pub(crate) mod ffi {
     ) {
         let tag = tag_or(tag, c"stratum_v2");
         while let Some(ev) = take_event(&*session) {
-            handle_v2(&*hooks, &*stats, pool, tag, &ev, last_submit_us, now_us);
+            handle_v2(&*hooks, stats, pool, tag, &ev, last_submit_us, now_us);
         }
     }
 }
@@ -277,8 +277,7 @@ mod tests {
     use super::ffi::*;
     use super::*;
     use crate::jobs::test_support::{fresh, take};
-    use crate::pool_coinbase::ffi::pool_coinbase_new;
-    use crate::pool_stats::ffi::{pool_stats_new, pool_stats_pool, PoolSummary};
+    use crate::pool_stats::PoolSummary;
     use crate::stratum_v1::session::ffi::{
         stratum_v1_session_free, stratum_v1_session_new, Handle as V1Session,
     };
@@ -343,18 +342,14 @@ mod tests {
         }
     }
 
-    fn pool_summary(stats: *const Stats, pool: c_int) -> PoolSummary {
-        let mut s = core::mem::MaybeUninit::<PoolSummary>::uninit();
-        unsafe {
-            pool_stats_pool(stats, pool, s.as_mut_ptr());
-            s.assume_init()
-        }
+    fn pool_summary(stats: &Stats, pool: c_int) -> PoolSummary {
+        stats.pool(pool)
     }
 
     struct V1 {
         session: *mut V1Session,
-        stats: *mut Stats,
-        coinbase: *mut Coinbase,
+        stats: Stats,
+        coinbase: Coinbase,
         rec: Rec,
         _jobs: std::sync::MutexGuard<'static, ()>,
     }
@@ -363,8 +358,8 @@ mod tests {
         fn new() -> Self {
             Self {
                 session: stratum_v1_session_new(),
-                stats: pool_stats_new(true, 0, 0),
-                coinbase: pool_coinbase_new(),
+                stats: Stats::new(true, 0, 0),
+                coinbase: Coinbase::default(),
                 rec: Rec::default(),
                 _jobs: fresh(),
             }
@@ -377,8 +372,8 @@ mod tests {
                 pool_dispatch_v1(
                     &hooks,
                     self.session,
-                    self.stats,
-                    self.coinbase,
+                    &self.stats,
+                    &self.coinbase,
                     pool,
                     core::ptr::null(),
                     line.as_ptr(),
@@ -390,10 +385,7 @@ mod tests {
 
     impl Drop for V1 {
         fn drop(&mut self) {
-            unsafe {
-                // the stats and the coinbase leak: the firmware never frees them
-                stratum_v1_session_free(self.session);
-            }
+            unsafe { stratum_v1_session_free(self.session) };
         }
     }
 
@@ -428,7 +420,7 @@ mod tests {
             ]
         );
         assert!(jobs::JOB_TABLES[0].clone_job(3).is_null());
-        assert!(pool_summary(t.stats, 1).network_difficulty > 1.0);
+        assert!(pool_summary(&t.stats, 1).network_difficulty > 1.0);
         // the work was replaced by v1, which needs the extranonce again
         assert!(job(1).is_none());
         t.line(1, SUBSCRIBE, 0);
@@ -467,7 +459,7 @@ mod tests {
             0,
         );
         assert!(t.rec.calls.is_empty());
-        assert_eq!(pool_summary(t.stats, 0).pool_difficulty, 4096);
+        assert_eq!(pool_summary(&t.stats, 0).pool_difficulty, 4096);
         // active with the next notify
         t.line(0, &NOTIFY.replace('\n', ""), 0);
         let (pool_diff, .., mask) = job(0).unwrap();
@@ -486,7 +478,7 @@ mod tests {
             r#"{"id":null,"method":"mining.set_extranonce","params":["0a0b0c0d",8]}"#,
             0,
         );
-        let stored = unsafe { (*t.coinbase).with(|c| c.extranonce(0)) };
+        let stored = t.coinbase.with(|c| c.extranonce(0));
         assert_eq!(stored, (Some(b"0a0b0c0d".to_vec()), 8));
         // the job source switches with the next notify
         assert_eq!(job(0).unwrap().3, "00000001");
@@ -511,14 +503,14 @@ mod tests {
         let mut t = V1::new();
         t.line(1, r#"{"id":10,"result":true,"error":null}"#, 5);
         t.line(1, r#"{"id":11,"result":false,"error":[23,"low",null]}"#, 7);
-        let s = pool_summary(t.stats, 1);
+        let s = pool_summary(&t.stats, 1);
         assert_eq!((s.accepted, s.rejected), (1, 1));
         assert!(t.rec.calls.is_empty());
     }
 
     struct V2 {
         session: *mut V2Session,
-        stats: *mut Stats,
+        stats: Stats,
         rec: Rec,
         _jobs: std::sync::MutexGuard<'static, ()>,
     }
@@ -527,7 +519,7 @@ mod tests {
         fn new() -> Self {
             Self {
                 session: sv2_session_new(true),
-                stats: pool_stats_new(false, 0, 0),
+                stats: Stats::new(false, 0, 0),
                 rec: Rec::default(),
                 _jobs: fresh(),
             }
@@ -536,7 +528,17 @@ mod tests {
         fn drain(&mut self, events: Vec<Event>) {
             unsafe { (*self.session).with(|s| s.events.extend(events)) };
             let hooks = v2_hooks(&mut self.rec);
-            unsafe { pool_drain_v2(&hooks, self.session, self.stats, 0, core::ptr::null(), 0, 1) };
+            unsafe {
+                pool_drain_v2(
+                    &hooks,
+                    self.session,
+                    &self.stats,
+                    0,
+                    core::ptr::null(),
+                    0,
+                    1,
+                )
+            };
         }
     }
 
@@ -564,7 +566,7 @@ mod tests {
             Event::SetupFailed,
         ]);
         assert_eq!(t.rec.calls, ["valid_notify 0", "setup_failed 0"]);
-        let s = pool_summary(t.stats, 0);
+        let s = pool_summary(&t.stats, 0);
         assert_eq!((s.accepted, s.rejected, s.pool_difficulty), (3, 1, 1024));
         // SetTarget changed the standard channel's difficulty in place
         let (pool_diff, _, job_id, _, _, mask) = job(0).unwrap();
@@ -579,6 +581,6 @@ mod tests {
             Event::SharesAccepted(u32::MAX),
             Event::SharesAccepted(u32::MAX),
         ]);
-        assert_eq!(pool_summary(t.stats, 0).accepted, 2 * u32::MAX as u64);
+        assert_eq!(pool_summary(&t.stats, 0).accepted, 2 * u32::MAX as u64);
     }
 }

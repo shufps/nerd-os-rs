@@ -36,13 +36,13 @@ use crate::config;
 use crate::http_json::{ManagerInfo, ManagerPool};
 use crate::log::log;
 use crate::pool::block;
-use crate::pool::ffi as policy;
+use crate::pool::{self as policy, Event as PolicyEvent};
 use crate::pool::{Actions, PoolState};
-use crate::pool_coinbase::ffi as cb;
+use crate::pool_coinbase as cb;
 use crate::pool_coinbase::{Outcome, VerifyConfig};
 use crate::pool_dispatch::ffi::{pool_dispatch_v1, pool_drain_v2};
 use crate::pool_dispatch::{V1Hooks, V2Hooks};
-use crate::pool_stats::ffi as stats;
+use crate::pool_stats as stats;
 use crate::sdkconfig as k;
 use crate::stratum_config::PoolConfig;
 use crate::stratum_transport::{Kind, Transport};
@@ -575,8 +575,7 @@ impl crate::stratum_task::Hooks for Ctx {
         // transport's lock covers a submit already inside send()
         self.t.connected.store(false, Release);
         self.t.transport(&self.proto).close();
-        self.m
-            .on_event(self.t.pool, policy::pool_policy_disconnected);
+        self.m.on_event(self.t.pool, PolicyEvent::Disconnected);
     }
     fn delay_ms(&mut self, ms: u32) {
         delay_ms(ms)
@@ -676,7 +675,7 @@ impl v1::Hooks for V1Loop<'_> {
         config::get_u16(b"stratum_keep", k::STRATUM_KEEPALIVE_ENABLE_VALUE as u16) != 0
     }
     fn connected(&mut self) {
-        self.m.on_event(self.t.pool, policy::pool_policy_connected);
+        self.m.on_event(self.t.pool, PolicyEvent::Connected);
         self.t.connected.store(true, Release);
     }
     fn dispatch(&mut self, line: &[u8]) {
@@ -714,7 +713,7 @@ unsafe extern "C" fn sv2_exit_requested(p: *mut c_void) -> bool {
 
 unsafe extern "C" fn sv2_connected(p: *mut c_void) {
     let c = ctx(p);
-    c.m.on_event(c.t.pool, policy::pool_policy_connected);
+    c.m.on_event(c.t.pool, PolicyEvent::Connected);
     c.t.connected.store(true, Release);
 }
 
@@ -738,7 +737,7 @@ unsafe extern "C" fn sv2_drain_events(p: *mut c_void) {
     pool_drain_v2(
         &hooks,
         &**session as *const V2Session as *mut V2Session,
-        c.m.stats,
+        &c.m.stats,
         c.t.pool as c_int,
         c.t.tag.as_ptr(),
         *lock(last_submit_us),
@@ -812,9 +811,13 @@ unsafe extern "C" fn sv2_extended_job(
 pub struct Manager {
     /// dual pool mode (changed by `load_settings()`)
     dual: AtomicBool,
-    policy: &'static policy::Handle,
-    stats: &'static stats::Handle,
-    coinbase: &'static cb::Handle,
+    policy: policy::Handle,
+    /// boxed like the coinbase state: the manager is built on the small
+    /// main task stack
+    stats: Box<stats::Handle>,
+    /// boxed: two decoded coinbases (with their scriptSig) would not fit on
+    /// the main task stack the manager is built on
+    coinbase: Box<cb::Handle>,
     /// the manager lock (`m_mutex`) with the pool configs
     configs: Mutex<[PoolConfig; 2]>,
     tasks: [OnceLock<&'static Task>; 2],
@@ -823,6 +826,10 @@ pub struct Manager {
 }
 
 static MANAGER: OnceLock<Manager> = OnceLock::new();
+
+// The manager is built on the main task stack (3.5 KB, CONFIG_ESP_MAIN_TASK_
+// STACK_SIZE) before it moves to the heap: its large state stays boxed.
+const _: () = assert!(core::mem::size_of::<Manager>() <= 512);
 
 /// The manager once created.
 pub fn get() -> Option<&'static Manager> {
@@ -871,17 +878,14 @@ unsafe extern "C" fn v1_process_coinbase(p: *mut c_void, pool: c_int, notify: *c
         return;
     }
     let vc = verify_config(pool);
-    let mut o = Outcome::default();
-    cb::pool_coinbase_process_v1(
-        d.m.coinbase,
+    let o = d.m.coinbase.process_v1(
         pool,
-        n.coinbase_1,
-        n.coinbase_2,
+        CStr::from_ptr(n.coinbase_1).to_bytes(),
+        CStr::from_ptr(n.coinbase_2).to_bytes(),
         n.version,
         n.target,
-        c.user.as_ptr(),
-        &vc,
-        &mut o,
+        Some(c.user.to_bytes()),
+        vc,
     );
     d.m.apply_verify_outcome(d.cfg, pool, &o);
 }
@@ -925,22 +929,18 @@ fn block_reason(b: u8) -> Option<&'static CStr> {
     }
 }
 
-type PolicyEvent = unsafe extern "C" fn(*const policy::Handle, i32, *const PoolState) -> Actions;
-
 impl Manager {
     fn new(dual: bool) -> Self {
         // SAFETY: new handles, kept for the lifetime of the firmware
         Manager {
             dual: AtomicBool::new(dual),
-            policy: unsafe { &*policy::pool_policy_new(dual) },
-            stats: unsafe {
-                &*stats::pool_stats_new(
-                    dual,
-                    config::get_u64(b"bestdiff", 0),
-                    config::get_u64(b"totalblocks", 0) as u32,
-                )
-            },
-            coinbase: unsafe { &*cb::pool_coinbase_new() },
+            policy: policy::Handle::new(dual),
+            stats: Box::new(stats::Handle::new(
+                dual,
+                config::get_u64(b"bestdiff", 0),
+                config::get_u64(b"totalblocks", 0) as u32,
+            )),
+            coinbase: Box::default(),
             configs: Mutex::new([PoolConfig::load(0), PoolConfig::load(1)]),
             tasks: [OnceLock::new(), OnceLock::new()],
             pings: [AtomicBool::new(false), AtomicBool::new(false)],
@@ -965,7 +965,7 @@ impl Manager {
     }
 
     pub fn is_verify_blocked(&self, pool: usize) -> bool {
-        unsafe { cb::pool_coinbase_blocked(self.coinbase, (pool & 1) as i32) != block::NONE }
+        self.coinbase.blocked((pool & 1) as i32) != block::NONE
     }
 
     fn state(&self) -> PoolState {
@@ -1001,7 +1001,7 @@ impl Manager {
         each(&|t| t.stop.store(false, Release), a.connect);
         for i in 0..2 {
             if a.reset_verify_counts[i] {
-                unsafe { cb::pool_coinbase_reset_counts(self.coinbase, i as i32) };
+                self.coinbase.reset_counts(i as i32);
             }
         }
     }
@@ -1010,14 +1010,14 @@ impl Manager {
     fn on_event(&self, pool: usize, event: PolicyEvent) {
         let _g = self.lock();
         let s = self.state();
-        let a = unsafe { event(self.policy, pool as i32, &s) };
+        let a = self.policy.event(event, pool as i32, &s);
         self.apply(&a);
     }
 
     /// Hands a Stratum v1 line to `pool_dispatch.rs`.
     fn dispatch(&self, pool: usize, line: &[u8], session: &V1Session) {
         let cfg = self.lock();
-        if !unsafe { policy::pool_policy_accepts_notify_from(self.policy, pool as i32) } {
+        if !self.policy.accepts_notify_from(pool as i32) {
             return;
         }
         let Some(t) = self.task(pool) else {
@@ -1036,8 +1036,8 @@ impl Manager {
             pool_dispatch_v1(
                 &hooks,
                 session as *const V1Session as *mut V1Session,
-                self.stats,
-                self.coinbase,
+                &self.stats,
+                &self.coinbase,
                 pool as c_int,
                 t.tag.as_ptr(),
                 line.as_ptr() as *const c_char,
@@ -1059,22 +1059,16 @@ impl Manager {
         // needs it
         let cfg = self.lock();
         let vc = verify_config(pool as c_int);
-        let mut o = Outcome::default();
-        unsafe {
-            cb::pool_coinbase_process_v2(
-                self.coinbase,
-                pool as c_int,
-                c1.as_ptr(),
-                c2.as_ptr(),
-                version,
-                nbits,
-                c"".as_ptr(),
-                extranonce2_len,
-                cfg[pool].user.as_ptr(),
-                &vc,
-                &mut o,
-            )
-        };
+        let o = self.coinbase.process_v2(
+            pool as c_int,
+            c1.to_bytes(),
+            c2.to_bytes(),
+            version,
+            nbits,
+            (b"", extranonce2_len),
+            Some(cfg[pool].user.to_bytes()),
+            vc,
+        );
         self.apply_verify_outcome(&cfg, pool as c_int, &o);
     }
 
@@ -1111,11 +1105,9 @@ impl Manager {
         // (the ASICs keep running on stale jobs, nothing is submitted to a
         // blocked pool); a pool without host does not count as usable
         if o.check_fault {
-            let usable = policy::pool_any_usable(
-                !cfg[0].host.is_empty(),
-                !cfg[1].host.is_empty(),
-                self.is_verify_blocked(0),
-                self.is_verify_blocked(1),
+            let usable = policy::any_usable(
+                [!cfg[0].host.is_empty(), !cfg[1].host.is_empty()],
+                [self.is_verify_blocked(0), self.is_verify_blocked(1)],
             );
             if !usable {
                 log!(
@@ -1130,20 +1122,20 @@ impl Manager {
         }
     }
 
-    fn coinbase_info(&self, pool: c_int) -> cb::Info {
-        let mut info = core::mem::MaybeUninit::uninit();
-        unsafe {
-            cb::pool_coinbase_info(self.coinbase, pool & 1, info.as_mut_ptr());
-            info.assume_init()
-        }
+    pub(crate) fn coinbase_info(&self, pool: c_int) -> cb::Info {
+        self.coinbase.info(pool & 1)
+    }
+
+    /// The coinbase verification state.
+    pub(crate) fn coinbase(&self) -> &cb::Handle {
+        &self.coinbase
     }
 
     pub fn rerun_verification(&self, pool: c_int) {
         let cfg = self.lock();
         let pool = pool & 1;
         let vc = verify_config(pool);
-        let mut o = Outcome::default();
-        unsafe { cb::pool_coinbase_verify(self.coinbase, pool, &vc, &mut o) };
+        let o = self.coinbase.verify(pool, vc);
         self.apply_verify_outcome(&cfg, pool, &o);
     }
 
@@ -1184,11 +1176,11 @@ impl Manager {
             self.task(i)
                 .is_some_and(|t| t.valid_notify.load(Acquire) && !self.is_verify_blocked(i))
         };
-        unsafe { policy::pool_policy_next_pool(self.policy, valid(0), valid(1)) }
+        self.policy.next_pool([valid(0), valid(1)])
     }
 
     fn selected(&self) -> c_int {
-        unsafe { policy::pool_policy_next_pool(self.policy, false, false) }
+        self.policy.next_pool([false, false])
     }
 
     pub fn select_asic_diff(&self, pool: c_int, pool_diff: u32) -> u32 {
@@ -1198,22 +1190,18 @@ impl Manager {
                 sys::bapi_asic_max_difficulty(),
             )
         };
-        unsafe { policy::pool_policy_select_asic_diff(self.policy, pool, pool_diff, min, max) }
+        self.policy.select_asic_diff(pool, pool_diff, min, max)
     }
 
     pub fn active_balance(&self, pool: c_int) -> c_int {
         let _g = self.lock();
         let s = self.state();
-        unsafe { policy::pool_policy_active_balance(self.policy, pool, &s) }
+        self.policy.active_balance(pool, &s)
     }
 
     /// The statistics (one consistent snapshot).
     pub fn summary(&self) -> stats::Summary {
-        let mut sum = core::mem::MaybeUninit::uninit();
-        unsafe {
-            stats::pool_stats_summary(self.stats, sum.as_mut_ptr());
-            sum.assume_init()
-        }
+        self.stats.summary()
     }
 
     pub fn best_session(&self) -> u64 {
@@ -1222,11 +1210,7 @@ impl Manager {
 
     /// Blocks found since the start (or the last session reset).
     pub fn found_blocks(&self) -> u32 {
-        let mut sum = core::mem::MaybeUninit::uninit();
-        unsafe {
-            stats::pool_stats_summary(self.stats, sum.as_mut_ptr());
-            sum.assume_init().found_blocks
-        }
+        self.stats.summary().found_blocks
     }
 
     pub fn pool_errors(&self) -> c_int {
@@ -1257,18 +1241,13 @@ impl Manager {
         if self.is_dual() {
             // a changed balance resets the dithering and reconnects
             let balance = config::get_u16(b"pool_balance", 50);
-            unsafe {
-                reconnect = policy::pool_policy_set_balance(self.policy, balance);
-                stats::pool_stats_set_balance(self.stats, balance);
-            }
+            reconnect = self.policy.set_balance(balance);
+            self.stats.set_balance(balance);
         }
-        unsafe {
-            stats::pool_stats_set_totals(
-                self.stats,
-                config::get_u64(b"bestdiff", 0),
-                config::get_u64(b"totalblocks", 0) as u32,
-            )
-        };
+        self.stats.set_totals(
+            config::get_u64(b"bestdiff", 0),
+            config::get_u64(b"totalblocks", 0) as u32,
+        );
         for (i, c) in cfg.iter_mut().enumerate() {
             if !(c.reload() || reconnect) {
                 continue;
@@ -1277,14 +1256,12 @@ impl Manager {
                 t.trigger_reconnect();
             }
             // session stats, verification, ping
-            unsafe { stats::pool_stats_reset_pool(self.stats, i as i32) };
+            self.stats.reset_pool(i as i32);
             if let Some(t) = self.task(i) {
                 t.pool_errors.store(0, Relaxed);
             }
-            unsafe {
-                cb::pool_coinbase_reset_counts(self.coinbase, i as i32);
-                cb::pool_coinbase_clear_blocked(self.coinbase, i as i32);
-            }
+            self.coinbase.reset_counts(i as i32);
+            self.coinbase.clear_blocked(i as i32);
             if self.pings[i].load(Acquire) {
                 crate::ping::reset(i as c_int);
             }
@@ -1296,7 +1273,7 @@ impl Manager {
     /// the new mode wants.
     fn set_mode(&self, dual: bool) {
         let balance = config::get_u16(b"pool_balance", 50);
-        if !unsafe { policy::pool_policy_set_mode(self.policy, dual, balance) } {
+        if !self.policy.set_mode(dual, balance) {
             return;
         }
         log!(
@@ -1305,10 +1282,8 @@ impl Manager {
             "pool mode changed to {}",
             if dual { "Dual Pool" } else { "Failover" }
         );
-        unsafe {
-            stats::pool_stats_set_mode(self.stats, dual);
-            stats::pool_stats_set_balance(self.stats, balance);
-        }
+        self.stats.set_mode(dual);
+        self.stats.set_balance(balance);
         self.dual.store(dual, Release);
         if !self.initialized.load(Acquire) {
             // the manager task connects the pools of the mode it starts in
@@ -1330,7 +1305,7 @@ impl Manager {
             // (the primary first) and drops the other
             for i in 0..2 {
                 if s.connected[i] {
-                    let a = unsafe { policy::pool_policy_connected(self.policy, i as i32, &s) };
+                    let a = self.policy.event(PolicyEvent::Connected, i as i32, &s);
                     self.apply(&a);
                     if s.connected[0] {
                         break;
@@ -1364,22 +1339,18 @@ impl Manager {
                 t.pool_errors.store(0, Relaxed);
             }
         }
-        unsafe { stats::pool_stats_reset_session(self.stats) };
+        self.stats.reset_session();
     }
 
     pub fn reset_all_time_stats(&self) {
         let _g = self.lock();
-        unsafe { stats::pool_stats_reset_all_time(self.stats) };
+        self.stats.reset_all_time();
         set_u64(b"bestdiff", 0);
         set_u64(b"totalblocks", 0);
     }
 
     pub fn check_best_diff(&self, pool: c_int, diff: f64, nbits: u32) {
-        let mut ev = core::mem::MaybeUninit::uninit();
-        let ev = unsafe {
-            stats::pool_stats_best_diff(self.stats, pool, diff, nbits, ev.as_mut_ptr());
-            ev.assume_init()
-        };
+        let ev = self.stats.best_diff(pool, diff, nbits);
         if !ev.new_total_best {
             return;
         }
@@ -1388,11 +1359,7 @@ impl Manager {
     }
 
     pub fn check_found_block(&self, diff: f64, nbits: u32) {
-        let mut ev = core::mem::MaybeUninit::uninit();
-        let ev = unsafe {
-            stats::pool_stats_found_block(self.stats, diff, nbits, ev.as_mut_ptr());
-            ev.assume_init()
-        };
+        let ev = self.stats.found_block(diff, nbits);
         if !ev.found_block {
             return;
         }
@@ -1432,23 +1399,15 @@ impl Manager {
 
     /// The ping values of the pool the v1 API shows.
     pub fn compat_ping(&self, f: extern "C" fn(c_int) -> f64) -> f64 {
-        let i = unsafe { policy::pool_policy_compat_ping_pool(self.policy) };
+        let i = self.policy.compat_ping_pool();
         self.ping_value((i & 1) as usize, f)
     }
 
     pub fn info(&self) -> ManagerInfo {
         let cfg = self.lock();
-        let mut sum = core::mem::MaybeUninit::uninit();
-        let sum: stats::Summary = unsafe {
-            stats::pool_stats_summary(self.stats, sum.as_mut_ptr());
-            sum.assume_init()
-        };
+        let sum = self.stats.summary();
         let pool = |i: usize| {
-            let mut st = core::mem::MaybeUninit::uninit();
-            let st: stats::PoolSummary = unsafe {
-                stats::pool_stats_pool(self.stats, i as i32, st.as_mut_ptr());
-                st.assume_init()
-            };
+            let st = self.stats.pool(i as i32);
             ManagerPool {
                 connected: self.is_connected(i),
                 accepted: st.accepted,
@@ -1456,7 +1415,7 @@ impl Manager {
                 best_session: st.best_session,
                 network_difficulty: st.network_difficulty,
                 pool_difficulty: st.pool_difficulty,
-                pool_diff_err: unsafe { policy::pool_policy_pool_diff_err(self.policy, i as i32) },
+                pool_diff_err: self.policy.pool_diff_err(i as i32),
                 ping_rtt: self.ping_value(i, crate::ping::ffi::ping_last_rtt),
                 ping_loss: self.ping_value(i, crate::ping::ffi::ping_recent_loss),
                 verify_blocked: block_reason(self.coinbase_info(i as c_int).blocked)
@@ -1555,17 +1514,13 @@ impl Manager {
             let now = now_us();
             for i in 0..2 {
                 if self.task(i).is_some_and(|t| t.timer_fired(now)) {
-                    self.on_event(i, policy::pool_policy_reconnect_timer);
+                    self.on_event(i, PolicyEvent::ReconnectTimer);
                 }
             }
             seconds += 1;
             if seconds % 30 == 0 {
                 // fed only while the pool answers submits (within an hour)
-                let mut sum = core::mem::MaybeUninit::uninit();
-                let last = unsafe {
-                    stats::pool_stats_summary(self.stats, sum.as_mut_ptr());
-                    sum.assume_init().last_response_us
-                };
+                let last = self.stats.summary().last_response_us;
                 if last != 0 && now_us().saturating_sub(last) < WATCHDOG_RESPONSE_US {
                     unsafe { sys::esp_task_wdt_reset() };
                 }
@@ -1800,9 +1755,7 @@ pub(crate) mod ffi {
 
     #[no_mangle]
     pub extern "C" fn pool_mgr_display_pool(pool: c_int) -> c_int {
-        m().map_or(0, |m| unsafe {
-            policy::pool_policy_display_pool(m.policy, pool)
-        })
+        m().map_or(0, |m| m.policy.display_pool(pool))
     }
 
     #[no_mangle]
@@ -1815,24 +1768,22 @@ pub(crate) mod ffi {
         m().map_or(0, Manager::pool_errors)
     }
 
+    /// The aggregated statistics (zeros before the manager exists).
+    ///
+    /// # Safety
+    /// `out` writable.
     #[no_mangle]
-    pub extern "C" fn pool_mgr_rerun_verification(pool: c_int) {
-        if let Some(m) = m() {
-            m.rerun_verification(pool);
-        }
+    pub unsafe extern "C" fn pool_mgr_summary(out: *mut stats::Summary) {
+        *out = m().map_or_else(Default::default, |m| m.stats.summary());
     }
 
-    /// The statistics (`pool_stats.h`); NULL before the manager exists.
+    /// The counters of one pool (zeros before the manager exists).
+    ///
+    /// # Safety
+    /// `out` writable.
     #[no_mangle]
-    pub extern "C" fn pool_mgr_stats() -> *const stats::Handle {
-        m().map_or(core::ptr::null(), |m| m.stats as *const _)
-    }
-
-    /// The coinbase verification state (`pool_coinbase.h`); NULL before the
-    /// manager exists.
-    #[no_mangle]
-    pub extern "C" fn pool_mgr_coinbase() -> *const cb::Handle {
-        m().map_or(core::ptr::null(), |m| m.coinbase as *const _)
+    pub unsafe extern "C" fn pool_mgr_pool_stats(pool: c_int, out: *mut stats::PoolSummary) {
+        *out = m().map_or_else(Default::default, |m| m.stats.pool(pool));
     }
 
     /// Round trip time (ms) of the pool the v1 API shows; 0 without ping.
@@ -1971,14 +1922,14 @@ mod tests {
         let (p, s) = (m.task(0).unwrap(), m.task(1).unwrap());
         p.stop.store(false, Release);
         // the primary drops: the secondary's timer runs, then connects it
-        m.on_event(0, policy::pool_policy_disconnected);
+        m.on_event(0, PolicyEvent::Disconnected);
         assert_ne!(*lock(&s.timer_due_us), 0);
         assert!(s.stop.load(Acquire));
-        m.on_event(1, policy::pool_policy_reconnect_timer);
+        m.on_event(1, PolicyEvent::ReconnectTimer);
         assert!(!s.stop.load(Acquire));
         // the primary is back: the secondary is dropped, its timer stopped
         p.connected.store(true, Release);
-        m.on_event(0, policy::pool_policy_connected);
+        m.on_event(0, PolicyEvent::Connected);
         assert!(s.stop.load(Acquire));
         assert_eq!(*lock(&s.timer_due_us), 0);
     }

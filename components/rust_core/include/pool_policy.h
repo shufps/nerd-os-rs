@@ -64,37 +64,6 @@ _Static_assert(sizeof(pool_state_t) == 6 && sizeof(pool_actions_t) == 12 && size
                "pool_policy.h layout must match rust_core");
 #endif
 
-/* The policy of a manager: failover or dual pool. Thread-safe. */
-typedef struct pool_policy pool_policy_t;
-
-pool_policy_t *pool_policy_new(bool dual);
-void pool_policy_free(pool_policy_t *p);
-
-pool_actions_t pool_policy_reconnect_timer(pool_policy_t *p, int pool, const pool_state_t *s);
-pool_actions_t pool_policy_connected(pool_policy_t *p, int pool, const pool_state_t *s);
-pool_actions_t pool_policy_disconnected(pool_policy_t *p, int pool, const pool_state_t *s);
-
-/* Failover: the selected pool. Dual pool: the pool for the next job; validN:
- * the pool has valid work and is not verify-blocked. */
-int pool_policy_next_pool(pool_policy_t *p, bool valid0, bool valid1);
-bool pool_policy_accepts_notify_from(pool_policy_t *p, int pool);
-uint32_t pool_policy_select_asic_diff(pool_policy_t *p, int pool, uint32_t pool_diff, uint32_t asic_min,
-                                      uint32_t asic_max);
-
-/* Dual pool only (failover: false / 0). */
-bool pool_policy_set_balance(pool_policy_t *p, uint16_t balance); // true if changed
-bool pool_policy_pool_diff_err(pool_policy_t *p, int pool);
-int pool_policy_active_balance(pool_policy_t *p, int pool, const pool_state_t *s);
-
-/* The pool a per-pool view shows for pool (failover: the selected one). */
-int pool_policy_display_pool(pool_policy_t *p, int pool);
-/* The pool whose ping the legacy single-pool getters report (failover: the
- * selected one; dual pool: the one with the larger balance share). */
-int pool_policy_compat_ping_pool(pool_policy_t *p);
-
-pool_verify_result_t pool_verify(const pool_verify_input_t *input);
-bool pool_any_usable(bool configured0, bool configured1, bool blocked0, bool blocked1);
-
 #ifdef __cplusplus
 }
 #endif

@@ -320,117 +320,73 @@ pub fn any_usable(configured: [bool; 2], blocked: [bool; 2]) -> bool {
     (0..2).any(|i| configured[i] && !blocked[i])
 }
 
-pub(crate) mod ffi {
-    use super::*;
-    use std::sync::Mutex;
+enum Policy {
+    Failover(Failover),
+    Dual(DualPool),
+}
 
-    pub enum Policy {
-        Failover(Failover),
-        Dual(DualPool),
-    }
+/// A connection event the policy decides on.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Event {
+    ReconnectTimer,
+    Connected,
+    Disconnected,
+}
 
-    /// `pool_policy_t`. Locked internally: the job task asks for the ASIC
-    /// difficulty without the manager's mutex (taking it there could
-    /// deadlock against the job mutex), the callbacks run with it. Nothing
-    /// else is locked while this lock is held.
-    pub struct Handle(Mutex<Policy>);
+/// The pool policy of the manager. Locked internally: the job task asks
+/// for the ASIC difficulty without the manager's mutex (taking it there
+/// could deadlock against the job mutex), the callbacks run with it.
+/// Nothing else is locked while this lock is held.
+pub struct Handle(std::sync::Mutex<Policy>);
 
-    impl Handle {
-        fn with<T>(&self, f: impl FnOnce(&mut Policy) -> T) -> T {
-            f(&mut self.0.lock().unwrap_or_else(|e| e.into_inner()))
-        }
-    }
+fn idx(pool: i32) -> usize {
+    (pool & 1) as usize
+}
 
-    pub extern "C" fn pool_policy_new(dual: bool) -> *mut Handle {
-        let policy = if dual {
+impl Handle {
+    pub fn new(dual: bool) -> Self {
+        Handle(std::sync::Mutex::new(if dual {
             Policy::Dual(DualPool::default())
         } else {
             Policy::Failover(Failover::default())
-        };
-        Box::into_raw(Box::new(Handle(Mutex::new(policy))))
+        }))
     }
 
-    fn idx(pool: i32) -> usize {
-        (pool & 1) as usize
+    fn with<T>(&self, f: impl FnOnce(&mut Policy) -> T) -> T {
+        f(&mut self.0.lock().unwrap_or_else(|e| e.into_inner()))
     }
 
-    /// # Safety
-    /// `p` valid, `s` readable.
-    pub unsafe extern "C" fn pool_policy_reconnect_timer(
-        p: *const Handle,
-        pool: i32,
-        s: *const PoolState,
-    ) -> Actions {
-        let s = &*s;
-        (*p).with(|policy| match policy {
-            Policy::Failover(f) => f.reconnect_timer(idx(pool), s),
-            Policy::Dual(d) => d.reconnect_timer(idx(pool), s),
-        })
-    }
-
-    /// # Safety
-    /// `p` valid, `s` readable.
-    pub unsafe extern "C" fn pool_policy_connected(
-        p: *const Handle,
-        pool: i32,
-        s: *const PoolState,
-    ) -> Actions {
-        let s = &*s;
-        (*p).with(|policy| match policy {
-            Policy::Failover(f) => f.connected(idx(pool), s),
-            Policy::Dual(d) => d.connected(idx(pool), s),
-        })
-    }
-
-    /// # Safety
-    /// `p` valid, `s` readable.
-    pub unsafe extern "C" fn pool_policy_disconnected(
-        p: *const Handle,
-        pool: i32,
-        s: *const PoolState,
-    ) -> Actions {
-        let s = &*s;
-        (*p).with(|policy| match policy {
-            Policy::Failover(f) => f.disconnected(idx(pool), s),
-            Policy::Dual(d) => d.disconnected(idx(pool)),
+    /// The actions for a connection event of `pool`.
+    pub fn event(&self, event: Event, pool: i32, s: &PoolState) -> Actions {
+        let i = idx(pool);
+        self.with(|policy| match (policy, event) {
+            (Policy::Failover(f), Event::ReconnectTimer) => f.reconnect_timer(i, s),
+            (Policy::Dual(d), Event::ReconnectTimer) => d.reconnect_timer(i, s),
+            (Policy::Failover(f), Event::Connected) => f.connected(i, s),
+            (Policy::Dual(d), Event::Connected) => d.connected(i, s),
+            (Policy::Failover(f), Event::Disconnected) => f.disconnected(i, s),
+            (Policy::Dual(d), Event::Disconnected) => d.disconnected(i),
         })
     }
 
     /// Failover: the selected pool (`valid` ignored); dual: the pool for the
     /// next job (`valid`: the pool has valid work and is not verify-blocked).
-    ///
-    /// # Safety
-    /// `p` valid.
-    pub unsafe extern "C" fn pool_policy_next_pool(
-        p: *const Handle,
-        valid0: bool,
-        valid1: bool,
-    ) -> i32 {
-        (*p).with(|policy| match policy {
+    pub fn next_pool(&self, valid: [bool; 2]) -> i32 {
+        self.with(|policy| match policy {
             Policy::Failover(f) => f.selected as i32,
-            Policy::Dual(d) => d.next_active_pool([valid0, valid1]) as i32,
+            Policy::Dual(d) => d.next_active_pool(valid) as i32,
         })
     }
 
-    /// # Safety
-    /// `p` valid.
-    pub unsafe extern "C" fn pool_policy_accepts_notify_from(p: *const Handle, pool: i32) -> bool {
-        (*p).with(|policy| match policy {
+    pub fn accepts_notify_from(&self, pool: i32) -> bool {
+        self.with(|policy| match policy {
             Policy::Failover(f) => f.accepts_notify_from(idx(pool)),
             Policy::Dual(_) => true,
         })
     }
 
-    /// # Safety
-    /// `p` valid.
-    pub unsafe extern "C" fn pool_policy_select_asic_diff(
-        p: *const Handle,
-        pool: i32,
-        pool_diff: u32,
-        asic_min: u32,
-        asic_max: u32,
-    ) -> u32 {
-        (*p).with(|policy| match policy {
+    pub fn select_asic_diff(&self, pool: i32, pool_diff: u32, asic_min: u32, asic_max: u32) -> u32 {
+        self.with(|policy| match policy {
             Policy::Failover(_) => clamp_asic_diff(pool_diff, asic_min, asic_max),
             Policy::Dual(_) if !(0..2).contains(&pool) => asic_max,
             Policy::Dual(d) => d.select_asic_diff(pool as usize, pool_diff, asic_min, asic_max),
@@ -439,15 +395,8 @@ pub(crate) mod ffi {
 
     /// Switches between failover and dual pool mode (a new policy state in
     /// the new mode); true if the mode changed.
-    ///
-    /// # Safety
-    /// `p` valid.
-    pub unsafe extern "C" fn pool_policy_set_mode(
-        p: *const Handle,
-        dual: bool,
-        balance: u16,
-    ) -> bool {
-        (*p).with(|policy| {
+    pub fn set_mode(&self, dual: bool, balance: u16) -> bool {
+        self.with(|policy| {
             if matches!(policy, Policy::Dual(_)) == dual {
                 return false;
             }
@@ -463,35 +412,22 @@ pub(crate) mod ffi {
     }
 
     /// Dual pool: true if the balance changed. Failover: false.
-    ///
-    /// # Safety
-    /// `p` valid.
-    pub unsafe extern "C" fn pool_policy_set_balance(p: *const Handle, balance: u16) -> bool {
-        (*p).with(|policy| match policy {
+    pub fn set_balance(&self, balance: u16) -> bool {
+        self.with(|policy| match policy {
             Policy::Failover(_) => false,
             Policy::Dual(d) => d.set_balance(balance),
         })
     }
 
-    /// # Safety
-    /// `p` valid.
-    #[no_mangle]
-    pub unsafe extern "C" fn pool_policy_pool_diff_err(p: *const Handle, pool: i32) -> bool {
-        (*p).with(|policy| match policy {
+    pub fn pool_diff_err(&self, pool: i32) -> bool {
+        self.with(|policy| match policy {
             Policy::Failover(_) => false,
             Policy::Dual(d) => (0..2).contains(&pool) && d.pool_diff_err[pool as usize],
         })
     }
 
-    /// # Safety
-    /// `p` valid, `s` readable.
-    pub unsafe extern "C" fn pool_policy_active_balance(
-        p: *const Handle,
-        pool: i32,
-        s: *const PoolState,
-    ) -> i32 {
-        let s = &*s;
-        (*p).with(|policy| match policy {
+    pub fn active_balance(&self, pool: i32, s: &PoolState) -> i32 {
+        self.with(|policy| match policy {
             Policy::Failover(_) => 0,
             Policy::Dual(d) => d.active_balance(idx(pool), s),
         })
@@ -499,11 +435,8 @@ pub(crate) mod ffi {
 
     /// The pool a per-pool view shows for `pool`: in failover mode always
     /// the selected one.
-    ///
-    /// # Safety
-    /// `p` valid.
-    pub unsafe extern "C" fn pool_policy_display_pool(p: *const Handle, pool: i32) -> i32 {
-        (*p).with(|policy| match policy {
+    pub fn display_pool(&self, pool: i32) -> i32 {
+        self.with(|policy| match policy {
             Policy::Failover(f) => f.selected as i32,
             Policy::Dual(_) => idx(pool) as i32,
         })
@@ -511,23 +444,11 @@ pub(crate) mod ffi {
 
     /// The pool whose ping the legacy single-pool getters report: the
     /// selected pool, or in dual pool mode the one with the larger share.
-    ///
-    /// # Safety
-    /// `p` valid.
-    pub unsafe extern "C" fn pool_policy_compat_ping_pool(p: *const Handle) -> i32 {
-        (*p).with(|policy| match policy {
+    pub fn compat_ping_pool(&self) -> i32 {
+        self.with(|policy| match policy {
             Policy::Failover(f) => f.selected as i32,
             Policy::Dual(d) => i32::from(d.balance < 50),
         })
-    }
-
-    pub extern "C" fn pool_any_usable(
-        configured0: bool,
-        configured1: bool,
-        blocked0: bool,
-        blocked1: bool,
-    ) -> bool {
-        any_usable([configured0, configured1], [blocked0, blocked1])
     }
 }
 
@@ -551,23 +472,20 @@ mod tests {
 
     #[test]
     fn display_and_compat_ping_pool() {
-        use super::ffi::*;
-        unsafe {
-            let f = pool_policy_new(false);
-            // failover: always the selected pool, the primary at first
-            assert_eq!(pool_policy_display_pool(f, 1), 0);
-            assert_eq!(pool_policy_compat_ping_pool(f), 0);
-            let s = state([false, true], [false; 2]);
-            pool_policy_connected(f, 1, &s);
-            assert_eq!(pool_policy_display_pool(f, 0), 1);
-            assert_eq!(pool_policy_compat_ping_pool(f), 1);
+        let f = Handle::new(false);
+        // failover: always the selected pool, the primary at first
+        assert_eq!(f.display_pool(1), 0);
+        assert_eq!(f.compat_ping_pool(), 0);
+        let s = state([false, true], [false; 2]);
+        f.event(Event::Connected, 1, &s);
+        assert_eq!(f.display_pool(0), 1);
+        assert_eq!(f.compat_ping_pool(), 1);
 
-            let d = pool_policy_new(true);
-            assert_eq!(pool_policy_display_pool(d, 1), 1);
-            assert_eq!(pool_policy_compat_ping_pool(d), 0);
-            pool_policy_set_balance(d, 49);
-            assert_eq!(pool_policy_compat_ping_pool(d), 1);
-        }
+        let d = Handle::new(true);
+        assert_eq!(d.display_pool(1), 1);
+        assert_eq!(d.compat_ping_pool(), 0);
+        d.set_balance(49);
+        assert_eq!(d.compat_ping_pool(), 1);
     }
 
     #[test]
@@ -617,19 +535,15 @@ mod tests {
 
     #[test]
     fn mode_switch_starts_a_new_policy() {
-        use ffi::*;
-        let p = pool_policy_new(false);
-        unsafe {
-            assert!(!pool_policy_set_mode(p, false, 50));
-            assert!(!pool_policy_set_balance(p, 70));
-            assert!(pool_policy_set_mode(p, true, 70));
-            // dual, already at the balance it was switched with
-            assert!(!pool_policy_set_balance(p, 70));
-            assert!(pool_policy_accepts_notify_from(p, 1));
-            assert!(pool_policy_set_mode(p, false, 70));
-            assert!(!pool_policy_accepts_notify_from(p, 1));
-            drop(Box::from_raw(p));
-        }
+        let p = Handle::new(false);
+        assert!(!p.set_mode(false, 50));
+        assert!(!p.set_balance(70));
+        assert!(p.set_mode(true, 70));
+        // dual, already at the balance it was switched with
+        assert!(!p.set_balance(70));
+        assert!(p.accepts_notify_from(1));
+        assert!(p.set_mode(false, 70));
+        assert!(!p.accepts_notify_from(1));
     }
 
     #[test]

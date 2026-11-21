@@ -108,15 +108,8 @@ fn small_core_count() -> c_int {
     crate::board::get().map_or(0, |b| b.small_core_count() as c_int)
 }
 
-fn stats() -> crate::pool_stats::ffi::Summary {
-    let mut s = core::mem::MaybeUninit::uninit();
-    unsafe {
-        crate::pool_stats::ffi::pool_stats_summary(
-            crate::pool_manager::ffi::pool_mgr_stats(),
-            s.as_mut_ptr(),
-        );
-        s.assume_init()
-    }
+fn stats() -> crate::pool_stats::Summary {
+    crate::pool_manager::get().map_or_else(Default::default, |m| m.summary())
 }
 
 fn manager_info() -> http_json::ManagerInfo {
@@ -127,16 +120,8 @@ fn manager_info() -> http_json::ManagerInfo {
     }
 }
 
-fn coinbase_info(pool: c_int) -> crate::pool_coinbase::ffi::Info {
-    let mut i = core::mem::MaybeUninit::uninit();
-    unsafe {
-        crate::pool_coinbase::ffi::pool_coinbase_info(
-            crate::pool_manager::ffi::pool_mgr_coinbase(),
-            pool,
-            i.as_mut_ptr(),
-        );
-        i.assume_init()
-    }
+fn coinbase_info(pool: c_int) -> Option<crate::pool_coinbase::Info> {
+    crate::pool_manager::get().map(|m| m.coinbase_info(pool))
 }
 
 fn uptime_seconds() -> i64 {
@@ -494,21 +479,23 @@ unsafe extern "C" fn dashboard(req: *mut Req) -> EspErr {
 
     let cbs = [coinbase_info(0), coinbase_info(1)];
     for (p, info) in cbs.iter().enumerate() {
-        let r = &info.result;
         let c = &mut d.coinbase[p];
+        c.verify_mode = cfg::coinbase_verify_mode(p);
+        c.max_fee = cfg::coinbase_max_fee(p);
+        c.force = cfg::coinbase_verify_force(p);
+        // nothing decoded before the manager exists
+        let Some(info) = info else { continue };
+        let r = &info.result;
         c.block_height = r.block_height;
         c.network_difficulty = r.network_difficulty;
         c.scriptsig = r.scriptsig.as_ptr();
         c.total_value_satoshis = r.total_value_satoshis;
         c.user_value_satoshis = r.user_value_satoshis;
-        c.verify_mode = cfg::coinbase_verify_mode(p);
         if r.block_height > 0 && c.verify_mode > 0 {
             c.verification_ok = info.ok;
             c.fail_count = info.fail_count;
             c.check_count = info.check_count;
         }
-        c.max_fee = cfg::coinbase_max_fee(p);
-        c.force = cfg::coinbase_verify_force(p);
     }
 
     d.history_requested = q.requested;
@@ -612,9 +599,6 @@ pub(crate) fn v2_settings_doc() -> crate::ajson::Json {
 /// The same structure as `GET /api/v2/settings`, all fields optional; the
 /// pools as a `pools[]` array.
 unsafe extern "C" fn v2_settings_patch(req: *mut Req) -> EspErr {
-    use crate::pool_coinbase::ffi::{
-        pool_coinbase_blocked, pool_coinbase_clear_blocked, pool_coinbase_reset_counts,
-    };
     let mut verify_changed = [false; 2];
     if crate::http_handlers::ffi::http_apply_settings(
         req,
@@ -629,16 +613,18 @@ unsafe extern "C" fn v2_settings_patch(req: *mut Req) -> EspErr {
 
     // re-run the verification (unblocked and counted afresh if its settings
     // changed)
-    let cb = crate::pool_manager::ffi::pool_mgr_coinbase();
-    for (i, &changed) in verify_changed.iter().enumerate() {
-        if changed {
-            pool_coinbase_clear_blocked(cb, i as c_int);
-            pool_coinbase_reset_counts(cb, i as c_int);
+    if let Some(m) = crate::pool_manager::get() {
+        let cb = m.coinbase();
+        for (i, &changed) in verify_changed.iter().enumerate() {
+            if changed {
+                cb.clear_blocked(i as c_int);
+                cb.reset_counts(i as c_int);
+            }
+            m.rerun_verification(i as c_int);
         }
-        crate::pool_manager::ffi::pool_mgr_rerun_verification(i as c_int);
-    }
-    if pool_coinbase_blocked(cb, 0) == 0 && pool_coinbase_blocked(cb, 1) == 0 {
-        crate::system::clear_error(COINBASE_VERIFY_FAULT);
+        if cb.blocked(0) == 0 && cb.blocked(1) == 0 {
+            crate::system::clear_error(COINBASE_VERIFY_FAULT);
+        }
     }
 
     crate::config_nvs::request_flush();

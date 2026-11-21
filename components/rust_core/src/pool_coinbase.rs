@@ -201,139 +201,86 @@ impl PoolCoinbase {
     }
 }
 
-pub(crate) mod ffi {
-    use super::*;
-    use core::ffi::{c_char, CStr};
+/// The coinbase verification state shared by the stratum tasks, the
+/// manager and the API (one mutex around [`PoolCoinbase`]).
+pub struct Handle(Mutex<PoolCoinbase>);
 
-    /// `pool_coinbase_t`
-    pub struct Handle(Mutex<PoolCoinbase>);
-
-    impl Handle {
-        pub(crate) fn with<T>(&self, f: impl FnOnce(&mut PoolCoinbase) -> T) -> T {
-            f(&mut self.0.lock().unwrap_or_else(|e| e.into_inner()))
-        }
+impl Default for Handle {
+    fn default() -> Self {
+        Handle(Mutex::new(PoolCoinbase::default()))
     }
+}
 
-    /// `pool_coinbase_info_t`
-    #[repr(C)]
-    pub struct Info {
-        pub result: CoinbaseResult,
-        pub ok: bool,
-        pub blocked: u8,
-        pub check_count: u32,
-        pub fail_count: u32,
+impl Handle {
+    pub(crate) fn with<T>(&self, f: impl FnOnce(&mut PoolCoinbase) -> T) -> T {
+        f(&mut self.0.lock().unwrap_or_else(|e| e.into_inner()))
     }
-
-    unsafe fn bytes<'a>(p: *const c_char) -> Option<&'a [u8]> {
-        (!p.is_null()).then(|| CStr::from_ptr(p).to_bytes())
-    }
-
-    pub extern "C" fn pool_coinbase_new() -> *mut Handle {
-        Box::into_raw(Box::new(Handle(Mutex::new(PoolCoinbase::default()))))
-    }
-
-    // All below: `h` from `pool_coinbase_new()`, strings NUL-terminated or NULL.
 
     /// v1: with the stored extranonce (nothing without one).
-    ///
-    /// # Safety
-    /// See above; `out` writable.
     #[allow(clippy::too_many_arguments)]
-    pub unsafe extern "C" fn pool_coinbase_process_v1(
-        h: *const Handle,
+    pub fn process_v1(
+        &self,
         pool: i32,
-        coinbase_1: *const c_char,
-        coinbase_2: *const c_char,
+        coinbase_1: &[u8],
+        coinbase_2: &[u8],
         version: u32,
         nbits: u32,
-        user: *const c_char,
-        config: *const VerifyConfig,
-        out: *mut Outcome,
-    ) {
-        let (Some(c1), Some(c2)) = (bytes(coinbase_1), bytes(coinbase_2)) else {
-            *out = Outcome::default();
-            return;
-        };
-        *out = (*h).with(|s| s.process(pool, c1, c2, version, nbits, None, bytes(user), *config));
+        user: Option<&[u8]>,
+        config: VerifyConfig,
+    ) -> Outcome {
+        self.with(|s| {
+            s.process(
+                pool, coinbase_1, coinbase_2, version, nbits, None, user, config,
+            )
+        })
     }
 
     /// v2: with the channel's extranonce.
-    ///
-    /// # Safety
-    /// See above; `out` writable.
     #[allow(clippy::too_many_arguments)]
-    pub unsafe extern "C" fn pool_coinbase_process_v2(
-        h: *const Handle,
+    pub fn process_v2(
+        &self,
         pool: i32,
-        coinbase_1: *const c_char,
-        coinbase_2: *const c_char,
+        coinbase_1: &[u8],
+        coinbase_2: &[u8],
         version: u32,
         nbits: u32,
-        extranonce1: *const c_char,
-        extranonce2_len: i32,
-        user: *const c_char,
-        config: *const VerifyConfig,
-        out: *mut Outcome,
-    ) {
-        let (Some(c1), Some(c2), Some(en1)) =
-            (bytes(coinbase_1), bytes(coinbase_2), bytes(extranonce1))
-        else {
-            *out = Outcome::default();
-            return;
-        };
-        *out = (*h).with(|s| {
+        extranonce: (&[u8], i32),
+        user: Option<&[u8]>,
+        config: VerifyConfig,
+    ) -> Outcome {
+        self.with(|s| {
             s.process(
                 pool,
-                c1,
-                c2,
+                coinbase_1,
+                coinbase_2,
                 version,
                 nbits,
-                Some((en1, extranonce2_len)),
-                bytes(user),
-                *config,
+                Some(extranonce),
+                user,
+                config,
             )
-        });
+        })
     }
 
-    /// # Safety
-    /// See above; `out` writable.
-    pub unsafe extern "C" fn pool_coinbase_verify(
-        h: *const Handle,
-        pool: i32,
-        config: *const VerifyConfig,
-        out: *mut Outcome,
-    ) {
-        *out = (*h).with(|s| s.verify(pool, *config));
+    pub fn verify(&self, pool: i32, config: VerifyConfig) -> Outcome {
+        self.with(|s| s.verify(pool, config))
     }
 
-    /// # Safety
-    /// See above.
-    #[no_mangle]
-    pub unsafe extern "C" fn pool_coinbase_reset_counts(h: *const Handle, pool: i32) {
-        (*h).with(|s| s.reset_counts(pool))
+    pub fn reset_counts(&self, pool: i32) {
+        self.with(|s| s.reset_counts(pool))
     }
 
-    /// # Safety
-    /// See above.
-    #[no_mangle]
-    pub unsafe extern "C" fn pool_coinbase_clear_blocked(h: *const Handle, pool: i32) {
-        (*h).with(|s| s.clear_blocked(pool))
+    pub fn clear_blocked(&self, pool: i32) {
+        self.with(|s| s.clear_blocked(pool))
     }
 
-    /// The block reason (`POOL_BLOCK_*`).
-    ///
-    /// # Safety
-    /// See above.
-    #[no_mangle]
-    pub unsafe extern "C" fn pool_coinbase_blocked(h: *const Handle, pool: i32) -> u8 {
-        (*h).with(|s| s.blocked(pool))
+    /// The block reason (`pool::block::*`).
+    pub fn blocked(&self, pool: i32) -> u8 {
+        self.with(|s| s.blocked(pool))
     }
 
-    /// # Safety
-    /// See above; `out` writable.
-    #[no_mangle]
-    pub unsafe extern "C" fn pool_coinbase_info(h: *const Handle, pool: i32, out: *mut Info) {
-        *out = (*h).with(|s| {
+    pub fn info(&self, pool: i32) -> Info {
+        self.with(|s| {
             let p = &s.pools[(pool & 1) as usize];
             Info {
                 result: p.result,
@@ -342,8 +289,18 @@ pub(crate) mod ffi {
                 check_count: p.checks,
                 fail_count: p.fails,
             }
-        });
+        })
     }
+}
+
+/// The verification state of one pool.
+#[derive(Clone, Copy)]
+pub struct Info {
+    pub result: CoinbaseResult,
+    pub ok: bool,
+    pub blocked: u8,
+    pub check_count: u32,
+    pub fail_count: u32,
 }
 
 #[cfg(test)]

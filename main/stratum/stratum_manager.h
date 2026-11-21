@@ -87,13 +87,13 @@ class StratumManager {
     pool_stats_summary_t getStats()
     {
         pool_stats_summary_t s;
-        pool_stats_summary(pool_mgr_stats(), &s);
+        pool_mgr_summary(&s);
         return s;
     }
     pool_stats_pool_t getPoolStats(int pool)
     {
         pool_stats_pool_t s;
-        pool_stats_pool(pool_mgr_stats(), pool, &s);
+        pool_mgr_pool_stats(pool, &s);
         return s;
     }
     uint64_t getSharesAccepted() { return getStats().accepted; }
@@ -109,30 +109,6 @@ class StratumManager {
 
     // the all-time best difficulty as "1.23M" into buf
     void getBestDiffString(char *buf, size_t len) { suffixString(getBestDiff(), buf, len, 0); }
-
-    // coinbase and verification state (pool_coinbase.h); thread-safe
-    pool_coinbase_info_t getCoinbaseInfo(int pool)
-    {
-        pool_coinbase_info_t info;
-        pool_coinbase_info(pool_mgr_coinbase(), pool & 1, &info);
-        return info;
-    }
-
-    coinbase_result_t getCoinbaseResult(int pool) { return getCoinbaseInfo(pool).result; }
-    bool getVerificationOk(int pool) { return getCoinbaseInfo(pool).ok; }
-    uint32_t getVerificationFailCount(int pool) { return getCoinbaseInfo(pool).fail_count; }
-    uint32_t getVerificationCheckCount(int pool) { return getCoinbaseInfo(pool).check_count; }
-
-    void rerunVerification(int pool) { pool_mgr_rerun_verification(pool & 1); }
-
-    void resetVerificationStats(int pool) { pool_coinbase_reset_counts(pool_mgr_coinbase(), pool & 1); }
-
-    bool isVerifyBlocked(int pool) const
-    {
-        return pool_coinbase_blocked(pool_mgr_coinbase(), pool & 1) != POOL_BLOCK_NONE;
-    }
-
-    void clearVerifyBlocked(int pool) { pool_coinbase_clear_blocked(pool_mgr_coinbase(), pool & 1); }
 };
 
 // ping of the pool the v1 API shows (0 without ping)

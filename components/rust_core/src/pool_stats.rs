@@ -242,150 +242,60 @@ impl PoolStats {
     }
 }
 
-pub(crate) mod ffi {
-    use super::*;
+/// The statistics shared between the stratum tasks, the ASIC result task
+/// and the API (one mutex around [`PoolStats`]).
+pub struct Handle(Mutex<PoolStats>);
 
-    /// `pool_stats_t`
-    pub struct Handle(Mutex<PoolStats>);
-
-    impl Handle {
-        pub(crate) fn with<T>(&self, f: impl FnOnce(&mut PoolStats) -> T) -> T {
-            f(&mut self.0.lock().unwrap_or_else(|e| e.into_inner()))
-        }
-    }
-
-    /// `pool_stats_summary_t`
-    #[repr(C)]
-    pub struct Summary {
-        pub accepted: u64,
-        pub rejected: u64,
-        pub best_session: u64,
-        pub total_best: u64,
-        pub network_difficulty: f64,
-        pub pool_difficulty: u32,
-        pub found_blocks: u32,
-        pub total_found_blocks: u32,
-        pub last_response_us: u64,
-    }
-
-    /// `pool_stats_pool_t`
-    #[repr(C)]
-    pub struct PoolSummary {
-        pub accepted: u64,
-        pub rejected: u64,
-        pub best_session: u64,
-        pub network_difficulty: f64,
-        pub pool_difficulty: u32,
-    }
-
-    /// `pool_stats_event_t`
-    #[repr(C)]
-    pub struct CEvent {
-        pub new_total_best: bool,
-        pub found_block: bool,
-        pub total_best: u64,
-        pub total_found_blocks: u32,
-        pub network_difficulty: f64,
-    }
-
-    impl From<Event> for CEvent {
-        fn from(e: Event) -> Self {
-            CEvent {
-                new_total_best: e.new_total_best,
-                found_block: e.found_block,
-                total_best: e.total_best,
-                total_found_blocks: e.total_found_blocks,
-                network_difficulty: e.network_difficulty,
-            }
-        }
-    }
-
-    pub extern "C" fn pool_stats_new(
-        dual: bool,
-        total_best: u64,
-        total_found_blocks: u32,
-    ) -> *mut Handle {
+impl Handle {
+    pub fn new(dual: bool, total_best: u64, total_found_blocks: u32) -> Self {
         let mode = if dual { Mode::Dual } else { Mode::Failover };
-        Box::into_raw(Box::new(Handle(Mutex::new(PoolStats::new(
+        Handle(Mutex::new(PoolStats::new(
             mode,
             total_best,
             total_found_blocks,
-        )))))
+        )))
     }
 
-    // All below: `h` from `pool_stats_new()`.
-
-    /// # Safety
-    /// See above.
-    pub unsafe extern "C" fn pool_stats_set_totals(
-        h: *const Handle,
-        total_best: u64,
-        total_found_blocks: u32,
-    ) {
-        (*h).with(|s| s.set_totals(total_best, total_found_blocks))
+    pub(crate) fn with<T>(&self, f: impl FnOnce(&mut PoolStats) -> T) -> T {
+        f(&mut self.0.lock().unwrap_or_else(|e| e.into_inner()))
     }
 
-    /// # Safety
-    /// See above.
-    pub unsafe extern "C" fn pool_stats_set_balance(h: *const Handle, balance: u16) {
-        (*h).with(|s| s.set_balance(balance))
+    pub fn set_totals(&self, total_best: u64, total_found_blocks: u32) {
+        self.with(|s| s.set_totals(total_best, total_found_blocks))
     }
 
-    /// # Safety
-    /// See above; `ev` writable.
-    pub unsafe extern "C" fn pool_stats_best_diff(
-        h: *const Handle,
-        pool: i32,
-        difficulty: f64,
-        nbits: u32,
-        ev: *mut CEvent,
-    ) {
-        *ev = (*h).with(|s| s.best_diff(pool, difficulty, nbits)).into();
+    pub fn set_balance(&self, balance: u16) {
+        self.with(|s| s.set_balance(balance))
     }
 
-    /// # Safety
-    /// See above; `ev` writable.
-    pub unsafe extern "C" fn pool_stats_found_block(
-        h: *const Handle,
-        difficulty: f64,
-        nbits: u32,
-        ev: *mut CEvent,
-    ) {
-        *ev = (*h).with(|s| s.found_block(difficulty, nbits)).into();
+    pub fn best_diff(&self, pool: i32, difficulty: f64, nbits: u32) -> Event {
+        self.with(|s| s.best_diff(pool, difficulty, nbits))
     }
 
-    /// # Safety
-    /// See above.
-    pub unsafe extern "C" fn pool_stats_reset_pool(h: *const Handle, pool: i32) {
-        (*h).with(|s| s.reset_pool(pool))
+    pub fn found_block(&self, difficulty: f64, nbits: u32) -> Event {
+        self.with(|s| s.found_block(difficulty, nbits))
     }
 
-    /// # Safety
-    /// See above.
-    pub unsafe extern "C" fn pool_stats_set_mode(h: *const Handle, dual: bool) {
+    pub fn reset_pool(&self, pool: i32) {
+        self.with(|s| s.reset_pool(pool))
+    }
+
+    pub fn set_mode(&self, dual: bool) {
         let mode = if dual { Mode::Dual } else { Mode::Failover };
-        (*h).with(|s| s.set_mode(mode))
+        self.with(|s| s.set_mode(mode))
     }
 
-    /// # Safety
-    /// See above.
-    pub unsafe extern "C" fn pool_stats_reset_session(h: *const Handle) {
-        (*h).with(PoolStats::reset_session)
+    pub fn reset_session(&self) {
+        self.with(PoolStats::reset_session)
     }
 
-    /// # Safety
-    /// See above.
-    pub unsafe extern "C" fn pool_stats_reset_all_time(h: *const Handle) {
-        (*h).with(PoolStats::reset_all_time)
+    pub fn reset_all_time(&self) {
+        self.with(PoolStats::reset_all_time)
     }
 
     /// One consistent snapshot of the aggregates.
-    ///
-    /// # Safety
-    /// See above; `out` writable.
-    #[no_mangle]
-    pub unsafe extern "C" fn pool_stats_summary(h: *const Handle, out: *mut Summary) {
-        *out = (*h).with(|s| Summary {
+    pub fn summary(&self) -> Summary {
+        self.with(|s| Summary {
             accepted: s.accepted(),
             rejected: s.rejected(),
             best_session: s.best_session(),
@@ -395,16 +305,12 @@ pub(crate) mod ffi {
             found_blocks: s.s.found_blocks,
             total_found_blocks: s.s.total_found_blocks,
             last_response_us: s.s.last_response_us,
-        });
+        })
     }
 
     /// The counters of one pool (failover: the shared ones).
-    ///
-    /// # Safety
-    /// See above; `out` writable.
-    #[no_mangle]
-    pub unsafe extern "C" fn pool_stats_pool(h: *const Handle, pool: i32, out: *mut PoolSummary) {
-        *out = (*h).with(|s| {
+    pub fn pool(&self, pool: i32) -> PoolSummary {
+        self.with(|s| {
             let i = s.slot(pool).unwrap_or(0);
             PoolSummary {
                 accepted: s.s.accepted[i],
@@ -413,8 +319,34 @@ pub(crate) mod ffi {
                 network_difficulty: s.s.network_difficulty[i],
                 pool_difficulty: s.s.pool_difficulty[i],
             }
-        });
+        })
     }
+}
+
+/// `pool_stats_summary_t`
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct Summary {
+    pub accepted: u64,
+    pub rejected: u64,
+    pub best_session: u64,
+    pub total_best: u64,
+    pub network_difficulty: f64,
+    pub pool_difficulty: u32,
+    pub found_blocks: u32,
+    pub total_found_blocks: u32,
+    pub last_response_us: u64,
+}
+
+/// `pool_stats_pool_t`
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct PoolSummary {
+    pub accepted: u64,
+    pub rejected: u64,
+    pub best_session: u64,
+    pub network_difficulty: f64,
+    pub pool_difficulty: u32,
 }
 
 #[cfg(test)]

@@ -143,7 +143,7 @@ fn log_health() {
     log!(Info, TAG, "-------------------------------");
 }
 
-pub(crate) mod ffi {
+pub(crate) mod api {
     use super::*;
 
     /// The task (`wifi_monitor_task`); never returns.

@@ -102,7 +102,7 @@ impl Message {
     }
 }
 
-pub(crate) mod ffi {
+pub(crate) mod api {
     use super::*;
 
     /// Frees what `stratum_v1_session_parse()` allocated in `message` and

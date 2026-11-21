@@ -249,7 +249,7 @@ fn alert_patch(req: &mut Request) -> EspErr {
 }
 
 fn alert_test(req: &mut Request) -> EspErr {
-    if crate::discord::ffi::discord_send_test() {
+    if crate::discord::api::discord_send_test() {
         send_str(req, c"ok");
     } else {
         send_err(req, err::E500_INTERNAL_SERVER_ERROR, c"Send failed");
@@ -261,12 +261,12 @@ fn alert_test(req: &mut Request) -> EspErr {
 // OTP
 
 fn otp_create(req: &mut Request) -> EspErr {
-    use crate::otp::ffi::otp_is_enabled;
+    use crate::otp::api::otp_is_enabled;
     if otp_is_enabled() {
         return send_err(req, err::E405_METHOD_NOT_ALLOWED, c"OTP is enabled");
     }
     // an enrollment already started: no new QR, no error
-    match crate::otp_device::ffi::otp_dev_start_enrollment() {
+    match crate::otp_device::api::otp_dev_start_enrollment() {
         ESP_ERR_NOT_FINISHED => {
             end_chunks(req);
             return ESP_OK;
@@ -288,8 +288,8 @@ fn otp_create(req: &mut Request) -> EspErr {
 }
 
 fn otp_patch(req: &mut Request) -> EspErr {
+    use crate::otp::api::{otp_save, otp_set_enabled};
     use crate::otp::disable_enrollment as otp_disable_enrollment;
-    use crate::otp::ffi::{otp_save, otp_set_enabled};
     // stops an enrollment (if one runs), hides the QR in any case
     otp_disable_enrollment();
     crate::display::send_hide_qr();
@@ -324,12 +324,12 @@ fn otp_patch(req: &mut Request) -> EspErr {
 fn otp_status(req: &mut Request) -> EspErr {
     send_doc(
         req,
-        http_json::otp_status(crate::otp::ffi::otp_is_enabled()),
+        http_json::otp_status(crate::otp::api::otp_is_enabled()),
     )
 }
 
 fn otp_session(req: &mut Request) -> EspErr {
-    if !crate::otp::ffi::otp_is_enabled() {
+    if !crate::otp::api::otp_is_enabled() {
         return send_err(req, err::E405_METHOD_NOT_ALLOWED, c"OTP disabled");
     }
     const TOTP_CAP: usize = 16;

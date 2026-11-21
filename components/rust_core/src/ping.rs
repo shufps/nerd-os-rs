@@ -154,16 +154,16 @@ pub fn reset(pool: c_int) {
     with(pool, |s| *s = Stats::new());
 }
 
-pub(crate) mod ffi {
+pub(crate) mod api {
     use super::*;
 
     /// Average round trip time of the last successful round (ms).
-    pub extern "C" fn ping_last_rtt(pool: c_int) -> f64 {
+    pub fn ping_last_rtt(pool: c_int) -> f64 {
         with(pool, |s| s.last_rtt_ms).unwrap_or(0.0)
     }
 
     /// Lost share (0..1) over the last 15 minutes.
-    pub extern "C" fn ping_recent_loss(pool: c_int) -> f64 {
+    pub fn ping_recent_loss(pool: c_int) -> f64 {
         with(pool, |s| s.loss()).unwrap_or(0.0)
     }
 }
@@ -242,19 +242,19 @@ mod tests {
                 "Recent 15-min packet loss: 14.3%",
             ]
         );
-        assert_eq!(ffi::ping_last_rtt(1), 41.5);
+        assert_eq!(api::ping_last_rtt(1), 41.5);
 
         // a failed round keeps the last RTT
         env.replies = 0;
         env.lines.clear();
         round(1, &mut env);
         assert_eq!(env.lines.len(), 3);
-        assert_eq!(ffi::ping_last_rtt(1), 41.5);
-        assert!((ffi::ping_recent_loss(1) - 8.0 / 14.0).abs() < 1e-9);
+        assert_eq!(api::ping_last_rtt(1), 41.5);
+        assert!((api::ping_recent_loss(1) - 8.0 / 14.0).abs() < 1e-9);
 
         reset(1);
-        assert_eq!(ffi::ping_last_rtt(1), 0.0);
-        assert_eq!(ffi::ping_recent_loss(1), 0.0);
+        assert_eq!(api::ping_last_rtt(1), 0.0);
+        assert_eq!(api::ping_recent_loss(1), 0.0);
 
         env.resolved = false;
         env.lines.clear();

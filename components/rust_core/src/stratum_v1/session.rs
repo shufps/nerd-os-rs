@@ -126,7 +126,7 @@ impl Session {
     }
 }
 
-pub(crate) mod ffi {
+pub(crate) mod api {
     use super::*;
     use core::ffi::CStr;
 

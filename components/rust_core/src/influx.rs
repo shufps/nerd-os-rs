@@ -575,10 +575,10 @@ pub fn run(settings: Settings, env: &mut impl TaskEnv) -> ! {
 
 // --- C API
 
-pub(crate) mod ffi {
+pub(crate) mod api {
     use super::*;
 
-    pub extern "C" fn influx_task_set_temperature(temp: f32, temp2: f32) {
+    pub fn influx_task_set_temperature(temp: f32, temp2: f32) {
         accum(|a| {
             a.temp[0] += temp as f64;
             a.temp[1] += temp2 as f64;
@@ -586,14 +586,7 @@ pub(crate) mod ffi {
         });
     }
 
-    pub extern "C" fn influx_task_set_pwr(
-        vin: f32,
-        iin: f32,
-        pin: f32,
-        vout: f32,
-        iout: f32,
-        pout: f32,
-    ) {
+    pub fn influx_task_set_pwr(vin: f32, iin: f32, pin: f32, vout: f32, iout: f32, pout: f32) {
         accum(|a| {
             for (sum, v) in a.pwr.iter_mut().zip([vin, iin, pin, vout, iout, pout]) {
                 *sum += v as f64;
@@ -602,7 +595,7 @@ pub(crate) mod ffi {
         });
     }
 
-    pub extern "C" fn influx_set_fan(pwm0: f32, rpm0: f32, pwm1: f32, rpm1: f32) {
+    pub fn influx_set_fan(pwm0: f32, rpm0: f32, pwm1: f32, rpm1: f32) {
         accum(|a| {
             for (sum, v) in a.fan.iter_mut().zip([pwm0, rpm0, pwm1, rpm1]) {
                 *sum += v as f64;
@@ -784,8 +777,8 @@ mod tests {
         assert_eq!(r.stats.accepted, 5_000_000_000);
         // a second block in the same session counts too
         i.found_blocks = 2;
-        ffi::influx_task_set_pwr(12.0, 1.0, 12.0, 1.0, 100.0, 100.0);
-        ffi::influx_task_set_pwr(12.5, 1.0, 12.5, 1.0, 100.0, 100.0);
+        api::influx_task_set_pwr(12.0, 1.0, 12.0, 1.0, 100.0, 100.0);
+        api::influx_task_set_pwr(12.5, 1.0, 12.5, 1.0, 100.0, 100.0);
         assert!(r.update(&i, t0 + Duration::from_secs(30)));
         assert_eq!((r.stats.blocks_found, r.stats.total_blocks_found), (2, 4));
         assert_eq!(r.stats.pwr[0], 12.25);

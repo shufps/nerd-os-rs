@@ -12,8 +12,8 @@ use core::ffi::{c_int, c_void, CStr};
 use std::sync::Mutex;
 use std::time::Duration;
 
-use crate::can_master::{self, ffi as master, SLAVE_MAX};
-use crate::can_slave::{self, ffi as slave};
+use crate::can_master::{self, api as master, SLAVE_MAX};
+use crate::can_slave::{self, api as slave};
 use crate::idf::nvs::{err_name, Nvs};
 use crate::idf::twai::{self, Message};
 use crate::idf::{ms_to_ticks, EspErr, ESP_OK};
@@ -330,8 +330,7 @@ fn load_registry() {
     // into the registry buffer)
     if let Ok(blob) = nvs.get_blob(REGISTRY_KEY) {
         if blob.len() <= can_master::REGISTRY_LEN {
-            // SAFETY: blob holds blob.len() bytes for the call
-            unsafe { master::can_master_load_registry(blob.as_ptr(), blob.len()) };
+            can_master::load_registry(&blob);
         }
     }
 }
@@ -341,9 +340,7 @@ fn save_registry() {
         log!(Warn, TAG_MASTER, "NVS open failed, registry not saved");
         return;
     };
-    let mut blob = [0u8; can_master::REGISTRY_LEN];
-    // SAFETY: blob is a REGISTRY_LEN-byte array, as the function requires
-    unsafe { master::can_master_registry(&mut blob) };
+    let blob = can_master::registry();
     nvs.set_blob(REGISTRY_KEY, &blob);
     nvs.commit();
 }
@@ -399,8 +396,8 @@ fn handle_nonce(slave_id: u8, nonce: u32, rolled_version: u32, job_id: u8) {
             );
         }
     }
-    crate::pool_manager::ffi::pool_mgr_check_best_diff(j.pool_id, diff, j.target);
-    crate::pool_manager::ffi::pool_mgr_check_found_block(j.pool_id, diff, j.target);
+    crate::pool_manager::api::pool_mgr_check_best_diff(j.pool_id, diff, j.target);
+    crate::pool_manager::api::pool_mgr_check_found_block(j.pool_id, diff, j.target);
 }
 
 fn master_loop() -> ! {
@@ -430,17 +427,12 @@ fn master_loop() -> ! {
             continue;
         }
 
-        let mut ev = can_master::Event::default();
-        // SAFETY: msg.data is the frame's 8 data bytes and ev a writable local
-        unsafe {
-            master::can_master_frame(
-                msg.identifier,
-                msg.data_length_code,
-                &msg.data,
-                crate::cutil::now_us(),
-                &mut ev,
-            )
-        };
+        let ev = can_master::frame(
+            msg.identifier,
+            msg.data_length_code,
+            &msg.data,
+            crate::cutil::now_us(),
+        );
         match ev.kind {
             can_master::EVENT_ASSIGN => {
                 if ev.save_registry {
@@ -484,7 +476,7 @@ fn telemetry() -> [u8; can_master::TELEMETRY_LEN] {
     put(37, &((vout * 1000.0) as u16).to_le_bytes());
     put(
         39,
-        &crate::hashrate::ffi::hashrate_monitor_total().to_le_bytes(),
+        &crate::hashrate::api::hashrate_monitor_total().to_le_bytes(),
     );
     put(
         43,
@@ -627,8 +619,7 @@ fn now_ms() -> u64 {
 fn slave_loop() -> ! {
     let mac = sta_mac();
     // negotiation, job reassembly and store: can_slave.rs
-    // SAFETY: mac is a 6-byte array, as the function requires
-    unsafe { slave::can_slave_init(&mac) };
+    slave::can_slave_init(mac);
     loop {
         // HELLO every second while unassigned
         if slave::can_slave_hello_due(now_ms()) {
@@ -646,17 +637,7 @@ fn slave_loop() -> ! {
             continue;
         }
 
-        let mut ev = can_slave::Event::NONE;
-        // SAFETY: msg.data is the frame's 8 data bytes and ev a writable local
-        unsafe {
-            slave::can_slave_frame(
-                msg.identifier,
-                msg.data_length_code,
-                &msg.data,
-                now_ms(),
-                &mut ev,
-            )
-        };
+        let ev = slave::can_slave_frame(msg.identifier, msg.data_length_code, &msg.data, now_ms());
         match ev.kind {
             can_slave::EVENT_ASSIGNED => send_slave_config(ev.id),
             can_slave::EVENT_COMMAND => {
@@ -732,7 +713,7 @@ fn slave_telemetry_loop() -> ! {
     }
 }
 
-pub(crate) mod ffi {
+pub(crate) mod api {
     use super::*;
 
     /// # Safety

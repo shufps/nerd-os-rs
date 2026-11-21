@@ -468,7 +468,7 @@ static HAS_IP: AtomicBool = AtomicBool::new(false);
 static IP: Mutex<String> = Mutex::new(String::new());
 
 /// The network manager's hooks: a new IP, a lost link.
-type Hook = unsafe extern "C" fn();
+type Hook = fn();
 static HOOKS: Mutex<(Option<Hook>, Option<Hook>)> = Mutex::new((None, None));
 
 pub fn set_pins(sclk: c_int, mosi: c_int, miso: c_int, cs: c_int, rst: c_int, irq: c_int) {
@@ -756,11 +756,11 @@ pub fn ip() -> String {
     }
 }
 
-pub(crate) mod ffi {
+pub(crate) mod api {
     use super::*;
 
     /// The network manager's hooks: a new IP, a lost link.
-    pub extern "C" fn w5500_set_hooks(got_ip: Option<Hook>, link_down: Option<Hook>) {
+    pub fn w5500_set_hooks(got_ip: Option<Hook>, link_down: Option<Hook>) {
         *HOOKS.lock().unwrap_or_else(|e| e.into_inner()) = (got_ip, link_down);
     }
 }

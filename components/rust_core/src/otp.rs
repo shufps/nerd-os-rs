@@ -273,7 +273,7 @@ pub fn request(
     time_synced: bool,
     now_ms: u64,
 ) -> Auth {
-    use crate::http_auth::ffi::{auth_rate_limit_blocked, auth_rate_limit_failure};
+    use crate::http_auth::api::{auth_rate_limit_blocked, auth_rate_limit_failure};
     if auth_rate_limit_blocked(now_ms) {
         return Auth::Blocked;
     }
@@ -298,7 +298,7 @@ pub fn request(
 /// The TOTP login of `/api/v2/otp/session` behind the rate limit (the TOTP
 /// header must be present); a wrong code is counted.
 pub fn login(totp: &[u8], now: i64, time_synced: bool, now_ms: u64) -> Auth {
-    use crate::http_auth::ffi::{auth_rate_limit_blocked, auth_rate_limit_failure};
+    use crate::http_auth::api::{auth_rate_limit_blocked, auth_rate_limit_failure};
     if auth_rate_limit_blocked(now_ms) {
         return Auth::Blocked;
     }
@@ -321,18 +321,18 @@ pub fn disable_enrollment() {
     with(|o| o.enrollment = false);
 }
 
-pub(crate) mod ffi {
+pub(crate) mod api {
     use super::*;
 
-    pub extern "C" fn otp_save() {
+    pub fn otp_save() {
         with(|o| o.save());
     }
 
-    pub extern "C" fn otp_is_enabled() -> bool {
+    pub fn otp_is_enabled() -> bool {
         with(|o| o.enabled)
     }
 
-    pub extern "C" fn otp_set_enabled(enabled: bool) {
+    pub fn otp_set_enabled(enabled: bool) {
         with(|o| o.enabled = enabled);
     }
 }

@@ -19,7 +19,7 @@
 //!   scan handler and the network manager); starting a scan is
 //!   check-and-set, so two scan requests start only one.
 
-use core::ffi::{c_char, c_int};
+use core::ffi::c_int;
 use std::sync::Mutex;
 
 /// Actions, carried out in this bit order.
@@ -164,7 +164,7 @@ pub fn ip_str(ip: Option<[u8; 4]>) -> String {
     format!("{a}.{b}.{c}.{d}")
 }
 
-pub(crate) mod ffi {
+pub(crate) mod api {
     use super::*;
 
     pub const EV_STA_START: c_int = 0;
@@ -174,7 +174,7 @@ pub(crate) mod ffi {
 
     /// An event without data (`WIFI_EV_*`): the `WIFI_ACT_*` bits to carry
     /// out, in bit order.
-    pub extern "C" fn wifi_state_event(ev: c_int) -> u32 {
+    pub fn wifi_state_event(ev: c_int) -> u32 {
         with(|s| match ev {
             EV_STA_START => s.sta_start(),
             EV_DISCONNECTED => s.disconnected(),
@@ -188,52 +188,38 @@ pub(crate) mod ffi {
     }
 
     /// `IP_EVENT_STA_GOT_IP`; `ip`: the address bytes in order.
-    ///
-    /// # Safety
-    /// `ip` points to 4 bytes.
-    pub unsafe extern "C" fn wifi_state_got_ip(ip: *const u8) -> u32 {
-        let mut a = [0u8; 4];
-        a.copy_from_slice(core::slice::from_raw_parts(ip, 4));
-        with(|s| s.got_ip(a))
+    pub fn wifi_state_got_ip(ip: [u8; 4]) -> u32 {
+        with(|s| s.got_ip(ip))
     }
 
-    pub extern "C" fn wifi_state_pause(paused: bool) -> u32 {
+    pub fn wifi_state_pause(paused: bool) -> u32 {
         with(|s| s.pause(paused))
     }
 
-    pub extern "C" fn wifi_state_set_has_ssid(has_ssid: bool) {
+    pub fn wifi_state_set_has_ssid(has_ssid: bool) {
         with(|s| s.has_ssid = has_ssid)
     }
 
-    pub extern "C" fn wifi_state_retries() -> u16 {
+    pub fn wifi_state_retries() -> u16 {
         with(|s| s.retries)
     }
 
-    pub extern "C" fn wifi_state_scan_begin() -> bool {
+    pub fn wifi_state_scan_begin() -> bool {
         with(|s| s.scan_begin())
     }
 
-    pub extern "C" fn wifi_state_scanning() -> bool {
+    pub fn wifi_state_scanning() -> bool {
         with(|s| s.scanning)
     }
 
-    pub extern "C" fn wifi_state_scan_finish() -> u32 {
+    pub fn wifi_state_scan_finish() -> u32 {
         with(|s| s.scan_finish())
     }
 
-    /// The address into `buf` (always terminated); true while connected.
-    ///
-    /// # Safety
-    /// `buf` writable for `len` bytes or NULL.
-    pub unsafe extern "C" fn wifi_state_ip(buf: *mut c_char, len: usize) -> bool {
+    /// The address while connected.
+    pub fn wifi_state_ip() -> Option<String> {
         let ip = with(|s| s.ip);
-        if !buf.is_null() && len > 0 {
-            let t = ip_str(ip);
-            let n = t.len().min(len - 1);
-            core::ptr::copy_nonoverlapping(t.as_ptr(), buf as *mut u8, n);
-            *buf.add(n) = 0;
-        }
-        ip.is_some()
+        ip.is_some().then(|| ip_str(ip))
     }
 }
 

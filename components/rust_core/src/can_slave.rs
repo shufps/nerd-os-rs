@@ -272,47 +272,37 @@ fn with<T>(f: impl FnOnce(&mut Slave) -> T) -> Option<T> {
         .map(f)
 }
 
-pub(crate) mod ffi {
+pub(crate) mod api {
     use super::*;
 
-    /// # Safety
-    /// `mac` holds 6 bytes.
-    pub unsafe extern "C" fn can_slave_init(mac: *const [u8; 6]) {
+    pub fn can_slave_init(mac: [u8; 6]) {
         log!(
             Info,
             TAG,
             "CAN slave MAC={}",
-            (*mac)
-                .iter()
+            mac.iter()
                 .map(|b| format!("{b:02X}"))
                 .collect::<Vec<_>>()
                 .join(":")
         );
-        *SLAVE.lock().unwrap_or_else(|e| e.into_inner()) = Some(Slave::new(*mac));
+        *SLAVE.lock().unwrap_or_else(|e| e.into_inner()) = Some(Slave::new(mac));
     }
 
-    pub extern "C" fn can_slave_hello_due(now_ms: u64) -> bool {
+    pub fn can_slave_hello_due(now_ms: u64) -> bool {
         with(|s| s.hello_due(now_ms)).unwrap_or(false)
     }
 
-    /// # Safety
-    /// `data` points to the 8 data bytes, `out` writable.
-    pub unsafe extern "C" fn can_slave_frame(
-        id: u32,
-        dlc: u8,
-        data: *const [u8; 8],
-        now_ms: u64,
-        out: *mut Event,
-    ) {
-        *out = with(|s| s.frame(id, dlc, &*data, now_ms)).unwrap_or(Event::NONE);
+    /// A received frame: what to do.
+    pub fn can_slave_frame(id: u32, dlc: u8, data: &[u8; 8], now_ms: u64) -> Event {
+        with(|s| s.frame(id, dlc, data, now_ms)).unwrap_or(Event::NONE)
     }
 
     /// The assigned CAN ID, `CAN_SLAVE_ID_UNASSIGNED` (0xFF) before.
-    pub extern "C" fn can_slave_id() -> u8 {
+    pub fn can_slave_id() -> u8 {
         with(|s| s.id).unwrap_or(UNASSIGNED)
     }
 
-    pub extern "C" fn can_slave_check_nonce(job_id: u8, nonce: u32, rolled_version: u32) -> bool {
+    pub fn can_slave_check_nonce(job_id: u8, nonce: u32, rolled_version: u32) -> bool {
         with(|s| s.check_nonce(job_id, nonce, rolled_version)).unwrap_or(true)
     }
 }

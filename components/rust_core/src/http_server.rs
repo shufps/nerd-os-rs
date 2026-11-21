@@ -448,10 +448,10 @@ pub fn start() -> EspErr {
     ESP_OK
 }
 
-pub(crate) mod ffi {
+pub(crate) mod api {
     use super::*;
 
-    pub extern "C" fn start_rest_server(_: *mut c_void) -> EspErr {
+    pub fn start_rest_server(_: *mut c_void) -> EspErr {
         start()
     }
 }

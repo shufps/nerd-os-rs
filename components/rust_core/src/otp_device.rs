@@ -107,10 +107,10 @@ pub fn start_enrollment() -> c_int {
     }
 }
 
-pub(crate) mod ffi {
+pub(crate) mod api {
     use super::*;
 
-    pub extern "C" fn otp_dev_start_enrollment() -> c_int {
+    pub fn otp_dev_start_enrollment() -> c_int {
         start_enrollment()
     }
 }

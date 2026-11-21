@@ -13,7 +13,7 @@ use std::ffi::CString;
 
 use crate::board::api::Info as BoardInfo;
 use crate::cfg;
-use crate::history::ffi::{history_current, history_current_timestamp};
+use crate::history::api::{history_current, history_current_timestamp};
 use crate::http_json::{self, AsicInfo, Dashboard, FanInfo, SystemInfo, V2Settings};
 use crate::http_routes::Handler;
 use crate::idf::httpd::{HandlerFn, Request};
@@ -88,13 +88,11 @@ fn stats() -> crate::pool_stats::Summary {
 }
 
 fn manager_info() -> http_json::ManagerInfo {
-    let mut m = core::mem::MaybeUninit::zeroed();
-    // SAFETY: the pointer is writable; ManagerInfo is plain numbers, bools and
-    // nullable pointers, so it is valid zeroed even if nothing is written
-    unsafe {
-        crate::pool_manager::ffi::pool_mgr_info(m.as_mut_ptr());
-        m.assume_init()
-    }
+    crate::pool_manager::api::pool_mgr_info().unwrap_or_else(|| {
+        // SAFETY: ManagerInfo is plain numbers, bools and nullable pointers,
+        // valid zeroed (no manager yet)
+        unsafe { core::mem::zeroed() }
+    })
 }
 
 fn coinbase_info(pool: c_int) -> Option<crate::pool_coinbase::Info> {
@@ -155,7 +153,7 @@ pub(crate) fn reload_settings() {
     crate::board::api::board_load_settings();
     crate::power_mgmt::fan_load_settings();
     crate::display::load_settings();
-    crate::pool_manager::ffi::pool_mgr_load_settings();
+    crate::pool_manager::api::pool_mgr_load_settings();
 }
 
 // ---------------------------------------------------------------------------
@@ -233,9 +231,9 @@ fn system_info(req: &mut Request) -> EspErr {
     }
     s.fans[0].mode = b.fan_mode[0];
 
-    s.last_ping_rtt = crate::pool_manager::ffi::pool_mgr_ping_rtt();
-    s.recent_ping_loss = crate::pool_manager::ffi::pool_mgr_ping_loss();
-    s.duplicate_hw_nonces = crate::mining_tasks::ffi::asic_result_duplicates();
+    s.last_ping_rtt = crate::pool_manager::api::pool_mgr_ping_rtt();
+    s.recent_ping_loss = crate::pool_manager::api::pool_mgr_ping_loss();
+    s.duplicate_hw_nonces = crate::mining_tasks::api::asic_result_duplicates();
 
     s.pool_difficulty = st.pool_difficulty;
     s.network_difficulty = st.network_difficulty;
@@ -343,9 +341,9 @@ fn reset_stats(req: &mut Request) -> EspErr {
     if all_time && crate::http_server::validate_otp(req, false) != ESP_OK {
         return ESP_FAIL;
     }
-    crate::pool_manager::ffi::pool_mgr_reset_session_stats();
+    crate::pool_manager::api::pool_mgr_reset_session_stats();
     if all_time {
-        crate::pool_manager::ffi::pool_mgr_reset_all_time_stats();
+        crate::pool_manager::api::pool_mgr_reset_all_time_stats();
     }
     log!(
         Info,
@@ -362,7 +360,7 @@ fn reset_stats(req: &mut Request) -> EspErr {
 }
 
 fn settings_patch(req: &mut Request) -> EspErr {
-    let dual = crate::pool_manager::ffi::pool_mgr_is_dual();
+    let dual = crate::pool_manager::api::pool_mgr_is_dual();
     if crate::http_handlers::apply_pool_settings(req, true, dual, c"system").is_err() {
         return ESP_FAIL;
     }
@@ -409,8 +407,8 @@ fn dashboard(req: &mut Request) -> EspErr {
     let mut chips = vec![0f32; 3 * n.max(1) as usize];
     for i in 0..n {
         let u = i as usize;
-        chips[u] = crate::hashrate::ffi::hashrate_monitor_chip(i);
-        chips[n as usize + u] = crate::hashrate::ffi::hashrate_monitor_chip_errors(i);
+        chips[u] = crate::hashrate::api::hashrate_monitor_chip(i);
+        chips[n as usize + u] = crate::hashrate::api::hashrate_monitor_chip_errors(i);
         chips[2 * n as usize + u] = crate::board_core::CHIP_TEMPS.get(i);
     }
     d.chip_hashrate = chips.as_ptr();

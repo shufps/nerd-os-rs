@@ -519,8 +519,8 @@ pub fn start() {
     crate::idf::task::create_internal(task, c"ota updater", 8192, 1);
 }
 
-pub(crate) mod ffi {
-    pub extern "C" fn ota_factory_start() {
+pub(crate) mod api {
+    pub fn ota_factory_start() {
         super::start();
     }
 }

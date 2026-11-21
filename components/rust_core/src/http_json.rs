@@ -1181,7 +1181,7 @@ pub struct CanMasterNode {
 /// The string pointers in the snapshot are NULL or NUL-terminated, and
 /// its array pointers hold their stated counts, for the call.
 pub unsafe fn can_swarm(m: &CanMasterNode) -> Json {
-    use crate::can_master::ffi as can;
+    use crate::can_master::api as can;
     use crate::can_master::{CONFIG_LEN, SLAVE_MAX, TELEMETRY_LEN};
 
     let f32_at = |b: &[u8], at: usize| f32::from_le_bytes(b[at..at + 4].try_into().unwrap());
@@ -1194,9 +1194,7 @@ pub unsafe fn can_swarm(m: &CanMasterNode) -> Json {
         if !can::can_master_is_slave_known(i) {
             continue;
         }
-        let mut t = [0u8; TELEMETRY_LEN];
-        // SAFETY: a TELEMETRY_LEN buffer
-        if unsafe { can::can_master_get_slave_telemetry(i, &mut t) } && t[43] == 0 {
+        if let Some(t) = crate::can_master::slave_telemetry(i).filter(|t| t[43] == 0) {
             slave_hashrate += f32_at(&t, 39);
         }
     }
@@ -1270,17 +1268,12 @@ pub unsafe fn can_swarm(m: &CanMasterNode) -> Json {
         if !can::can_master_is_slave_known(i) {
             continue;
         }
-        let mut mac = [0u8; 6];
-        let mut t = [0u8; TELEMETRY_LEN];
-        let mut c = [0u8; CONFIG_LEN];
-        // SAFETY: buffers of the expected sizes
-        let (has_telem, has_config) = unsafe {
-            can::can_master_get_slave_mac(i, &mut mac);
-            (
-                can::can_master_get_slave_telemetry(i, &mut t),
-                can::can_master_get_slave_config(i, &mut c),
-            )
-        };
+        let mac = crate::can_master::slave_mac(i).unwrap_or_default();
+        let telem = crate::can_master::slave_telemetry(i);
+        let config = crate::can_master::slave_config(i);
+        let (has_telem, has_config) = (telem.is_some(), config.is_some());
+        let t = telem.unwrap_or([0; TELEMETRY_LEN]);
+        let c = config.unwrap_or([0; CONFIG_LEN]);
         let text = |b: &[u8]| {
             let b = if has_config { b } else { &[][..] };
             Json::Str(b[..b.iter().position(|&x| x == 0).unwrap_or(b.len())].to_vec())

@@ -213,26 +213,26 @@ pub fn run(env: &mut impl Env) -> ! {
     }
 }
 
-pub(crate) mod ffi {
+pub(crate) mod api {
     use super::*;
 
-    pub extern "C" fn hashrate_monitor_init(asic_count: c_int) {
+    pub fn hashrate_monitor_init(asic_count: c_int) {
         init(usize::try_from(asic_count).unwrap_or(0));
     }
 
-    pub extern "C" fn hashrate_monitor_chip(asic: c_int) -> f32 {
+    pub fn hashrate_monitor_chip(asic: c_int) -> f32 {
         with(|m| m.chip(asic).map_or(0.0, |c| c.hashes.rate))
     }
 
-    pub extern "C" fn hashrate_monitor_chip_errors(asic: c_int) -> f32 {
+    pub fn hashrate_monitor_chip_errors(asic: c_int) -> f32 {
         with(|m| m.chip(asic).map_or(0.0, |c| c.errors.rate))
     }
 
-    pub extern "C" fn hashrate_monitor_total() -> f32 {
+    pub fn hashrate_monitor_total() -> f32 {
         with(|m| m.hashrate)
     }
 
-    pub extern "C" fn hashrate_monitor_smoothed() -> f32 {
+    pub fn hashrate_monitor_smoothed() -> f32 {
         with(|m| m.smoothed)
     }
 }

@@ -350,29 +350,29 @@ fn with<T>(f: impl FnOnce(&mut History) -> T) -> Option<T> {
         .map(f)
 }
 
-pub(crate) mod ffi {
+pub(crate) mod api {
     use super::*;
 
-    pub extern "C" fn history_init(asic_count: c_int) -> bool {
+    pub fn history_init(asic_count: c_int) -> bool {
         init(usize::try_from(asic_count).unwrap_or(0))
     }
 
-    pub extern "C" fn history_push(rate: f32, vreg_temp: f32, asic_temp: f32, timestamp_ms: u64) {
+    pub fn history_push(rate: f32, vreg_temp: f32, asic_temp: f32, timestamp_ms: u64) {
         push(rate, vreg_temp, asic_temp, timestamp_ms)
     }
 
-    pub extern "C" fn history_push_share(asic: c_int) {
+    pub fn history_push_share(asic: c_int) {
         if let Some(Some(line)) = with(|h| h.push_share(asic)) {
             log!(Info, TAG, "{line}");
         }
     }
 
     /// The display average of window 0..3 (1m, 10m, 1h, 1d).
-    pub extern "C" fn history_current(window: c_int) -> f64 {
+    pub fn history_current(window: c_int) -> f64 {
         with(|h| h.current(usize::try_from(window).unwrap_or(usize::MAX))).unwrap_or(0.0)
     }
 
-    pub extern "C" fn history_current_timestamp() -> u64 {
+    pub fn history_current_timestamp() -> u64 {
         with(|h| h.current_timestamp()).unwrap_or(0)
     }
 }

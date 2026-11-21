@@ -867,12 +867,12 @@ impl Tps546 {
     }
 }
 
-pub(crate) mod ffi {
+pub(crate) mod api {
     use super::*;
 
     /// The NerdAxe family's converter (NerdAxe defaults, one domain),
     /// created on first use.
-    pub extern "C" fn tps546_dev() -> *mut Tps546 {
+    pub fn tps546_dev() -> *mut Tps546 {
         static DEV: std::sync::OnceLock<usize> = std::sync::OnceLock::new();
         *DEV.get_or_init(|| {
             Box::into_raw(Box::new(Tps546::new(

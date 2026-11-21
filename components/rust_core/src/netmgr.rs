@@ -156,21 +156,14 @@ pub fn has_ip() -> bool {
     with(|s| s.wifi_ip || s.eth_ip)
 }
 
-pub(crate) mod ffi {
+pub(crate) mod api {
     use super::*;
 
     /// `ev`: 0 WiFi got an IP, 1 WiFi disconnected, 2 Ethernet got an IP,
     /// 3 Ethernet link down. The `NETMGR_ACT_*` bits to carry out, in bit
     /// order; the preferred interface (`NETMGR_*`) in `*preferred`.
     ///
-    /// # Safety
-    /// `preferred` writable or NULL.
-    pub unsafe extern "C" fn netmgr_event(
-        ev: c_int,
-        eth_netif: bool,
-        wifi_netif: bool,
-        preferred: *mut c_int,
-    ) -> u32 {
+    pub fn netmgr_event(ev: c_int, eth_netif: bool, wifi_netif: bool) -> (u32, c_int) {
         let ev = match ev {
             0 => Event::WifiGotIp,
             1 => Event::WifiDisconnected,
@@ -178,23 +171,20 @@ pub(crate) mod ffi {
             _ => Event::EthLinkDown,
         };
         let (a, p) = with(|s| (s.event(ev, eth_netif, wifi_netif), s.preferred));
-        if !preferred.is_null() {
-            *preferred = p as c_int;
-        }
-        a
+        (a, p as c_int)
     }
 
     /// The access point off outside an event (startup with a configured
     /// pool): true if it is to be switched off now (the first time).
-    pub extern "C" fn netmgr_ap_off_once() -> bool {
+    pub fn netmgr_ap_off_once() -> bool {
         with(|s| s.ap_off_once() != 0)
     }
 
-    pub extern "C" fn netmgr_wifi_has_ip() -> bool {
+    pub fn netmgr_wifi_has_ip() -> bool {
         with(|s| s.wifi_ip)
     }
 
-    pub extern "C" fn netmgr_eth_has_ip() -> bool {
+    pub fn netmgr_eth_has_ip() -> bool {
         with(|s| s.eth_ip)
     }
 }

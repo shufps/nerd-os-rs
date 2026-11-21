@@ -10,13 +10,13 @@ use core::ffi::{c_int, c_void, CStr};
 use std::ffi::CString;
 use std::time::Duration;
 
-use crate::asic::driver::ffi as asic;
+use crate::asic::driver::api as asic;
 use crate::influx::{Inputs, Method, Response};
 use crate::jobs::BmJob;
 use crate::log::log;
 use crate::mining_tasks::TaskResult;
 use crate::mining_tasks::{JobEnv, ResultEnv};
-use crate::pool_manager::ffi as mgr;
+use crate::pool_manager::api as mgr;
 
 /// the influx client's answer limit (`influx.rs`)
 const RESPONSE_MAX: usize = 32768;
@@ -79,7 +79,7 @@ impl JobEnv for Jobs {
         })
     }
     fn slave_active(&mut self, slave: u8) -> bool {
-        crate::can_master::ffi::can_master_is_slave_active(slave)
+        crate::can_master::api::can_master_is_slave_active(slave)
     }
     fn send_slave_job(&mut self, slave: u8, job_id: u8, job: &BmJob) {
         crate::can::send_raw_job(slave, job_id, job)
@@ -119,7 +119,7 @@ impl ResultEnv for Results {
         crate::suffix::suffix_string(best, 3)
     }
     fn push_share(&mut self, asic_nr: c_int) {
-        crate::history::ffi::history_push_share(asic_nr);
+        crate::history::api::history_push_share(asic_nr);
     }
     fn submit_share(
         &mut self,
@@ -229,10 +229,10 @@ impl crate::influx::TaskEnv for Influx {
     fn inputs(&mut self) -> Inputs {
         let mut i = Inputs {
             hashrate: crate::system::current_hashrate(),
-            hashrate_1m: crate::history::ffi::history_current(0) as f32,
+            hashrate_1m: crate::history::api::history_current(0) as f32,
             last_ping_rtt: mgr::pool_mgr_ping_rtt(),
             recent_ping_loss: mgr::pool_mgr_ping_loss(),
-            duplicates: crate::mining_tasks::ffi::asic_result_duplicates(),
+            duplicates: crate::mining_tasks::api::asic_result_duplicates(),
             ..Inputs::default()
         };
         if let Some(m) = crate::pool_manager::get() {
@@ -276,7 +276,7 @@ unsafe extern "C" fn hashrate_task(arg: *mut c_void) {
     crate::hashrate::run(&mut Counters(&*(arg as *const asic::Handle)))
 }
 
-pub(crate) mod ffi {
+pub(crate) mod api {
     use super::*;
 
     /// The job task (`create_jobs_task`); never returns.
@@ -322,7 +322,7 @@ pub(crate) mod ffi {
 
     /// Starts the hashrate monitor (the counters read every 5 s); false
     /// without initialized ASICs.
-    pub extern "C" fn hashrate_monitor_start() -> bool {
+    pub fn hashrate_monitor_start() -> bool {
         let Some(a) = asics() else {
             log!(
                 Error,
@@ -331,7 +331,7 @@ pub(crate) mod ffi {
             );
             return false;
         };
-        crate::hashrate::ffi::hashrate_monitor_init(board_info().asic_count);
+        crate::hashrate::api::hashrate_monitor_init(board_info().asic_count);
         crate::idf::task::spawn_psram(
             hashrate_task,
             c"hr_monitor",

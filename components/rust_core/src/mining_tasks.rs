@@ -327,10 +327,10 @@ impl ResultTask {
 // ---------------------------------------------------------------------------
 // C API
 
-pub(crate) mod ffi {
+pub(crate) mod api {
     use super::*;
 
-    pub extern "C" fn asic_result_duplicates() -> u64 {
+    pub fn asic_result_duplicates() -> u64 {
         duplicates()
     }
 }

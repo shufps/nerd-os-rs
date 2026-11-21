@@ -158,7 +158,7 @@ pub fn init(asic_count: c_int) {
         s.start_us = crate::cutil::now_us();
         s.ip = b"0.0.0.0".to_vec();
     }
-    if !crate::history::ffi::history_init(asic_count) {
+    if !crate::history::api::history_init(asic_count) {
         log!(Error, TAG, "history couldn't be initialized!");
     }
 }
@@ -264,9 +264,9 @@ pub fn reset_reason() -> &'static CStr {
 /// them, else the 10 min average of the shares.
 pub fn current_hashrate() -> f32 {
     if sys::bapi_has_hashrate_counter() {
-        crate::hashrate::ffi::hashrate_monitor_smoothed()
+        crate::hashrate::api::hashrate_monitor_smoothed()
     } else {
-        crate::history::ffi::history_current(1) as f32
+        crate::history::api::history_current(1) as f32
     }
 }
 
@@ -388,7 +388,7 @@ pub fn run() -> ! {
         if can_slave {
             // the CAN ID in the IP label, every tick (the negotiation may
             // just have finished)
-            let id = crate::can_slave::ffi::can_slave_id();
+            let id = crate::can_slave::api::can_slave_id();
             let label = if id == crate::can_slave::UNASSIGNED {
                 c"CAN: ...".into()
             } else {
@@ -430,8 +430,8 @@ pub fn run() -> ! {
         // a history sample with the filtered temperatures
         let timestamp_ms = (crate::cutil::now_us() / 1000) as u64;
         let (vreg, asic) = filters.push(crate::power_mgmt::get(4), crate::power_mgmt::get(3));
-        crate::history::ffi::history_push(
-            crate::hashrate::ffi::hashrate_monitor_total(),
+        crate::history::api::history_push(
+            crate::hashrate::api::hashrate_monitor_total(),
             vreg,
             asic,
             timestamp_ms,
@@ -439,7 +439,7 @@ pub fn run() -> ! {
     }
 }
 
-pub(crate) mod ffi {
+pub(crate) mod api {
     use super::*;
 
     /// The system task entry; never returns.

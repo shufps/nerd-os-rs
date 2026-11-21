@@ -104,19 +104,19 @@ fn diff_text(d: f64) -> String {
     suffix_string(d as u64, 0)
 }
 
-pub(crate) mod ffi {
+pub(crate) mod api {
     use super::*;
     use crate::alerts::kind;
 
-    pub extern "C" fn discord_send_test() -> bool {
+    pub fn discord_send_test() -> bool {
         send(kind::TEST, "", "", 0, 0, 0, 0)
     }
 
-    pub extern "C" fn discord_send_watchdog() -> bool {
+    pub fn discord_send_watchdog() -> bool {
         send(kind::WATCHDOG, "", "", 0, 0, 0, 0)
     }
 
-    pub extern "C" fn discord_send_block_found(diff: f64, network_diff: f64) -> bool {
+    pub fn discord_send_block_found(diff: f64, network_diff: f64) -> bool {
         send(
             kind::BLOCK_FOUND,
             &diff_text(diff),
@@ -128,7 +128,7 @@ pub(crate) mod ffi {
         )
     }
 
-    pub extern "C" fn discord_send_best_diff(diff: f64, network_diff: f64) -> bool {
+    pub fn discord_send_best_diff(diff: f64, network_diff: f64) -> bool {
         send(
             kind::BEST_DIFF,
             &diff_text(diff),
@@ -140,7 +140,7 @@ pub(crate) mod ffi {
         )
     }
 
-    pub extern "C" fn discord_send_coinbase_verify_failed(
+    pub fn discord_send_coinbase_verify_failed(
         pool: c_int,
         user_sats: u64,
         total_sats: u64,

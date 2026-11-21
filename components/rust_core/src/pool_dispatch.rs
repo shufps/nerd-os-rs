@@ -231,9 +231,9 @@ pub fn dispatch_v1(
         .parse(line, &mut m);
     // SAFETY: m was filled by the parser and is freed only below
     unsafe {
-        crate::stratum_v1::session::ffi::log_parsed(ok, &m);
+        crate::stratum_v1::session::api::log_parsed(ok, &m);
         handle_v1(h, stats, coinbase, pool, tag, &m, ok, now_us);
-        crate::stratum_v1::ffi::stratum_v1_message_free(&mut m);
+        crate::stratum_v1::api::stratum_v1_message_free(&mut m);
     }
 }
 

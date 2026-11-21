@@ -486,7 +486,7 @@ mod tests {
     }
 }
 
-pub(crate) mod ffi {
+pub(crate) mod api {
     use super::*;
     use core::ffi::c_void;
 

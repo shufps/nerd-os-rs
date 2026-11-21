@@ -146,13 +146,13 @@ fn task(code: TaskFn, name: &'static CStr, stack: u32, prio: u32) {
 }
 
 /// Network preferred route changed (ETH <-> WiFi): the pools reconnect.
-unsafe extern "C" fn on_preferred_changed() {
+fn on_preferred_changed() {
     log!(
         Warn,
         TAG,
         "Network preferred route changed -> request stratum reconnect"
     );
-    crate::pool_manager::ffi::pool_mgr_reconnect_all();
+    crate::pool_manager::api::pool_mgr_reconnect_all();
 }
 
 /// The firmware's boot steps.
@@ -242,7 +242,7 @@ impl Hooks for Firmware {
                 crate::w5500::GPIO_NC,
             );
         }
-        crate::network::ffi::network_early_eth_init();
+        crate::network::api::network_early_eth_init();
     }
 
     fn board_load_settings(&mut self) {
@@ -344,9 +344,9 @@ impl Hooks for Firmware {
     }
 
     fn start_system_tasks(&mut self) {
-        task(crate::system::ffi::system_task, c"SYSTEM_task", 4096, 3);
+        task(crate::system::api::system_task, c"SYSTEM_task", 4096, 3);
         task(
-            crate::power_mgmt::ffi::pm_task,
+            crate::power_mgmt::api::pm_task,
             c"power mangement",
             8192,
             10,
@@ -371,7 +371,7 @@ impl Hooks for Firmware {
     }
 
     fn start_can_slave_tasks(&mut self) {
-        use crate::can::ffi as can;
+        use crate::can::api as can;
         task(can::can_slave_task, c"can slave", 4096, 10);
         task(can::can_slave_result_task, c"can result", 4096, 10);
         task(can::can_slave_telemetry_task, c"can telem", 4096, 5);
@@ -382,7 +382,7 @@ impl Hooks for Firmware {
     }
 
     fn start_hashrate_monitor(&mut self) {
-        crate::tasks::ffi::hashrate_monitor_start();
+        crate::tasks::api::hashrate_monitor_start();
     }
 
     fn pool_mode(&mut self) -> c_int {
@@ -394,11 +394,11 @@ impl Hooks for Firmware {
     }
 
     fn create_stratum_manager(&mut self, mode: PoolMode) {
-        crate::pool_manager::ffi::pool_mgr_create(mode == PoolMode::Dual);
+        crate::pool_manager::api::pool_mgr_create(mode == PoolMode::Dual);
     }
 
     fn stratum_load_settings(&mut self) {
-        crate::pool_manager::ffi::pool_mgr_load_settings();
+        crate::pool_manager::api::pool_mgr_load_settings();
     }
 
     /// WiFi (and Ethernet), the HTTP server, then waiting for an IP;
@@ -409,7 +409,7 @@ impl Hooks for Firmware {
         let hostname = crate::cfg::hostname();
         crate::system::set_ssid(&ssid);
 
-        crate::network::ffi::network_set_hook_preferred_changed(Some(on_preferred_changed));
+        crate::network::api::network_set_hook_preferred_changed(Some(on_preferred_changed));
         let has_eth = crate::board::api::board_has_ethernet();
         check(
             crate::network::start(&ssid, &pass, &hostname, has_eth),
@@ -418,11 +418,11 @@ impl Hooks for Firmware {
 
         // the REST server for the AP fallback / config (also reachable over
         // LAN and WiFi)
-        crate::http_server::ffi::start_rest_server(core::ptr::null_mut());
+        crate::http_server::api::start_rest_server(core::ptr::null_mut());
 
         loop {
             if crate::network::wait_any_ip(Duration::from_secs(30)) != 0 {
-                if crate::netmgr::ffi::netmgr_eth_has_ip() {
+                if crate::netmgr::api::netmgr_eth_has_ip() {
                     log!(Info, TAG, "Network up via ETH (preferred)");
                     crate::system::set_wifi_status(b"LAN Connected!");
                 } else {
@@ -473,17 +473,17 @@ impl Hooks for Firmware {
     }
 
     fn discord_watchdog_alert(&mut self) {
-        crate::discord::ffi::discord_send_watchdog();
+        crate::discord::api::discord_send_watchdog();
     }
 
     fn start_mining_tasks(&mut self) {
-        use crate::tasks::ffi as t;
+        use crate::tasks::api as t;
         task(t::create_jobs_task, c"stratum miner", 8192, 10);
         task(t::ASIC_result_task, c"asic result", 8192, 15);
         task(t::influx_task, c"influx", 8192, 1);
-        task(crate::apis_fetcher::ffi::apis_task, c"apis ticker", 8192, 5);
+        task(crate::apis_fetcher::api::apis_task, c"apis ticker", 8192, 5);
         task(
-            crate::wifi_health::ffi::wifi_monitor_task,
+            crate::wifi_health::api::wifi_monitor_task,
             c"wifi monitor",
             4096,
             1,
@@ -497,17 +497,17 @@ impl Hooks for Firmware {
     fn start_can_master(&mut self) {
         self.can_init();
         // internal RAM, as before (xTaskCreate)
-        create_internal(crate::can::ffi::can_master_task, c"can master", 4096, 5);
+        create_internal(crate::can::api::can_master_task, c"can master", 4096, 5);
     }
 
     fn start_ota_task(&mut self) {
         // writes flash: its task is in internal RAM
-        crate::ota_factory_task::ffi::ota_factory_start();
+        crate::ota_factory_task::api::ota_factory_start();
     }
 
     fn start_stratum_task(&mut self) {
         task(
-            crate::pool_manager::ffi::pool_mgr_task,
+            crate::pool_manager::api::pool_mgr_task,
             c"stratum manager",
             8192,
             5,
@@ -540,7 +540,7 @@ impl Hooks for Firmware {
 /// The firmware's entry point (the ESP-IDF main task).
 #[cfg(target_os = "espidf")]
 #[no_mangle]
-pub extern "C" fn app_main() {
+pub fn app_main() {
     let mut f = Firmware::default();
     crate::boot::start(&mut f);
     while crate::boot::idle(&mut f) {}

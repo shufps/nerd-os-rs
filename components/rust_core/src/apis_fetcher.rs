@@ -233,7 +233,7 @@ pub fn run() -> ! {
     }
 }
 
-pub(crate) mod ffi {
+pub(crate) mod api {
     use super::*;
 
     /// The task entry (`xTaskCreatePSRAM`).

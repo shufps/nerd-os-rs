@@ -12,7 +12,7 @@
 //! The class hierarchy is flattened: each method matches the board id the
 //! way the C++ overrides did.
 
-use crate::asic::driver::ffi::Handle as Asics;
+use crate::asic::driver::api::Handle as Asics;
 use crate::idf::idf_const;
 use core::ffi::{c_int, CStr};
 use std::sync::{Mutex, MutexGuard, OnceLock};
@@ -262,7 +262,7 @@ enum Buck {
 
 fn axe_tps() -> &'static Tps546 {
     // SAFETY: tps546_dev() returns a leaked Box (never freed), so the pointer is valid for 'static
-    unsafe { &*tps546::ffi::tps546_dev() }
+    unsafe { &*tps546::api::tps546_dev() }
 }
 
 /// The hardware objects and detections.

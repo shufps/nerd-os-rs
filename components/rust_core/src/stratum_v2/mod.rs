@@ -42,7 +42,7 @@ const _: () = assert!(core::mem::size_of::<FrameHeader>() == 8);
 
 extern "C" {}
 
-pub(crate) mod ffi {
+pub(crate) mod api {
 
     // --- frame header ---
 

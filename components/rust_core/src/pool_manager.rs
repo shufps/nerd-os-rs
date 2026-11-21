@@ -1026,7 +1026,7 @@ impl Manager {
         }
         if o.alert {
             let info = self.coinbase_info(pool);
-            crate::discord::ffi::discord_send_coinbase_verify_failed(
+            crate::discord::api::discord_send_coinbase_verify_failed(
                 pool,
                 info.result.user_value_satoshis,
                 info.result.total_value_satoshis,
@@ -1299,7 +1299,7 @@ impl Manager {
             return;
         }
         set_u64(b"bestdiff", ev.total_best);
-        crate::discord::ffi::discord_send_best_diff(diff, ev.network_difficulty);
+        crate::discord::api::discord_send_best_diff(diff, ev.network_difficulty);
     }
 
     pub fn check_found_block(&self, diff: f64, nbits: u32) {
@@ -1315,7 +1315,7 @@ impl Manager {
             crate::cutil::fixed(ev.network_difficulty, 6)
         );
         set_u64(b"totalblocks", ev.total_found_blocks as u64);
-        crate::discord::ffi::discord_send_block_found(diff, ev.network_difficulty);
+        crate::discord::api::discord_send_block_found(diff, ev.network_difficulty);
     }
 
     pub fn pool_host(&self, pool: c_int) -> CString {
@@ -1343,7 +1343,7 @@ impl Manager {
         self.lock()[(pool & 1) as usize].port
     }
 
-    fn ping_value(&self, pool: usize, f: extern "C" fn(c_int) -> f64) -> f64 {
+    fn ping_value(&self, pool: usize, f: fn(c_int) -> f64) -> f64 {
         if self.pings[pool].load(Acquire) {
             f(pool as c_int)
         } else {
@@ -1352,7 +1352,7 @@ impl Manager {
     }
 
     /// The ping values of the pool the v1 API shows.
-    pub fn compat_ping(&self, f: extern "C" fn(c_int) -> f64) -> f64 {
+    pub fn compat_ping(&self, f: fn(c_int) -> f64) -> f64 {
         let i = self.policy.compat_ping_pool();
         self.ping_value((i & 1) as usize, f)
     }
@@ -1370,8 +1370,8 @@ impl Manager {
                 network_difficulty: st.network_difficulty,
                 pool_difficulty: st.pool_difficulty,
                 pool_diff_err: self.policy.pool_diff_err(i as i32),
-                ping_rtt: self.ping_value(i, crate::ping::ffi::ping_last_rtt),
-                ping_loss: self.ping_value(i, crate::ping::ffi::ping_recent_loss),
+                ping_rtt: self.ping_value(i, crate::ping::api::ping_last_rtt),
+                ping_loss: self.ping_value(i, crate::ping::api::ping_recent_loss),
                 verify_blocked: block_reason(self.coinbase_info(i as c_int).blocked)
                     .map_or(core::ptr::null(), CStr::as_ptr),
                 protocol: cfg[i].protocol as c_int,
@@ -1531,7 +1531,7 @@ unsafe extern "C" fn ping_task_entry(arg: *mut c_void) {
     crate::ping::run(pool as c_int, &mut env)
 }
 
-pub(crate) mod ffi {
+pub(crate) mod api {
     use super::*;
 
     fn m() -> Option<&'static Manager> {
@@ -1539,11 +1539,11 @@ pub(crate) mod ffi {
     }
 
     /// Creates the manager (once); `dual`: dual pool mode, else failover.
-    pub extern "C" fn pool_mgr_create(dual: bool) {
+    pub fn pool_mgr_create(dual: bool) {
         let _ = MANAGER.set(Manager::new(dual));
     }
 
-    pub extern "C" fn pool_mgr_exists() -> bool {
+    pub fn pool_mgr_exists() -> bool {
         m().is_some()
     }
 
@@ -1554,70 +1554,67 @@ pub(crate) mod ffi {
         }
     }
 
-    pub extern "C" fn pool_mgr_is_dual() -> bool {
+    pub fn pool_mgr_is_dual() -> bool {
         m().is_some_and(|m| m.is_dual())
     }
 
-    pub extern "C" fn pool_mgr_check_best_diff(pool: c_int, diff: f64, nbits: u32) {
+    pub fn pool_mgr_check_best_diff(pool: c_int, diff: f64, nbits: u32) {
         if let Some(m) = m() {
             m.check_best_diff(pool, diff, nbits);
         }
     }
 
-    pub extern "C" fn pool_mgr_check_found_block(_pool: c_int, diff: f64, nbits: u32) {
+    pub fn pool_mgr_check_found_block(_pool: c_int, diff: f64, nbits: u32) {
         if let Some(m) = m() {
             m.check_found_block(diff, nbits);
         }
     }
 
-    pub extern "C" fn pool_mgr_next_active_pool() -> c_int {
+    pub fn pool_mgr_next_active_pool() -> c_int {
         m().map_or(-1, Manager::next_active_pool)
     }
 
-    pub extern "C" fn pool_mgr_select_asic_diff(pool: c_int, pool_diff: u32) -> u32 {
+    pub fn pool_mgr_select_asic_diff(pool: c_int, pool_diff: u32) -> u32 {
         m().map_or(pool_diff, |m| m.select_asic_diff(pool, pool_diff))
     }
 
-    pub extern "C" fn pool_mgr_reconnect_all() {
+    pub fn pool_mgr_reconnect_all() {
         if let Some(m) = m() {
             m.reconnect_all();
         }
     }
 
-    pub extern "C" fn pool_mgr_load_settings() {
+    pub fn pool_mgr_load_settings() {
         if let Some(m) = m() {
             m.load_settings();
         }
     }
 
-    pub extern "C" fn pool_mgr_reset_session_stats() {
+    pub fn pool_mgr_reset_session_stats() {
         if let Some(m) = m() {
             m.reset_session_stats();
         }
     }
 
-    pub extern "C" fn pool_mgr_reset_all_time_stats() {
+    pub fn pool_mgr_reset_all_time_stats() {
         if let Some(m) = m() {
             m.reset_all_time_stats();
         }
     }
 
-    /// # Safety
-    /// `info` writable.
-    pub unsafe extern "C" fn pool_mgr_info(info: *mut ManagerInfo) {
-        if let Some(m) = m() {
-            *info = m.info();
-        }
+    /// The manager's values (None before it exists).
+    pub fn pool_mgr_info() -> Option<ManagerInfo> {
+        m().map(|m| m.info())
     }
 
     /// Round trip time (ms) of the pool the v1 API shows; 0 without ping.
-    pub extern "C" fn pool_mgr_ping_rtt() -> f64 {
-        m().map_or(0.0, |m| m.compat_ping(crate::ping::ffi::ping_last_rtt))
+    pub fn pool_mgr_ping_rtt() -> f64 {
+        m().map_or(0.0, |m| m.compat_ping(crate::ping::api::ping_last_rtt))
     }
 
     /// Recent ping loss (0..1) of the pool the v1 API shows.
-    pub extern "C" fn pool_mgr_ping_loss() -> f64 {
-        m().map_or(0.0, |m| m.compat_ping(crate::ping::ffi::ping_recent_loss))
+    pub fn pool_mgr_ping_loss() -> f64 {
+        m().map_or(0.0, |m| m.compat_ping(crate::ping::api::ping_recent_loss))
     }
 }
 

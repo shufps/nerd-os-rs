@@ -103,7 +103,7 @@ pub fn round(h: &mut impl Hooks, tag: &core::ffi::CStr) -> Round {
     Round::Disconnected { reconnect }
 }
 
-mod ffi {
+mod api {
 
     // SAFETY (all): the C++ side provides valid callbacks for its context.
 }

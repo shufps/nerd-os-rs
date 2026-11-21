@@ -322,7 +322,7 @@ pub fn run(
     }
 }
 
-mod ffi {
+mod api {
     use super::*;
     use core::ffi::{c_int, c_void};
 

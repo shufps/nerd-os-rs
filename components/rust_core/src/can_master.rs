@@ -411,110 +411,60 @@ pub fn delete(slave: u8) {
     with(|m| m.delete(slave as usize));
 }
 
+/// The registry in its saved form.
+pub fn registry() -> [u8; REGISTRY_LEN] {
+    with(|m| m.registry())
+}
+
+/// A known slave's MAC.
+pub fn slave_mac(slave: u8) -> Option<[u8; 6]> {
+    with(|m| m.slot(slave as usize).filter(|s| s.used).map(|s| s.mac))
+}
+
+/// A known slave's last telemetry (`can_slave_telemetry_t`).
+pub fn slave_telemetry(slave: u8) -> Option<[u8; TELEMETRY_LEN]> {
+    with(|m| {
+        m.slot(slave as usize)
+            .filter(|s| s.used)
+            .map(|s| s.telemetry)
+    })
+}
+
+/// A known slave's configuration (`can_slave_config_t`).
+pub fn slave_config(slave: u8) -> Option<[u8; CONFIG_LEN]> {
+    with(|m| m.slot(slave as usize).filter(|s| s.used).map(|s| s.config))
+}
+
 fn with<T>(f: impl FnOnce(&mut Master) -> T) -> T {
     f(&mut MASTER.lock().unwrap_or_else(|e| e.into_inner()))
 }
 
-pub(crate) mod ffi {
+pub(crate) mod api {
     use super::*;
 
-    /// A received frame; `*out` says what to do (`CAN_EVENT_*`).
-    ///
-    /// # Safety
-    /// `data` points to the frame's 8 data bytes, `out` writable.
-    pub unsafe extern "C" fn can_master_frame(
-        id: u32,
-        dlc: u8,
-        data: *const [u8; 8],
-        now_us: i64,
-        out: *mut Event,
-    ) {
-        *out = frame(id, dlc, &*data, now_us);
-    }
-
-    pub extern "C" fn can_master_tick(now_us: i64) {
+    pub fn can_master_tick(now_us: i64) {
         tick(now_us);
     }
 
-    /// # Safety
-    /// `blob` holds `len` bytes.
-    pub unsafe extern "C" fn can_master_load_registry(blob: *const u8, len: usize) {
-        if !blob.is_null() {
-            load_registry(core::slice::from_raw_parts(blob, len));
-        }
-    }
-
-    /// # Safety
-    /// `out` holds `REGISTRY_LEN` bytes.
-    pub unsafe extern "C" fn can_master_registry(out: *mut [u8; REGISTRY_LEN]) {
-        *out = with(|m| m.registry());
-    }
-
-    pub extern "C" fn can_master_delete(slave: u8) {
+    pub fn can_master_delete(slave: u8) {
         delete(slave);
     }
 
-    pub extern "C" fn can_master_is_slave_active(slave: u8) -> bool {
+    pub fn can_master_is_slave_active(slave: u8) -> bool {
         with(|m| m.slot(slave as usize).is_some_and(|s| s.used && s.online))
     }
 
-    pub extern "C" fn can_master_is_slave_known(slave: u8) -> bool {
+    pub fn can_master_is_slave_known(slave: u8) -> bool {
         with(|m| m.slot(slave as usize).is_some_and(|s| s.used))
     }
 
     /// (never set: foreign slaves are not detected yet)
-    pub extern "C" fn can_master_is_slave_foreign(_slave: u8) -> bool {
+    pub fn can_master_is_slave_foreign(_slave: u8) -> bool {
         false
     }
 
-    /// # Safety
-    /// `out` holds 6 bytes.
-    pub unsafe extern "C" fn can_master_get_slave_mac(slave: u8, out: *mut [u8; 6]) -> bool {
-        match with(|m| m.slot(slave as usize).filter(|s| s.used).map(|s| s.mac)) {
-            Some(mac) => {
-                *out = mac;
-                true
-            }
-            None => false,
-        }
-    }
-
-    /// # Safety
-    /// `out` holds a `can_slave_telemetry_t` (49 bytes).
-    pub unsafe extern "C" fn can_master_get_slave_telemetry(
-        slave: u8,
-        out: *mut [u8; TELEMETRY_LEN],
-    ) -> bool {
-        match with(|m| {
-            m.slot(slave as usize)
-                .filter(|s| s.used)
-                .map(|s| s.telemetry)
-        }) {
-            Some(t) => {
-                *out = t;
-                true
-            }
-            None => false,
-        }
-    }
-
-    /// # Safety
-    /// `out` holds a `can_slave_config_t` (46 bytes).
-    pub unsafe extern "C" fn can_master_get_slave_config(
-        slave: u8,
-        out: *mut [u8; CONFIG_LEN],
-    ) -> bool {
-        match with(|m| m.slot(slave as usize).filter(|s| s.used).map(|s| s.config)) {
-            Some(c) => {
-                *out = c;
-                true
-            }
-            None => false,
-        }
-    }
-
     /// Sum of the power (W) the known slaves report.
-    pub extern "C" fn can_master_get_slave_fleet_power() -> f32 {
+    pub fn can_master_get_slave_fleet_power() -> f32 {
         with(|m| {
             m.slots[1..]
                 .iter()

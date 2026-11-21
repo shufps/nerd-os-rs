@@ -326,14 +326,14 @@ pub fn network_allowed(
         || parse_ipv4(host).is_some_and(|ip| ip != u32::MAX && is_private(ip))
 }
 
-pub(crate) mod ffi {
+pub(crate) mod api {
     use super::*;
 
-    pub extern "C" fn auth_rate_limit_blocked(now_ms: u64) -> bool {
+    pub fn auth_rate_limit_blocked(now_ms: u64) -> bool {
         rate_limit().blocked(now_ms)
     }
 
-    pub extern "C" fn auth_rate_limit_failure(now_ms: u64) -> bool {
+    pub fn auth_rate_limit_failure(now_ms: u64) -> bool {
         rate_limit().record_failure(now_ms)
     }
 }

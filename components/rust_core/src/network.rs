@@ -21,8 +21,8 @@ use std::time::Duration;
 use crate::idf::nvs::err_name;
 use crate::idf::{EspErr, ESP_OK};
 use crate::log::log;
-use crate::netmgr::{act as nact, ffi as netmgr};
-use crate::wifi::{act, ffi as wifi_state};
+use crate::netmgr::{act as nact, api as netmgr};
+use crate::wifi::{act, api as wifi_state};
 
 /// The event bases the network code registers for.
 #[derive(Clone, Copy)]
@@ -589,7 +589,7 @@ unsafe extern "C" fn wifi_event(_: *mut c_void, base: *const c_char, id: i32, da
         let ip = sys::got_ip(data);
         let [a, b, c, d] = ip;
         log!(Info, TAG, "WiFi got IP: {a}.{b}.{c}.{d}");
-        run_actions(wifi_state::wifi_state_got_ip(ip.as_ptr()));
+        run_actions(wifi_state::wifi_state_got_ip(ip));
     }
 }
 
@@ -772,7 +772,7 @@ static NET_BITS: Mutex<u8> = Mutex::new(0);
 static NET_CHANGED: Condvar = Condvar::new();
 static NET_INITED: AtomicBool = AtomicBool::new(false);
 
-type Hook = unsafe extern "C" fn();
+type Hook = fn();
 /// main: reconnect the pools when the preferred interface changes
 static HOOK_PREFERRED: Mutex<Option<Hook>> = Mutex::new(None);
 
@@ -782,11 +782,11 @@ fn net_bits(set: u8, clear: u8) {
     NET_CHANGED.notify_all();
 }
 
-unsafe extern "C" fn eth_got_ip() {
+fn eth_got_ip() {
     on_event(Event::EthGotIp);
 }
 
-unsafe extern "C" fn eth_link_down() {
+fn eth_link_down() {
     on_event(Event::EthLinkDown);
 }
 
@@ -801,7 +801,7 @@ fn net_init() -> EspErr {
             return e;
         }
     }
-    crate::w5500::ffi::w5500_set_hooks(Some(eth_got_ip), Some(eth_link_down));
+    crate::w5500::api::w5500_set_hooks(Some(eth_got_ip), Some(eth_link_down));
     NET_INITED.store(true, Ordering::Release);
     ESP_OK
 }
@@ -843,10 +843,7 @@ pub fn shutdown_ap_once() {
 fn on_event(ev: Event) {
     let eth = crate::w5500::netif();
     let sta = NETIF_STA.get();
-    let mut preferred = 0;
-    // SAFETY: `preferred` is a live local the call writes to
-    let a =
-        unsafe { netmgr::netmgr_event(ev as c_int, eth.is_some(), sta.is_some(), &mut preferred) };
+    let (a, preferred) = netmgr::netmgr_event(ev as c_int, eth.is_some(), sta.is_some());
 
     let set = if a & nact::SET_WIFI_BIT != 0 {
         NET_WIFI_IP
@@ -908,9 +905,7 @@ fn on_event(ev: Event) {
     if a & nact::HOOK_PREFERRED != 0 {
         let hook = *HOOK_PREFERRED.lock().unwrap_or_else(|e| e.into_inner());
         if let Some(h) = hook {
-            // SAFETY: `h` was registered through network_set_hook_preferred_changed, whose
-            // caller passes a valid function taking no arguments
-            unsafe { h() };
+            h();
         }
     }
 }
@@ -922,30 +917,22 @@ pub fn preferred_ip() -> Option<(String, bool)> {
         return Some((crate::w5500::ip(), true));
     }
     if netmgr::netmgr_wifi_has_ip() {
-        let mut buf = [0 as c_char; 20];
-        // SAFETY: `buf` is a live local of `buf.len()` bytes; the call writes at most that
-        // many including the NUL
-        let ok = unsafe { wifi_state::wifi_state_ip(buf.as_mut_ptr(), buf.len()) };
-        // SAFETY: wifi_state_ip always NUL-terminates `buf` (len > 0) and it was zeroed
-        let ip = unsafe { CStr::from_ptr(buf.as_ptr()) }
-            .to_string_lossy()
-            .into_owned();
-        if ok && !ip.is_empty() {
+        if let Some(ip) = wifi_state::wifi_state_ip().filter(|ip| !ip.is_empty()) {
             return Some((ip, false));
         }
     }
     None
 }
 
-pub(crate) mod ffi {
+pub(crate) mod api {
     use super::*;
 
-    pub extern "C" fn network_set_hook_preferred_changed(hook: Option<Hook>) {
+    pub fn network_set_hook_preferred_changed(hook: Option<Hook>) {
         *HOOK_PREFERRED.lock().unwrap_or_else(|e| e.into_inner()) = hook;
     }
 
     /// The Ethernet setup before the board init; a failure is logged.
-    pub extern "C" fn network_early_eth_init() {
+    pub fn network_early_eth_init() {
         let e = crate::w5500::early_init();
         if e != ESP_OK {
             log!(

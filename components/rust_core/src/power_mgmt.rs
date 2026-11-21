@@ -296,13 +296,13 @@ impl Env for Board {
         fan_get(ch, what)
     }
     fn influx_pwr(&mut self, v: [f32; 6]) {
-        crate::influx::ffi::influx_task_set_pwr(v[0], v[1], v[2], v[3], v[4], v[5]);
+        crate::influx::api::influx_task_set_pwr(v[0], v[1], v[2], v[3], v[4], v[5]);
     }
     fn influx_temperature(&mut self, chip: f32, vr: f32) {
-        crate::influx::ffi::influx_task_set_temperature(chip, vr);
+        crate::influx::api::influx_task_set_temperature(chip, vr);
     }
     fn influx_fan(&mut self, v: [f32; 4]) {
-        crate::influx::ffi::influx_set_fan(v[0], v[1], v[2], v[3]);
+        crate::influx::api::influx_set_fan(v[0], v[1], v[2], v[3]);
     }
     fn now_us(&mut self) -> u64 {
         crate::cutil::now_us() as u64
@@ -342,7 +342,7 @@ pub fn get(what: c_int) -> f32 {
     TASK.get().map_or(0.0, |t| t.get(what))
 }
 
-pub(crate) mod ffi {
+pub(crate) mod api {
     use super::*;
 
     pub unsafe extern "C" fn pm_task(_: *mut c_void) {

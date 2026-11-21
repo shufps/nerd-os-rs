@@ -31,6 +31,9 @@ void disp_update(int toggle);
 /* implemented in Rust (display_shot.rs): every flushed area, for the
  * development screenshot route (a no-op without it) */
 void disp_shadow_flush(int x1, int y1, int x2, int y2, const uint16_t *px);
+/* simulated short presses (bit 0: button 1, bit 1: button 2) of the
+ * development route, taken once; always 0 without it */
+uint32_t disp_debug_take_press(void);
 
 #ifdef __cplusplus
 }

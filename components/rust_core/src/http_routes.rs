@@ -69,6 +69,9 @@ pub enum Handler {
     /// GET /api/debug/screen (development)
     #[cfg(feature = "screenshot")]
     Screenshot,
+    /// POST /api/debug/press?btn=1|2 (development)
+    #[cfg(feature = "screenshot")]
+    Press,
 }
 
 /// What runs before the handler, and when the route exists.
@@ -100,12 +103,15 @@ pub mod flag {
 /// The routes of optional development features, registered before
 /// [`ROUTES`] (not part of the table the reference test compares).
 #[cfg(feature = "screenshot")]
-pub static EXTRA: [Route; 1] = [r(
-    c"/api/debug/screen",
-    Method::Get,
-    Handler::Screenshot,
-    API | OTP,
-)];
+pub static EXTRA: [Route; 2] = [
+    r(
+        c"/api/debug/screen",
+        Method::Get,
+        Handler::Screenshot,
+        API | OTP,
+    ),
+    r(c"/api/debug/press", Method::Post, Handler::Press, API | OTP),
+];
 #[cfg(not(feature = "screenshot"))]
 pub static EXTRA: [Route; 0] = [];
 

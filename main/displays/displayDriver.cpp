@@ -544,6 +544,10 @@ void DisplayDriver::processButtons(Button &btn1, Button &btn2, int64_t tnow,
 
     uint32_t evt1 = btn1.getEvent();
     uint32_t evt2 = btn2.getEvent();
+    // simulated short presses of the development build (always 0 otherwise)
+    uint32_t sim = disp_debug_take_press();
+    if (sim & 1) evt1 |= BTN_EVENT_SHORTPRESS;
+    if (sim & 2) evt2 |= BTN_EVENT_SHORTPRESS;
     bool bothPressed = (evt1 & BTN_EVENT_PRESSED) && (evt2 & BTN_EVENT_PRESSED);
     bool anyPressed = (evt1 & BTN_EVENT_PRESSED) || (evt2 & BTN_EVENT_PRESSED);
 

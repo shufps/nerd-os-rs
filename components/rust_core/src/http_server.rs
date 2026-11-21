@@ -337,6 +337,8 @@ unsafe fn register_routes(ctx: *mut ServerCtx) {
                     Handler::Coredump => Some(crate::http_coredump::handler as httpd::HandlerFn),
                     #[cfg(feature = "screenshot")]
                     Handler::Screenshot => Some(crate::display_shot::handler as httpd::HandlerFn),
+                    #[cfg(feature = "screenshot")]
+                    Handler::Press => Some(crate::display_shot::press as httpd::HandlerFn),
                     Handler::CanNodes => Some(crate::http_can::nodes as httpd::HandlerFn),
                     Handler::CanSlaveAction => Some(crate::http_can::action as httpd::HandlerFn),
                     Handler::CanSlavePatch => Some(crate::http_can::patch as httpd::HandlerFn),

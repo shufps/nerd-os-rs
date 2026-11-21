@@ -3,6 +3,8 @@
 //! partial buffers, so every flushed area is copied into a shadow frame
 //! buffer in PSRAM, which `GET /api/debug/screen` returns as a BMP. Without
 //! the feature the flush hook does nothing and the route does not exist.
+//! `POST /api/debug/press?btn=1|2` simulates a short button press, so every
+//! screen can be reached for a screenshot.
 //! Not for release builds: the display can show the OTP enrollment QR code.
 
 /// The T-Display-S3 panel (landscape).
@@ -12,6 +14,7 @@ pub const HEIGHT: usize = 170;
 #[cfg(feature = "screenshot")]
 mod imp {
     use super::{HEIGHT, WIDTH};
+    use std::sync::atomic::{AtomicU32, Ordering};
     use std::sync::Mutex;
 
     use crate::idf::httpd::Request;
@@ -70,6 +73,20 @@ mod imp {
         b
     }
 
+    /// simulated presses, taken by the display task
+    pub static PRESSES: AtomicU32 = AtomicU32::new(0);
+
+    pub fn press(req: &mut Request) -> EspErr {
+        let q = req.query(32);
+        let bit = match q.as_deref().map(|q| q.to_bytes()) {
+            Some(b"btn=1") => 1,
+            Some(b"btn=2") => 2,
+            _ => return req.send_err(crate::idf::httpd::err::E400_BAD_REQUEST, Some(c"btn=1|2")),
+        };
+        PRESSES.fetch_or(bit, Ordering::AcqRel);
+        req.send(b"ok")
+    }
+
     pub fn handler(req: &mut Request) -> EspErr {
         req.set_type(c"image/bmp");
         req.set_hdr(c"Cache-Control", c"no-store");
@@ -78,9 +95,19 @@ mod imp {
 }
 
 #[cfg(feature = "screenshot")]
-pub use imp::handler;
+pub use imp::{handler, press};
 
 pub(crate) mod ffi {
+    /// The simulated presses since the last call (bit 0: button 1, bit 1:
+    /// button 2); always 0 without the feature.
+    #[no_mangle]
+    pub extern "C" fn disp_debug_take_press() -> u32 {
+        #[cfg(feature = "screenshot")]
+        return super::imp::PRESSES.swap(0, std::sync::atomic::Ordering::AcqRel);
+        #[cfg(not(feature = "screenshot"))]
+        0
+    }
+
     /// Every area LVGL flushes to the panel (`px`: (x2-x1+1)*(y2-y1+1)
     /// pixels).
     ///

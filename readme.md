@@ -185,6 +185,8 @@ the display can show the OTP enrollment QR code.
 ./docker/idf.sh -DRUST_CORE_SCREENSHOT=ON reconfigure
 ./docker/idf.sh build
 curl -o screen.bmp http://<device>/api/debug/screen
+# a short press of button 1 or 2, to reach the other screens
+curl -X POST "http://<device>/api/debug/press?btn=1"
 ```
 
 `-DRUST_CORE_SCREENSHOT=OFF reconfigure` turns it off again (the option is

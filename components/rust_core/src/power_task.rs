@@ -12,7 +12,7 @@
 //! The overheat status word is built from the temperatures with saturating
 //! conversions (negative and NaN give 0).
 
-use core::ffi::{c_int, c_void, CStr};
+use core::ffi::{c_int, CStr};
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::Mutex;
 use std::time::{Duration, Instant};
@@ -302,123 +302,6 @@ impl PowerTask {
                 next += period;
             }
         }
-    }
-}
-
-/// `power_task_board_t`: the board, the fan controller and the system
-/// error; `lock`/`unlock` take the task's recursive hardware mutex.
-#[repr(C)]
-pub struct Hooks {
-    pub ctx: *mut c_void,
-    pub lock: unsafe extern "C" fn(ctx: *mut c_void),
-    pub unlock: unsafe extern "C" fn(ctx: *mut c_void),
-    pub is_shutdown: unsafe extern "C" fn(ctx: *mut c_void) -> bool,
-    pub is_initialized: unsafe extern "C" fn(ctx: *mut c_void) -> bool,
-    pub is_buck_initialized: unsafe extern "C" fn(ctx: *mut c_void) -> bool,
-    pub asic_voltage_millis: unsafe extern "C" fn(ctx: *mut c_void) -> u16,
-    pub set_voltage: unsafe extern "C" fn(ctx: *mut c_void, volts: f32),
-    pub asic_frequency: unsafe extern "C" fn(ctx: *mut c_void) -> u16,
-    pub set_asic_frequency: unsafe extern "C" fn(ctx: *mut c_void, mhz: f32) -> bool,
-    pub vr_frequency: unsafe extern "C" fn(ctx: *mut c_void) -> u32,
-    pub set_vr_frequency: unsafe extern "C" fn(ctx: *mut c_void, hz: u32),
-    pub request_chip_temps: unsafe extern "C" fn(ctx: *mut c_void),
-    pub max_chip_temp: unsafe extern "C" fn(ctx: *mut c_void) -> f32,
-    pub asic_count: unsafe extern "C" fn(ctx: *mut c_void) -> c_int,
-    pub chip_temp: unsafe extern "C" fn(ctx: *mut c_void, i: c_int) -> f32,
-    pub request_buck_telemetry: unsafe extern "C" fn(ctx: *mut c_void),
-    pub power: unsafe extern "C" fn(ctx: *mut c_void, what: c_int) -> f32,
-    pub fault: unsafe extern "C" fn(ctx: *mut c_void, status: *mut u32) -> c_int,
-    pub set_board_error: unsafe extern "C" fn(ctx: *mut c_void, error: c_int, status: u32),
-    pub num_temp_sensors: unsafe extern "C" fn(ctx: *mut c_void) -> c_int,
-    pub temperature: unsafe extern "C" fn(ctx: *mut c_void, i: c_int) -> f32,
-    pub fan_update: unsafe extern "C" fn(ctx: *mut c_void, chip_temp_max: f32, vr_temp: f32),
-    pub fan_get: unsafe extern "C" fn(ctx: *mut c_void, ch: c_int, what: c_int) -> u16,
-}
-
-impl Env for &Hooks {
-    // SAFETY (all): valid hooks (caller contract)
-    fn lock(&mut self) {
-        unsafe { (self.lock)(self.ctx) }
-    }
-    fn unlock(&mut self) {
-        unsafe { (self.unlock)(self.ctx) }
-    }
-    fn is_shutdown(&mut self) -> bool {
-        unsafe { (self.is_shutdown)(self.ctx) }
-    }
-    fn is_initialized(&mut self) -> bool {
-        unsafe { (self.is_initialized)(self.ctx) }
-    }
-    fn is_buck_initialized(&mut self) -> bool {
-        unsafe { (self.is_buck_initialized)(self.ctx) }
-    }
-    fn asic_voltage_millis(&mut self) -> u16 {
-        unsafe { (self.asic_voltage_millis)(self.ctx) }
-    }
-    fn set_voltage(&mut self, volts: f32) {
-        unsafe { (self.set_voltage)(self.ctx, volts) }
-    }
-    fn asic_frequency(&mut self) -> u16 {
-        unsafe { (self.asic_frequency)(self.ctx) }
-    }
-    fn set_asic_frequency(&mut self, mhz: f32) -> bool {
-        unsafe { (self.set_asic_frequency)(self.ctx, mhz) }
-    }
-    fn vr_frequency(&mut self) -> u32 {
-        unsafe { (self.vr_frequency)(self.ctx) }
-    }
-    fn set_vr_frequency(&mut self, hz: u32) {
-        unsafe { (self.set_vr_frequency)(self.ctx, hz) }
-    }
-    fn request_chip_temps(&mut self) {
-        unsafe { (self.request_chip_temps)(self.ctx) }
-    }
-    fn max_chip_temp(&mut self) -> f32 {
-        unsafe { (self.max_chip_temp)(self.ctx) }
-    }
-    fn asic_count(&mut self) -> c_int {
-        unsafe { (self.asic_count)(self.ctx) }
-    }
-    fn chip_temp(&mut self, i: c_int) -> f32 {
-        unsafe { (self.chip_temp)(self.ctx, i) }
-    }
-    fn request_buck_telemetry(&mut self) {
-        unsafe { (self.request_buck_telemetry)(self.ctx) }
-    }
-    fn power(&mut self, what: c_int) -> f32 {
-        unsafe { (self.power)(self.ctx, what) }
-    }
-    fn fault(&mut self) -> (c_int, u32) {
-        let mut status = 0;
-        let e = unsafe { (self.fault)(self.ctx, &mut status) };
-        (e, status)
-    }
-    fn set_board_error(&mut self, error: c_int, status: u32) {
-        unsafe { (self.set_board_error)(self.ctx, error, status) }
-    }
-    fn num_temp_sensors(&mut self) -> c_int {
-        unsafe { (self.num_temp_sensors)(self.ctx) }
-    }
-    fn temperature(&mut self, i: c_int) -> f32 {
-        unsafe { (self.temperature)(self.ctx, i) }
-    }
-    fn fan_update(&mut self, chip_temp_max: f32, vr_temp: f32) {
-        unsafe { (self.fan_update)(self.ctx, chip_temp_max, vr_temp) }
-    }
-    fn fan_get(&mut self, ch: c_int, what: c_int) -> u16 {
-        unsafe { (self.fan_get)(self.ctx, ch, what) }
-    }
-    fn influx_pwr(&mut self, v: [f32; 6]) {
-        crate::influx::ffi::influx_task_set_pwr(v[0], v[1], v[2], v[3], v[4], v[5]);
-    }
-    fn influx_temperature(&mut self, chip: f32, vr: f32) {
-        crate::influx::ffi::influx_task_set_temperature(chip, vr);
-    }
-    fn influx_fan(&mut self, v: [f32; 4]) {
-        crate::influx::ffi::influx_set_fan(v[0], v[1], v[2], v[3]);
-    }
-    fn now_us(&mut self) -> u64 {
-        crate::cutil::now_us() as u64
     }
 }
 

@@ -13,7 +13,7 @@
 //! voltage below ~0.99 V (or above ~1.93 V) gives the largest code in its
 //! direction.
 
-use core::ffi::{c_int, c_void, CStr};
+use core::ffi::{c_int, CStr};
 
 use crate::board_core::{validate_voltage, Limits};
 use crate::cutil::fixed;
@@ -312,81 +312,6 @@ pub fn shutdown(hw: &mut impl Hw, v: Variant, limits: &Limits) {
         hw.delay_ms(500);
     }
     hw.state(STATE_SHUTDOWN, 1);
-}
-
-/// `board_power_hw_t`: the hooks (each gets `ctx`).
-#[repr(C)]
-pub struct Hooks {
-    pub ctx: *mut c_void,
-    pub vreg: unsafe extern "C" fn(ctx: *mut c_void, on: bool),
-    pub ldo: unsafe extern "C" fn(ctx: *mut c_void, on: bool),
-    pub asic_reset: unsafe extern "C" fn(ctx: *mut c_void, released: bool),
-    pub delay_ms: unsafe extern "C" fn(ctx: *mut c_void, ms: u32),
-    pub buck_init:
-        unsafe extern "C" fn(ctx: *mut c_void, phases: c_int, imax: c_int, ifault: f32) -> bool,
-    pub buck_set_vout: unsafe extern "C" fn(ctx: *mut c_void, volts: f32) -> bool,
-    pub buck_disable: unsafe extern "C" fn(ctx: *mut c_void) -> bool,
-    pub dac_set: unsafe extern "C" fn(ctx: *mut c_void, code: u8),
-    pub serial_clear: unsafe extern "C" fn(ctx: *mut c_void),
-    pub serial_set_baud: unsafe extern "C" fn(ctx: *mut c_void, baud: c_int),
-    pub asic_init: unsafe extern "C" fn(
-        ctx: *mut c_void,
-        frequency: c_int,
-        count: c_int,
-        max_difficulty: u32,
-        vr_frequency: u32,
-    ) -> c_int,
-    pub asic_max_baud: unsafe extern "C" fn(ctx: *mut c_void) -> c_int,
-    pub state: unsafe extern "C" fn(ctx: *mut c_void, what: c_int, value: c_int),
-}
-
-impl Hw for &Hooks {
-    // SAFETY (all): valid hooks (caller contract)
-    fn vreg(&mut self, on: bool) {
-        unsafe { (self.vreg)(self.ctx, on) }
-    }
-    fn ldo(&mut self, on: bool) {
-        unsafe { (self.ldo)(self.ctx, on) }
-    }
-    fn asic_reset(&mut self, released: bool) {
-        unsafe { (self.asic_reset)(self.ctx, released) }
-    }
-    fn delay_ms(&mut self, ms: u32) {
-        unsafe { (self.delay_ms)(self.ctx, ms) }
-    }
-    fn buck_init(&mut self, phases: c_int, imax: c_int, ifault: f32) -> bool {
-        unsafe { (self.buck_init)(self.ctx, phases, imax, ifault) }
-    }
-    fn buck_set_vout(&mut self, volts: f32) -> bool {
-        unsafe { (self.buck_set_vout)(self.ctx, volts) }
-    }
-    fn buck_disable(&mut self) -> bool {
-        unsafe { (self.buck_disable)(self.ctx) }
-    }
-    fn dac_set(&mut self, code: u8) {
-        unsafe { (self.dac_set)(self.ctx, code) }
-    }
-    fn serial_clear(&mut self) {
-        unsafe { (self.serial_clear)(self.ctx) }
-    }
-    fn serial_set_baud(&mut self, baud: c_int) {
-        unsafe { (self.serial_set_baud)(self.ctx, baud) }
-    }
-    fn asic_init(
-        &mut self,
-        frequency: c_int,
-        count: c_int,
-        max_difficulty: u32,
-        vr_frequency: u32,
-    ) -> c_int {
-        unsafe { (self.asic_init)(self.ctx, frequency, count, max_difficulty, vr_frequency) }
-    }
-    fn asic_max_baud(&mut self) -> c_int {
-        unsafe { (self.asic_max_baud)(self.ctx) }
-    }
-    fn state(&mut self, what: c_int, value: c_int) {
-        unsafe { (self.state)(self.ctx, what, value) }
-    }
 }
 
 mod ffi {}

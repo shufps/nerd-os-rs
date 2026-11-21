@@ -18,7 +18,7 @@
 //! - a NaN temperature drives the channel to 100 % and leaves the PID state
 //!   untouched, so the PID keeps working once the readings are valid again.
 
-use core::ffi::{c_int, c_void, CStr};
+use core::ffi::{c_int, CStr};
 use std::sync::Mutex;
 
 use crate::cutil::fixed;
@@ -326,24 +326,6 @@ impl FanController {
 
     pub fn pid_use_max(&self) -> bool {
         self.with(|s| s.pid_use_max)
-    }
-}
-
-/// `fan_control_board_t`: the board's fans.
-#[repr(C)]
-pub struct Hooks {
-    pub ctx: *mut c_void,
-    pub get_rpm: unsafe extern "C" fn(ctx: *mut c_void, ch: c_int) -> u16,
-    pub set_speed: unsafe extern "C" fn(ctx: *mut c_void, ch: c_int, fraction: f32),
-}
-
-impl Fans for &Hooks {
-    fn rpm(&mut self, ch: usize) -> u16 {
-        // SAFETY: valid hooks (caller contract)
-        unsafe { (self.get_rpm)(self.ctx, ch as c_int) }
-    }
-    fn set_speed(&mut self, ch: usize, fraction: f32) {
-        unsafe { (self.set_speed)(self.ctx, ch as c_int, fraction) }
     }
 }
 

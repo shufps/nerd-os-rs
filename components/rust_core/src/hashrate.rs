@@ -11,7 +11,7 @@
 //!   on boards with many chips;
 //! - a reply at the same microsecond as the previous one is ignored.
 
-use core::ffi::{c_int, c_void, CStr};
+use core::ffi::{c_int, CStr};
 use std::sync::Mutex;
 use std::time::{Duration, Instant};
 
@@ -213,28 +213,6 @@ pub fn run(env: &mut impl Env) -> ! {
     }
 }
 
-/// `hashrate_monitor_hooks_t`
-#[repr(C)]
-pub struct Hooks {
-    pub ctx: *mut c_void,
-    pub suspend_if_shutdown: unsafe extern "C" fn(ctx: *mut c_void),
-    pub reset_counter: unsafe extern "C" fn(ctx: *mut c_void, reg: u8),
-    pub read_counter: unsafe extern "C" fn(ctx: *mut c_void, reg: u8),
-}
-
-impl Env for &Hooks {
-    fn suspend_if_shutdown(&mut self) {
-        // SAFETY: valid hooks (caller contract of hashrate_monitor_run)
-        unsafe { (self.suspend_if_shutdown)(self.ctx) }
-    }
-    fn reset_counter(&mut self, reg: u8) {
-        unsafe { (self.reset_counter)(self.ctx, reg) }
-    }
-    fn read_counter(&mut self, reg: u8) {
-        unsafe { (self.read_counter)(self.ctx, reg) }
-    }
-}
-
 pub(crate) mod ffi {
     use super::*;
 
@@ -280,16 +258,6 @@ pub(crate) mod ffi {
     #[no_mangle]
     pub extern "C" fn hashrate_monitor_external() -> f32 {
         external()
-    }
-
-    /// The measurement loop; never returns.
-    ///
-    /// # Safety
-    /// `hooks` valid for the task's lifetime.
-    #[no_mangle]
-    pub unsafe extern "C" fn hashrate_monitor_run(hooks: *const Hooks) -> ! {
-        let mut env = &*hooks;
-        run(&mut env)
     }
 }
 

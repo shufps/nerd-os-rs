@@ -14,7 +14,7 @@
 //!   every block of a session is counted;
 //! - share counters are 64-bit.
 
-use core::ffi::{c_char, c_int, c_void, CStr};
+use core::ffi::{c_int, CStr};
 use std::sync::Mutex;
 use std::time::{Duration, Instant};
 
@@ -25,8 +25,6 @@ use crate::log::log;
 const TAG: &CStr = c"InfluxDB";
 const TASK_TAG: &CStr = c"influx_task";
 const PERIOD: Duration = Duration::from_secs(15);
-/// Response buffer (`m_big_buffer_SIZE`).
-const RESPONSE_MAX: usize = 32768;
 
 #[derive(Clone, Default, Debug)]
 pub struct Settings {
@@ -434,7 +432,6 @@ impl Client {
 }
 
 /// The values the task takes from the system and the pool manager.
-#[repr(C)]
 #[derive(Clone, Copy, Default, Debug)]
 pub struct Inputs {
     pub hashrate: f32,
@@ -577,85 +574,6 @@ pub fn run(settings: Settings, env: &mut impl TaskEnv) -> ! {
 }
 
 // --- C API
-
-/// `influx_hooks_t`
-#[repr(C)]
-pub struct Hooks {
-    pub ctx: *mut c_void,
-    pub suspend_if_shutdown: unsafe extern "C" fn(ctx: *mut c_void),
-    pub inputs: unsafe extern "C" fn(ctx: *mut c_void, out: *mut Inputs),
-    /// method 0 GET, 1 POST; header values NULL if not set; the answer into
-    /// `resp` (at most `resp_cap` bytes, `*resp_len`); the HTTP status or
-    /// < 0 if there was no answer (logged by the hook)
-    pub request: unsafe extern "C" fn(
-        ctx: *mut c_void,
-        method: c_int,
-        url: *const c_char,
-        auth: *const c_char,
-        content_type: *const c_char,
-        accept: *const c_char,
-        body: *const u8,
-        body_len: usize,
-        resp: *mut u8,
-        resp_cap: usize,
-        resp_len: *mut usize,
-    ) -> c_int,
-}
-
-impl Env for &Hooks {
-    fn request(
-        &mut self,
-        method: Method,
-        url: &str,
-        auth: Option<&str>,
-        content_type: Option<&str>,
-        accept: Option<&str>,
-        body: &[u8],
-    ) -> Response {
-        let c = |s: Option<&str>| s.and_then(|s| std::ffi::CString::new(s).ok());
-        let (Some(url), auth, ct, acc) = (c(Some(url)), c(auth), c(content_type), c(accept)) else {
-            return Response {
-                status: -1,
-                body: Vec::new(),
-            };
-        };
-        let p =
-            |s: &Option<std::ffi::CString>| s.as_ref().map_or(core::ptr::null(), |s| s.as_ptr());
-        let mut resp = vec![0u8; RESPONSE_MAX];
-        let mut len = 0usize;
-        // SAFETY: valid hooks (caller contract of influx_run); buffers live
-        let status = unsafe {
-            (self.request)(
-                self.ctx,
-                method as c_int,
-                url.as_ptr(),
-                p(&auth),
-                p(&ct),
-                p(&acc),
-                body.as_ptr(),
-                body.len(),
-                resp.as_mut_ptr(),
-                resp.len(),
-                &mut len,
-            )
-        };
-        resp.truncate(len.min(RESPONSE_MAX));
-        Response { status, body: resp }
-    }
-}
-
-impl TaskEnv for &Hooks {
-    fn suspend_if_shutdown(&mut self) {
-        // SAFETY: valid hooks
-        unsafe { (self.suspend_if_shutdown)(self.ctx) }
-    }
-    fn inputs(&mut self) -> Inputs {
-        let mut i = Inputs::default();
-        // SAFETY: valid hooks, `i` writable
-        unsafe { (self.inputs)(self.ctx, &mut i) };
-        i
-    }
-}
 
 pub(crate) mod ffi {
     use super::*;

@@ -29,17 +29,6 @@ float hashrate_monitor_smoothed(void);
 void hashrate_monitor_set_external(float ghs);
 float hashrate_monitor_external(void);
 
-typedef struct {
-    void *ctx;
-    void (*suspend_if_shutdown)(void *ctx);
-    /* broadcast reset / read of a counter register */
-    void (*reset_counter)(void *ctx, uint8_t reg);
-    void (*read_counter)(void *ctx, uint8_t reg);
-} hashrate_monitor_hooks_t;
-
-/* The measurement loop (every 5 s); never returns. */
-void hashrate_monitor_run(const hashrate_monitor_hooks_t *hooks) __attribute__((noreturn));
-
 #ifdef __cplusplus
 }
 #endif

@@ -12,7 +12,7 @@
 //!   default 0xff/0xffff);
 //! - the "initialized" flag starts false until `init()`.
 
-use core::ffi::{c_int, c_void, CStr};
+use core::ffi::{c_int, CStr};
 
 use crate::log::log;
 
@@ -415,39 +415,6 @@ impl Tps536x7 {
 
 // ---------------------------------------------------------------------------
 // C API
-
-/// `tps536x7_bus_t`: the SMBus transactions; each returns an `esp_err_t`.
-#[repr(C)]
-pub struct Hooks {
-    pub ctx: *mut c_void,
-    pub read_byte: unsafe extern "C" fn(ctx: *mut c_void, addr: u8, cmd: u8, out: *mut u8) -> c_int,
-    pub read_word:
-        unsafe extern "C" fn(ctx: *mut c_void, addr: u8, cmd: u8, out: *mut u16) -> c_int,
-    pub write_byte: unsafe extern "C" fn(ctx: *mut c_void, addr: u8, cmd: u8, data: u8) -> c_int,
-    pub write_word: unsafe extern "C" fn(ctx: *mut c_void, addr: u8, cmd: u8, data: u16) -> c_int,
-    pub write_command: unsafe extern "C" fn(ctx: *mut c_void, addr: u8, cmd: u8) -> c_int,
-}
-
-impl Bus for &Hooks {
-    fn read_byte(&mut self, addr: u8, cmd: u8) -> Option<u8> {
-        let mut v = 0;
-        // SAFETY: valid hooks (caller contract)
-        (unsafe { (self.read_byte)(self.ctx, addr, cmd, &mut v) } == 0).then_some(v)
-    }
-    fn read_word(&mut self, addr: u8, cmd: u8) -> Option<u16> {
-        let mut v = 0;
-        (unsafe { (self.read_word)(self.ctx, addr, cmd, &mut v) } == 0).then_some(v)
-    }
-    fn write_byte(&mut self, addr: u8, cmd: u8, data: u8) -> bool {
-        unsafe { (self.write_byte)(self.ctx, addr, cmd, data) == 0 }
-    }
-    fn write_word(&mut self, addr: u8, cmd: u8, data: u16) -> bool {
-        unsafe { (self.write_word)(self.ctx, addr, cmd, data) == 0 }
-    }
-    fn write_command(&mut self, addr: u8, cmd: u8) -> bool {
-        unsafe { (self.write_command)(self.ctx, addr, cmd) == 0 }
-    }
-}
 
 mod ffi {}
 

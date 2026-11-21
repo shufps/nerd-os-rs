@@ -87,16 +87,20 @@ struct Buf(*mut u8);
 
 impl Buf {
     fn new() -> Option<Buf> {
+        // SAFETY: heap_caps_malloc has no preconditions; a NULL result yields None
         let p = unsafe { sys::heap_caps_malloc(UPLOAD_CHUNK, CAP_INTERNAL_8BIT) } as *mut u8;
         (!p.is_null()).then_some(Buf(p))
     }
     fn slice(&mut self) -> &mut [u8] {
+        // SAFETY: self.0 is the non-null UPLOAD_CHUNK-byte allocation owned by self, and &mut self
+        // keeps the slice unique
         unsafe { core::slice::from_raw_parts_mut(self.0, UPLOAD_CHUNK) }
     }
 }
 
 impl Drop for Buf {
     fn drop(&mut self) {
+        // SAFETY: self.0 came from heap_caps_malloc in Buf::new and is freed only here
         unsafe { sys::heap_caps_free(self.0 as *mut c_void) }
     }
 }

@@ -64,10 +64,12 @@ mod sys {
 }
 
 struct Chars(std::sync::Mutex<Characteristics>);
-// the curve pointers point into static calibration tables
+// SAFETY: the curve pointers point into static read-only calibration tables, and all
+// access goes through the mutex.
 unsafe impl Sync for Chars {}
 
 // all zero until init()
+// SAFETY: integers and raw pointers, for which all zero (null) is valid.
 static CHARS: Chars = Chars(std::sync::Mutex::new(unsafe { core::mem::zeroed() }));
 
 fn chars() -> std::sync::MutexGuard<'static, Characteristics> {
@@ -77,6 +79,7 @@ fn chars() -> std::sync::MutexGuard<'static, Characteristics> {
 /// Channel attenuation and calibration.
 pub fn init() {
     let mut c = chars();
+    // SAFETY: plain configuration calls; `c` is the locked characteristics, written by the call.
     unsafe {
         sys::adc1_config_channel_atten(CHANNEL, ATTEN);
         sys::esp_adc_cal_characterize(UNIT, ATTEN, WIDTH, 0, &mut *c);
@@ -86,6 +89,7 @@ pub fn init() {
 /// The core voltage in mV.
 pub fn vcore_mv() -> u16 {
     let c = chars();
+    // SAFETY: plain ADC calls; `c` is the locked characteristics, only read.
     unsafe {
         sys::adc1_config_width(WIDTH);
         sys::esp_adc_cal_raw_to_voltage(sys::adc1_get_raw(CHANNEL) as u32, &*c) as u16

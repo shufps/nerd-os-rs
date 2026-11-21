@@ -93,6 +93,8 @@ fn stats() -> crate::pool_stats::Summary {
 
 fn manager_info() -> http_json::ManagerInfo {
     let mut m = core::mem::MaybeUninit::zeroed();
+    // SAFETY: the pointer is writable; ManagerInfo is plain numbers, bools and
+    // nullable pointers, so it is valid zeroed even if nothing is written
     unsafe {
         crate::pool_manager::ffi::pool_mgr_info(m.as_mut_ptr());
         m.assume_init()
@@ -143,10 +145,12 @@ fn set_json(req: &mut Request) {
 }
 
 fn running_partition() -> CString {
+    // SAFETY: no arguments; returns a pointer into the static partition table or NULL
     let p = unsafe { sys::esp_ota_get_running_partition() };
     if p.is_null() {
         return CString::default();
     }
+    // SAFETY: non-null and static; the label array is NUL-terminated
     unsafe { CStr::from_ptr((*p).label.as_ptr()) }.into()
 }
 
@@ -154,6 +158,7 @@ fn running_partition() -> CString {
 pub(crate) fn reload_settings() {
     crate::board::ffi::board_load_settings();
     crate::power_mgmt::fan_load_settings();
+    // SAFETY: the display's C++ entry point, no arguments
     unsafe { sys::disp_load_settings() };
     crate::pool_manager::ffi::pool_mgr_load_settings();
 }

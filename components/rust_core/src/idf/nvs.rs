@@ -65,6 +65,7 @@ mod sys {
 
 /// The name of an error code.
 pub fn err_name(err: EspErr) -> String {
+    // SAFETY: `esp_err_to_name` always returns a static NUL-terminated string.
     unsafe { CStr::from_ptr(sys::esp_err_to_name(err)) }
         .to_string_lossy()
         .into_owned()
@@ -76,6 +77,7 @@ pub struct Nvs(Handle);
 impl Nvs {
     pub fn open(namespace: &CStr, mode: u32) -> Result<Nvs, EspErr> {
         let mut h = 0;
+        // SAFETY: `namespace` is NUL-terminated and `h` a valid local for the out value.
         match unsafe { sys::nvs_open(namespace.as_ptr(), mode, &mut h) } {
             ESP_OK => Ok(Nvs(h)),
             e => Err(e),
@@ -83,16 +85,19 @@ impl Nvs {
     }
 
     pub fn commit(&self) -> EspErr {
+        // SAFETY: the handle comes from a successful `nvs_open` and is only closed in `drop`.
         unsafe { sys::nvs_commit(self.0) }
     }
 
     pub fn get_blob(&self, key: &CStr) -> Result<Vec<u8>, EspErr> {
         let mut len = 0usize;
+        // SAFETY: the handle comes from a successful `nvs_open` and is only closed in `drop`; `key` is NUL-terminated, a null buffer only queries the length.
         let e = unsafe { sys::nvs_get_blob(self.0, key.as_ptr(), core::ptr::null_mut(), &mut len) };
         if e != ESP_OK {
             return Err(e);
         }
         let mut buf = vec![0u8; len];
+        // SAFETY: as above; `buf` is writable for `len` bytes, the length passed in.
         match unsafe {
             sys::nvs_get_blob(
                 self.0,
@@ -110,6 +115,7 @@ impl Nvs {
     }
 
     pub fn set_blob(&self, key: &CStr, data: &[u8]) -> EspErr {
+        // SAFETY: the handle comes from a successful `nvs_open` and is only closed in `drop`; `key` is NUL-terminated and `data` readable for `data.len()` bytes.
         unsafe {
             sys::nvs_set_blob(
                 self.0,
@@ -123,6 +129,7 @@ impl Nvs {
     /// A string (without the terminator); None if missing or empty.
     pub fn get_str(&self, key: &CStr) -> Option<Vec<u8>> {
         let mut len = 0usize;
+        // SAFETY: the handle comes from a successful `nvs_open` and is only closed in `drop`; `key` is NUL-terminated, a null buffer only queries the length.
         if unsafe { sys::nvs_get_str(self.0, key.as_ptr(), core::ptr::null_mut(), &mut len) }
             != ESP_OK
             || len == 0
@@ -130,6 +137,7 @@ impl Nvs {
             return None;
         }
         let mut buf = vec![0u8; len];
+        // SAFETY: as above; `buf` is writable for `len` bytes, the length passed in.
         if unsafe {
             sys::nvs_get_str(
                 self.0,
@@ -148,17 +156,20 @@ impl Nvs {
 
     pub fn get_u16(&self, key: &CStr) -> Option<u16> {
         let mut v = 0;
+        // SAFETY: the handle comes from a successful `nvs_open` and is only closed in `drop`; `key` is NUL-terminated and `v` a valid local.
         (unsafe { sys::nvs_get_u16(self.0, key.as_ptr(), &mut v) } == ESP_OK).then_some(v)
     }
 
     pub fn get_u64(&self, key: &CStr) -> Option<u64> {
         let mut v = 0;
+        // SAFETY: the handle comes from a successful `nvs_open` and is only closed in `drop`; `key` is NUL-terminated and `v` a valid local.
         (unsafe { sys::nvs_get_u64(self.0, key.as_ptr(), &mut v) } == ESP_OK).then_some(v)
     }
 }
 
 impl Drop for Nvs {
     fn drop(&mut self) {
+        // SAFETY: the handle is open and owned by this `Nvs`; it is not used after drop.
         unsafe { sys::nvs_close(self.0) }
     }
 }

@@ -60,6 +60,8 @@ pub fn init_fs() -> EspErr {
         max_files: 5,
         format_if_mount_failed: false,
     };
+    // SAFETY: `conf` is a live config with a static base path; it is only read
+    // (the strings are copied)
     let ret = unsafe { sys::esp_vfs_spiffs_register(&conf) };
     if ret != ESP_OK {
         match ret {
@@ -75,6 +77,7 @@ pub fn init_fs() -> EspErr {
         return ESP_FAIL;
     }
     let (mut total, mut used) = (0usize, 0usize);
+    // SAFETY: NULL label means the default partition; both outputs are writable usizes
     let ret = unsafe { sys::esp_spiffs_info(core::ptr::null(), &mut total, &mut used) };
     if ret != ESP_OK {
         log!(

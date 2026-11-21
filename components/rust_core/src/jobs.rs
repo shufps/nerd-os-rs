@@ -771,6 +771,7 @@ mod tests {
         cb1: &std::ffi::CString,
         cb2: &std::ffi::CString,
     ) -> Box<MiningNotify> {
+        // SAFETY: MiningNotify is plain numbers, arrays and nullable pointers
         let mut n: Box<MiningNotify> = unsafe { Box::new(core::mem::zeroed()) };
         n.job_id = job_id.as_ptr() as *mut _;
         n.coinbase_1 = cb1.as_ptr() as *mut _;
@@ -786,6 +787,7 @@ mod tests {
         let _s = serial();
         let (id, cb1, cb2) = (c"1d2e".into(), c"0100".into(), c"ffff".into());
         let n = notify(&id, &cb1, &cb2);
+        // SAFETY: the notify's strings are the test's live CStrings
         unsafe { v1_notify(0, &n, false) };
         assert!(build(0, 0, false, |d| d).is_none());
 
@@ -802,6 +804,7 @@ mod tests {
             (8192, 512, "1d2e".into(), "00000007".into(), 0, 0)
         );
 
+        // SAFETY: the notify's strings are the test's live CStrings
         unsafe { v1_notify(0, &n, false) };
         assert_eq!(take(build(0, 1, false, |d| d)).0, 4096);
     }
@@ -812,9 +815,11 @@ mod tests {
         let (id, cb1, cb2) = (c"1".into(), c"01".into(), c"02".into());
         let n = notify(&id, &cb1, &cb2);
         v1_set_extranonce(1, Some(b"aa"), 2);
+        // SAFETY: the notify's strings are the test's live CStrings
         unsafe { v1_notify(1, &n, false) };
         v1_set_next_extranonce(1, Some(b"bb"), 3);
         assert_eq!(take(build(1, 1, false, |d| d)).3, "0001");
+        // SAFETY: the notify's strings are the test's live CStrings
         unsafe { v1_notify(1, &n, false) };
         assert_eq!(take(build(1, 1, false, |d| d)).3, "000001");
     }
@@ -927,8 +932,10 @@ mod tests {
         let (id, cb1, cb2) = (c"1".into(), c"01".into(), c"02".into());
         let n = notify(&id, &cb1, &cb2);
         v1_set_extranonce(0, Some(b"aa"), 2);
+        // SAFETY: the notify's strings are the test's live CStrings
         unsafe { v1_notify(0, &n, false) };
         master().store(build(0, 0, false, |d| d).unwrap(), 2);
+        // SAFETY: the notify's strings are the test's live CStrings
         unsafe { v1_notify(0, &n, true) };
         assert!(master().clone_job(2).is_none());
     }

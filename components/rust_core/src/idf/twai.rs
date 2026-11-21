@@ -49,28 +49,36 @@ mod imp {
             acceptance_mask: 0xFFFF_FFFF,
             single_filter: true,
         };
+        // SAFETY: the three configs are valid locals; the driver copies what it needs.
         unsafe { raw::twai_driver_install(&g, &t, &f) }
     }
     pub fn driver_uninstall() -> EspErr {
+        // SAFETY: no arguments; the driver returns an error if it is not installed or not stopped.
         unsafe { raw::twai_driver_uninstall() }
     }
     pub fn start() -> EspErr {
+        // SAFETY: no arguments; the driver checks its own state.
         unsafe { raw::twai_start() }
     }
     pub fn transmit(m: &Message, ticks: u32) -> EspErr {
+        // SAFETY: `m` is a valid message, only read (copied into the TX queue).
         unsafe { raw::twai_transmit(m, ticks) }
     }
     pub fn receive(m: &mut Message, ticks: u32) -> EspErr {
+        // SAFETY: `m` is a valid exclusive reference the received frame is written to.
         unsafe { raw::twai_receive(m, ticks) }
     }
     pub fn status() -> Option<StatusInfo> {
         let mut s = StatusInfo::default();
+        // SAFETY: `s` is a valid local the status is written to.
         (unsafe { raw::twai_get_status_info(&mut s) } == super::super::ESP_OK).then_some(s)
     }
     pub fn initiate_recovery() -> EspErr {
+        // SAFETY: no arguments; the driver checks its own state.
         unsafe { raw::twai_initiate_recovery() }
     }
     pub fn clear_transmit_queue() -> EspErr {
+        // SAFETY: no arguments; the driver checks its own state.
         unsafe { raw::twai_clear_transmit_queue() }
     }
 }

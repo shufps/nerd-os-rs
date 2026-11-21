@@ -161,6 +161,8 @@ fn shutdown(req: &mut Request) -> EspErr {
 
 fn board_info() -> crate::board::ffi::Info {
     let mut i = core::mem::MaybeUninit::uninit();
+    // SAFETY: board_info() writes a complete plain-data Info to the pointer,
+    // so it is initialized afterwards
     unsafe {
         crate::board::ffi::board_info(i.as_mut_ptr());
         i.assume_init()

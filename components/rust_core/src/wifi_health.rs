@@ -52,6 +52,8 @@ mod sys {
     /// The block (plain counters written by the lwIP task, read without a
     /// lock as before).
     fn proto(b: Block) -> *mut raw::stats_proto {
+        // SAFETY: only takes field addresses of the `lwip_stats` global with addr_of_mut!,
+        // no reference is created and nothing is read
         unsafe {
             let s = core::ptr::addr_of_mut!(raw::lwip_stats);
             match b {
@@ -66,6 +68,8 @@ mod sys {
         }
     }
     pub fn counters(b: Block) -> Counters {
+        // SAFETY: `proto` points to a field of the static `lwip_stats`; the lwIP task may
+        // update counters meanwhile, a torn value only affects the log
         let p = unsafe { proto(b).read_volatile() };
         Counters {
             xmit: p.xmit,
@@ -78,11 +82,14 @@ mod sys {
         }
     }
     pub fn reset(b: Block) {
+        // SAFETY: `proto` points to a field of the static `lwip_stats`; a concurrent lwIP
+        // increment can be lost, which only affects the log
         unsafe { proto(b).write_volatile(raw::stats_proto::default()) };
     }
     /// RSSI, SSID and channel of the access point while connected.
     pub fn ap_info() -> Option<(i8, Vec<u8>, u8)> {
         let mut r = raw::wifi_ap_record_t::default();
+        // SAFETY: `r` is a live local the call fills
         (unsafe { raw::esp_wifi_sta_get_ap_info(&mut r) } == 0)
             .then(|| (r.rssi, crate::cutil::until_nul(&r.ssid).to_vec(), r.primary))
     }

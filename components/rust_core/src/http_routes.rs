@@ -104,11 +104,13 @@ pub struct Route {
     pub flags: u16,
 }
 
-// the table is static data
+// SAFETY: the table is static data: the uri points to a static C string and
+// is never written
 unsafe impl Sync for Route {}
 
 impl Route {
     pub fn uri(&self) -> &'static str {
+        // SAFETY: routes are built by r() from a `&'static CStr`
         unsafe { CStr::from_ptr(self.uri) }.to_str().unwrap_or("")
     }
 }

@@ -96,6 +96,7 @@ pub fn init() {
         // the source clock 0 (the default) and no flags, as the memset
         ..Default::default()
     };
+    // SAFETY: `cfg` is a valid local, only read; null event queue with size 0 means none.
     unsafe {
         sys::uart_param_config(PORT, &cfg);
         sys::uart_set_pin(PORT, TXD, RXD, PIN_NO_CHANGE, PIN_NO_CHANGE);
@@ -113,11 +114,13 @@ pub fn init() {
 
 pub fn set_baud(baud: c_int) {
     log!(Info, TAG, "Changing UART baud to {baud}");
+    // SAFETY: plain call with the port number; the driver checks the port.
     unsafe { sys::uart_set_baudrate(PORT, baud as u32) };
 }
 
 pub fn send(data: &[u8]) -> c_int {
     let _g = TX.lock().unwrap_or_else(|e| e.into_inner());
+    // SAFETY: `data` is readable for `data.len()` bytes; the driver copies them to its TX buffer.
     unsafe { sys::uart_write_bytes(PORT, data.as_ptr() as *const c_void, data.len()) }
 }
 
@@ -126,10 +129,12 @@ pub fn send(data: &[u8]) -> c_int {
 pub fn rx(buf: &mut [u8], timeout_ms: u16) -> i16 {
     let len = buf.len() as u16;
     let ticks = crate::idf::ms_to_ticks(timeout_ms as u32);
+    // SAFETY: at most `len` (<= `buf.len()`) bytes are written to `buf`.
     unsafe { sys::uart_read_bytes(PORT, buf.as_mut_ptr() as *mut c_void, len as u32, ticks) as i16 }
 }
 
 pub fn clear() {
+    // SAFETY: plain call with the port number; the driver checks the port.
     unsafe { sys::uart_flush(PORT) };
 }
 

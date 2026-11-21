@@ -83,10 +83,13 @@ static STARTED: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::n
 
 /// The firmware version (`esp_app_get_description()->version`).
 pub(crate) fn fw_version() -> String {
+    // SAFETY: no arguments; returns a pointer to the static app descriptor (null on the host)
     let app = unsafe { sys::esp_app_get_description() };
     if app.is_null() {
         return String::new();
     }
+    // SAFETY: `app` is non-null and points to the static descriptor whose `version` is
+    // a NUL-terminated char array
     unsafe { CStr::from_ptr((*app).version.as_ptr()) }
         .to_string_lossy()
         .into_owned()
@@ -98,6 +101,7 @@ pub fn start(hostname: &str, board_version: i32, asic_count: i32, family: &str, 
     if STARTED.load(Ordering::Acquire) {
         return;
     }
+    // SAFETY: no arguments; init happens once (STARTED)
     let err = unsafe { sys::mdns_init() };
     if err != ESP_OK {
         log!(Error, TAG, "mdns_init failed: {}", err_name(err));
@@ -118,6 +122,7 @@ pub fn start(hostname: &str, board_version: i32, asic_count: i32, family: &str, 
         fw_version(),
     );
     let fw_c = c(&fw);
+    // SAFETY: `host_c` is a live NUL-terminated CString; mdns copies the strings
     unsafe {
         sys::mdns_hostname_set(host_c.as_ptr());
         sys::mdns_instance_name_set(host_c.as_ptr());
@@ -144,6 +149,8 @@ pub fn start(hostname: &str, board_version: i32, asic_count: i32, family: &str, 
             value: fw_c.as_ptr(),
         },
     ];
+    // SAFETY: all strings are live NUL-terminated CStrings or static literals and `txt`
+    // has `txt.len()` items; mdns copies the strings and items
     let err = unsafe {
         sys::mdns_service_add(
             host_c.as_ptr(),
@@ -158,6 +165,8 @@ pub fn start(hostname: &str, board_version: i32, asic_count: i32, family: &str, 
         log!(Warn, TAG, "mdns_service_add failed: {}", err_name(err));
         return;
     }
+    // SAFETY: all strings are live NUL-terminated CStrings or static literals; the
+    // instance name may be null
     let err = unsafe {
         sys::mdns_service_subtype_add_for_host(
             host_c.as_ptr(),

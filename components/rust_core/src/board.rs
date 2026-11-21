@@ -141,6 +141,7 @@ use crate::idf::task::delay_ms;
 
 /// `gpio_pad_select_gpio()`, output, `level`.
 fn gpio_output(pin: c_int, level: bool) {
+    // SAFETY: plain ESP-IDF GPIO calls on a board pin number, no pointers
     unsafe {
         sys::gpio_pad_select_gpio(pin as u32);
         sys::gpio_set_direction(pin, GPIO_MODE_OUTPUT);
@@ -149,6 +150,7 @@ fn gpio_output(pin: c_int, level: bool) {
 }
 
 fn gpio_set(pin: c_int, level: bool) {
+    // SAFETY: plain ESP-IDF GPIO call on a board pin number, no pointers
     unsafe { sys::gpio_set_level(pin, level as u32) };
 }
 
@@ -211,6 +213,8 @@ impl Mux {
                     mode: GPIO_MODE_OUTPUT,
                     ..Default::default()
                 };
+                // SAFETY: g is a valid config on the stack; gpio_config only reads it during the
+                // call
                 if unsafe { sys::gpio_config(&g) } != 0 {
                     log!(Error, c"Tmp451Mux", "gpio_config");
                     return false;
@@ -259,6 +263,7 @@ enum Buck {
 }
 
 fn axe_tps() -> &'static Tps546 {
+    // SAFETY: tps546_dev() returns a leaked Box (never freed), so the pointer is valid for 'static
     unsafe { &*tps546::ffi::tps546_dev() }
 }
 
@@ -303,7 +308,7 @@ struct State {
     shutdown: bool,
 }
 
-// the profile's pointers are static strings and lists
+// SAFETY: the profile's pointers are static strings and lists
 unsafe impl Send for State {}
 
 pub struct Board {
@@ -649,12 +654,14 @@ impl Board {
             }
             NerdOctaxeGamma => {
                 // GPIO3 high: TPS53667 (6 phases), low or open: TPS53647
+                // SAFETY: plain ESP-IDF GPIO calls on a board pin number, no pointers
                 unsafe {
                     sys::gpio_reset_pin(OCTAXE_VR_DETECT);
                     sys::gpio_set_direction(OCTAXE_VR_DETECT, GPIO_MODE_INPUT);
                     sys::gpio_set_pull_mode(OCTAXE_VR_DETECT, GPIO_PULLDOWN_ONLY);
                 }
                 delay_ms(1);
+                // SAFETY: plain ESP-IDF GPIO call on a board pin number, no pointers
                 hw.tps53667 = unsafe { sys::gpio_get_level(OCTAXE_VR_DETECT) } != 0;
                 detect.tps53667 = hw.tps53667;
             }
@@ -899,6 +906,7 @@ impl Board {
     fn init_axe(&self, id: BoardId, fan_invert: bool, fan_perc: f32) -> bool {
         let t = tag(id);
         if id == NerdAxeGaia {
+            // SAFETY: plain ESP-IDF GPIO calls on a board pin number, no pointers
             unsafe {
                 sys::gpio_pad_select_gpio(GAIA_LDO_EN as u32);
                 sys::gpio_set_direction(GAIA_LDO_EN, GPIO_MODE_OUTPUT);
@@ -1065,6 +1073,7 @@ impl Board {
             crate::emc2101::ffi::EMC2101_get_fan_speed()
         } else {
             let mut rpm = 0;
+            // SAFETY: rpm is a writable local u16 for the call
             unsafe { crate::emc2302::ffi::EMC2302_get_fan_speed(ch, &mut rpm) };
             rpm
         }

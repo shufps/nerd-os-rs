@@ -71,6 +71,8 @@ mod sys {
     }
 
     pub fn bundle() -> &'static [u8] {
+        // SAFETY: the linker symbols delimit the embedded bundle in flash (start <= end, same
+        // object), which is read-only and lives for the whole program.
         unsafe {
             let start = core::ptr::addr_of!(BUNDLE_START);
             let end = core::ptr::addr_of!(BUNDLE_END);

@@ -166,11 +166,14 @@ pub struct Transport {
     require_auth: AtomicBool,
 }
 
-// the handles are used under the lock (recv: by the owner task only)
+// SAFETY: the raw handles are used under the lock (recv: by the owner task
+// only), and the keep-alive pointer stays inside the locked state
 unsafe impl Send for Transport {}
+// SAFETY: see Send: all handle access is serialized by the lock or the owner task
 unsafe impl Sync for Transport {}
 
 fn err_text(e: c_int) -> String {
+    // SAFETY: strerror() returns a NUL-terminated static string for any errno
     unsafe { CStr::from_ptr(sys::strerror(e)) }
         .to_string_lossy()
         .into_owned()
@@ -203,6 +206,8 @@ impl Transport {
     fn close_locked(&self, s: &mut State) {
         s.noise_tx = None; // wipes the key
         if !s.t.is_null() {
+            // SAFETY: a non-null handle from a successful *_init(), destroyed
+            // once here under the lock and nulled right after
             unsafe {
                 sys::esp_transport_close(s.t);
                 sys::esp_transport_destroy(s.t);
@@ -216,6 +221,7 @@ impl Transport {
     fn shutdown_socket(&self) {
         let sock = self.sock.load(Ordering::Acquire);
         if sock >= 0 {
+            // SAFETY: plain syscall on an fd number; a stale fd only makes it fail
             unsafe { sys::lwip_shutdown(sock, SHUT_RDWR) };
         }
     }
@@ -233,6 +239,8 @@ impl Transport {
         let mut s = self.lock();
         self.close_locked(&mut s);
         let tls = self.kind == Kind::Tls;
+        // SAFETY: the handle is null-checked before use; `host` is a valid C
+        // string (the transport copies the common name)
         let t = unsafe {
             if tls {
                 let t = sys::esp_transport_ssl_init();
@@ -265,6 +273,8 @@ impl Transport {
         };
         if enable {
             let ka: *mut KeepAlive = &mut s.keep_alive;
+            // SAFETY: `t` is the fresh non-null handle; `ka` points into the
+            // locked state, which lives as long as the transport
             unsafe {
                 if tls {
                     sys::esp_transport_ssl_set_keep_alive(t, ka);
@@ -281,10 +291,12 @@ impl Transport {
             if tls { "TLS" } else { "TCP" },
             target.to_string_lossy()
         );
+        // SAFETY: `t` is the non-null handle created above; `target` is a valid C string
         if unsafe {
             sys::esp_transport_connect(t, target.as_ptr(), port as c_int, CONNECT_TIMEOUT_MS)
         } != 0
         {
+            // SAFETY: `t` is still the valid handle (closed only below)
             let e = unsafe { sys::esp_transport_get_errno(t) };
             log!(
                 Error,
@@ -297,12 +309,14 @@ impl Transport {
         }
         // Nagle off: share submits are latency-sensitive, and the Noise
         // transport writes header and payload as separate segments
+        // SAFETY: `t` is the connected handle, owned under the held lock
         let sock = unsafe { sys::esp_transport_get_socket(t) };
         if sock < 0 {
             log!(Warn, TAG, "Could not get socket fd to set TCP_NODELAY");
         } else {
             self.sock.store(sock, Ordering::Release);
             let one: c_int = 1;
+            // SAFETY: `one` is a live c_int and the length passed is its size
             let r = unsafe {
                 sys::lwip_setsockopt(
                     sock,
@@ -388,6 +402,8 @@ impl Transport {
         if s.t.is_null() {
             return -ENOTCONN;
         }
+        // SAFETY: non-null handle used under the lock; pointer and length come
+        // from the same slice
         let r = unsafe {
             sys::esp_transport_write(
                 s.t,
@@ -397,6 +413,7 @@ impl Transport {
             )
         };
         if r < 0 {
+            // SAFETY: the same non-null handle, lock still held
             let e = unsafe { sys::esp_transport_get_errno(s.t) };
             let e = if e > 0 { e } else { ECONNRESET };
             log!(
@@ -428,6 +445,8 @@ impl Transport {
         if t.is_null() {
             return -ENOTCONN;
         }
+        // SAFETY: a connected transport that only the owner task (this caller)
+        // closes; pointer and length come from the same mutable slice
         let r = unsafe {
             sys::esp_transport_read(
                 t,
@@ -445,6 +464,7 @@ impl Transport {
         if r == TRANSPORT_CLOSED_BY_FIN {
             return 0;
         }
+        // SAFETY: as above, the handle is still open
         let e = unsafe { sys::esp_transport_get_errno(t) };
         let e = if e > 0 { e } else { ECONNRESET };
         log!(Warn, TAG, "read failed ret={r} errno={e} ({})", err_text(e));
@@ -453,6 +473,7 @@ impl Transport {
 
     pub fn is_connected(&self) -> bool {
         let s = self.lock();
+        // SAFETY: only called on a non-null handle, under the lock
         !s.t.is_null() && unsafe { sys::esp_transport_poll_write(s.t, 0) } >= 0
     }
 

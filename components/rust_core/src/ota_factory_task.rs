@@ -108,6 +108,7 @@ struct Internal(*mut u8);
 
 impl Internal {
     fn new() -> Option<Internal> {
+        // SAFETY: heap_caps_malloc has no preconditions; a NULL result is checked below
         let p = unsafe { sys::heap_caps_malloc(CHUNK, CAP_INTERNAL_8BIT) } as *mut u8;
         if p.is_null() {
             log!(Error, TAG, "alloc failed: buf");
@@ -116,12 +117,15 @@ impl Internal {
         Some(Internal(p))
     }
     fn slice(&mut self) -> &mut [u8] {
+        // SAFETY: self.0 is the non-null CHUNK-byte allocation owned by self, and &mut self keeps
+        // the slice unique
         unsafe { core::slice::from_raw_parts_mut(self.0, CHUNK) }
     }
 }
 
 impl Drop for Internal {
     fn drop(&mut self) {
+        // SAFETY: self.0 came from heap_caps_malloc in Internal::new and is freed only here
         unsafe { sys::heap_caps_free(self.0 as *mut c_void) }
     }
 }
@@ -235,12 +239,15 @@ fn firmware_update(c: &http_client::Client) -> EspErr {
     let Some(mut buf) = Internal::new() else {
         return ESP_ERR_NO_MEM;
     };
+    // SAFETY: NULL asks for the slot after the running partition; the result is checked for NULL
     let p = unsafe { sys::esp_ota_get_next_update_partition(core::ptr::null()) };
     if p.is_null() {
         log!(Error, TAG, "no OTA partition");
         return ESP_ERR_NOT_FOUND;
     }
     let mut h = 0u32;
+    // SAFETY: p is a non-null partition entry (static in the partition table) and h is a writable
+    // local
     let e = unsafe { sys::esp_ota_begin(p, OTA_SIZE_UNKNOWN, &mut h) };
     if e != ESP_OK {
         log!(Error, TAG, "esp_ota_begin failed: {}", err_name(e));
@@ -249,22 +256,24 @@ fn firmware_update(c: &http_client::Client) -> EspErr {
     for offset in (0..FW_LEN as usize).step_by(CHUNK) {
         let e = read_exact(c, buf.slice());
         if e != ESP_OK {
+            // SAFETY: h is the open handle from esp_ota_begin, aborted once before returning
             unsafe { sys::esp_ota_abort(h) };
             return e;
         }
         if offset & 0xffff == 0 {
             log!(Info, TAG, "flashing to {offset:08x}");
         }
+        // SAFETY: h is the open handle; buf.0 holds CHUNK bytes filled by read_exact
         if unsafe { sys::esp_ota_write(h, buf.0 as *const c_void, CHUNK) } != ESP_OK {
+            // SAFETY: h is the open handle, aborted once before returning
             unsafe { sys::esp_ota_abort(h) };
             return ESP_FAIL;
         }
         updater().add(0, CHUNK as u32);
     }
     // validate and activate (the restart comes later)
-    if unsafe { sys::esp_ota_end(h) } != ESP_OK
-        || unsafe { sys::esp_ota_set_boot_partition(p) } != ESP_OK
-    {
+    // SAFETY: h is the open handle (ended once here), p the partition it was begun on
+    if unsafe { sys::esp_ota_end(h) != ESP_OK || sys::esp_ota_set_boot_partition(p) != ESP_OK } {
         return ESP_FAIL;
     }
     ESP_OK
@@ -274,6 +283,7 @@ fn www_update(data: &[u8]) -> EspErr {
     let Some(mut buf) = Internal::new() else {
         return ESP_ERR_NO_MEM;
     };
+    // SAFETY: plain constants and a static NUL-terminated label; the result is checked for NULL
     let p = unsafe {
         sys::esp_partition_find_first(
             PARTITION_TYPE_DATA,
@@ -284,6 +294,7 @@ fn www_update(data: &[u8]) -> EspErr {
     if p.is_null() {
         return ESP_ERR_NOT_FOUND;
     }
+    // SAFETY: p is non-null (checked above) and points to a static partition table entry
     let size = unsafe { (*p).size } as usize;
     if WWW_LEN as usize > size {
         log!(
@@ -294,6 +305,7 @@ fn www_update(data: &[u8]) -> EspErr {
         return ESP_ERR_INVALID_SIZE;
     }
     log!(Info, TAG, "erasing www partition ...");
+    // SAFETY: p is a valid partition entry and 0..size is its whole range
     let e = unsafe { sys::esp_partition_erase_range(p, 0, size) };
     if e != ESP_OK {
         log!(Error, TAG, "erasing www failed: {}", err_name(e));
@@ -306,6 +318,8 @@ fn www_update(data: &[u8]) -> EspErr {
         if offset & 0xffff == 0 {
             log!(Info, TAG, "flashing to {offset:08x}");
         }
+        // SAFETY: p is a valid partition entry; buf.0 holds CHUNK bytes and offset + CHUNK <=
+        // WWW_LEN <= size
         if unsafe { sys::esp_partition_write(p, offset, buf.0 as *const c_void, CHUNK) } != ESP_OK {
             return ESP_FAIL;
         }
@@ -315,6 +329,7 @@ fn www_update(data: &[u8]) -> EspErr {
 }
 
 fn erase_nvs() -> EspErr {
+    // SAFETY: plain constants and a static NUL-terminated label; the result is checked for NULL
     let p = unsafe {
         sys::esp_partition_find_first(PARTITION_TYPE_DATA, PARTITION_SUBTYPE_NVS, c"nvs".as_ptr())
     };
@@ -327,6 +342,8 @@ fn erase_nvs() -> EspErr {
         TAG,
         "erasing NVS partition (reset to factory defaults) ..."
     );
+    // SAFETY: p is non-null (checked above), a static partition table entry; the range is the whole
+    // partition
     let e = unsafe { sys::esp_partition_erase_range(p, 0, (*p).size as usize) };
     if e != ESP_OK {
         log!(Error, TAG, "NVS erase failed: {}", err_name(e));

@@ -96,3 +96,8 @@ CONFIG_FREERTOS_WATCHPOINT_END_OF_STACK=y
 
 # IPv6 address autoconfiguration (SLAAC) for IPv6 pool connections
 CONFIG_LWIP_IPV6_AUTOCONFIG=y
+
+# the default event loop runs the Wi-Fi/IP/Ethernet handlers (network.rs,
+# w5500.rs), which log and call into lwIP; 2304 bytes overflowed on the
+# first Wi-Fi IP once IPv6 was added
+CONFIG_ESP_SYSTEM_EVENT_TASK_STACK_SIZE=4096

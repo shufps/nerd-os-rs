@@ -50,47 +50,20 @@ The tests run on the host with the same toolchain:
 
 ```sh
 cd components/rust_core
-cargo test --workspace --release
+cargo test --release
 ```
 
 - The modules have unit tests (for example BIP-173/350 address vectors).
-- `c-reference/` compiles the former C/C++ implementations for the host, with
-  stubs for the ESP-IDF headers (`shim/`, `cpp-shim/`):
-  - `tests/differential.rs` runs the old and the new coinbase decoder on
-    300,000 random and mutated coinbases and requires identical results.
-  - `tests/stratum_v1.rs` builds the former `StratumApi` (C++ with ArduinoJson,
-    `c-reference/cpp/`) *and* the current `main/stratum/stratum_api.cpp`, which
-    calls into Rust. It compares them on random and mutated pool messages,
-    request formatting and chunked line framing through a scripted transport.
-  - `tests/mining.rs` compares job construction and the nonce difficulty with
-    the former `mining.cpp` (`c-reference/c-mining/`) and a verbatim copy of
-    `MiningInfoV1::buildBmJob()`, plus the genesis block as a known answer.
-  - `tests/sv2_protocol.rs` compares the SV2 codec with the former
-    `sv2_protocol.c` (`c-reference/c-sv2/`, functions renamed to `ref_sv2_*`):
-    builders on random arguments and buffer sizes, parsers on random,
-    well-formed and mutated payloads.
-  - `tests/sv2_noise.rs` runs the former `sv2_noise.c` and the Rust Noise
-    transport against a Noise NX responder in the test, with the same scripted
-    random source and transport: identical handshake bytes, keys, encrypted
-    and decrypted frames, and identical failures (wrong or invalid authority
-    key, corrupted responder message). The mbedTLS functions the C code needs
-    are provided by `c-reference/src/lib.rs`.
-  - `tests/sv2_jobs.rs` compares the SV2 job construction with the former
-    `mining_info_v2.cpp` (`c-reference/c-sv2/`) for standard and extended
-    channels.
-  - `tests/pool_policy.rs` compares the pool policies with the former
-    manager logic. `gen_ref_manager.py` extracts the method bodies verbatim
-    from `c-reference/c-manager/` into `cpp-shim/ref_manager.cpp`, with
-    mocks around them that record what the logic does. The test then drives
-    random event sequences (reconnect timer, connect, disconnect, blocking)
-    through both.
-  - `cpp-shim/header_check.c` compiles the rust_core headers on the host, so
-    their layout assertions are checked for 64-bit as well.
-  - To run more cases, set `DIFF_ITERATIONS=5000000 DIFF_SEED=42`.
-
-Where the reference does not define the behaviour for malformed input, the
-Rust port defines it; the differential tests check that Rust handles those
-cases safely.
+- `tests/` holds golden tests: the drivers (ASIC, regulators, sensors, fans),
+  the board logic, the configuration, the HTTP documents and bodies, the
+  authentication, Stratum v1/v2, Noise, the job construction, the pool
+  policies and the coinbase verification run on fixed random inputs, and
+  their outputs are compared with `tests/golden/<suite>.txt`. These files
+  hold the outputs of the former C/C++ code, recorded by differential tests
+  while it still compiled for the host (count, SHA-256 digest and the first
+  outputs in full). After an intended change of behaviour, `GOLDEN_BLESS=1
+  cargo test --release` rewrites them; their diff belongs to the review
+  (see `tests/golden/mod.rs`).
 
 ## Build notes
 

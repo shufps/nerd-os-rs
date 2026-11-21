@@ -5,7 +5,7 @@
 //! clients see the same behaviour as before, including what ArduinoJson
 //! accepts beyond JSON: single quotes, unquoted keys, `+1`, `.5`, `01`.
 //! Port of `Json/JsonDeserializer.hpp` and `Numbers/parseNumber.hpp`;
-//! verified against ArduinoJson by `c-reference/tests/http_settings.rs`.
+//! verified against ArduinoJson (`tests/http_settings.rs`).
 
 /// A number as ArduinoJson stores it.
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -685,7 +685,7 @@ impl Json {
 // ---------------------------------------------------------------------------
 // Serializer (port of `Json/JsonSerializer.hpp`, `Json/TextFormatter.hpp`
 // and `Numbers/FloatParts.hpp`): the output of `serializeJson()` byte for
-// byte; verified against ArduinoJson by `c-reference/tests/json_write.rs`.
+// byte (verified against ArduinoJson when the port was made).
 
 /// 1e1, 1e2, 1e4, ... 1e256 and their reciprocals, bit-exact as in
 /// `Numbers/FloatTraits.hpp`.

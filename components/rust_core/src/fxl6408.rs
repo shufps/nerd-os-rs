@@ -3,7 +3,7 @@
 //! written whole. On the Q1370/Q1373 it switches the VREG and LDO enables
 //! and the ASIC reset, and selects the TMP451 multiplexer channel.
 //! Verified against the C++ driver by
-//! `c-reference/tests/sensors.rs`.
+//! `tests/sensors.rs`.
 //!
 //! Every read-modify-write of a shadow register happens under the
 //! expander's lock: the expander is shared by the power sequencing

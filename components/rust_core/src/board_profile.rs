@@ -5,7 +5,7 @@
 //! the version rolling frequency, per board as the constructor chain left
 //! them, with the hardware detections as inputs (Q1373 straps and VR device
 //! code, NerdOCTAXE-γ VR detect pin). C API: `board_profile.h`. Verified
-//! against the former constructors by `c-reference/tests/board_profile.rs`.
+//! against the former constructors by `tests/board_profile.rs`.
 //!
 //! Note: the Q1370/Q1373 keep the BM1368's default version rolling frequency
 //! (register 0x15a4) that the NerdQAxe+ constructor set before they replaced

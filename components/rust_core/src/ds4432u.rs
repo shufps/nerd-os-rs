@@ -1,7 +1,7 @@
 //! DS4432U current DAC that trims the TPS40305 core voltage of the NerdAxe
 //! (port of `main/boards/drivers/nerdaxe/DS4432U.cpp`): one code register
 //! per output. C API: the former `DS4432U.h` functions. Verified against
-//! the C++ driver by `c-reference/tests/ina260_ds4432u.rs`.
+//! the C++ driver by `tests/ina260_ds4432u.rs`.
 //!
 //! `DS4432U_test()` logs the register value only when the read succeeds.
 

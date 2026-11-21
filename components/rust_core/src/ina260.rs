@@ -2,7 +2,7 @@
 //! `main/boards/drivers/nerdaxe/INA260.cpp`): 16-bit big-endian registers,
 //! 1.25 mA, 1.25 mV and 10 mW per LSB. C API: the former `INA260.h`
 //! functions. Verified against the C++ driver by
-//! `c-reference/tests/ina260_ds4432u.rs`.
+//! `tests/ina260_ds4432u.rs`.
 //!
 //! The current register is signed (two's complement), so a slightly
 //! negative reading (offset at idle) stays a small negative current.

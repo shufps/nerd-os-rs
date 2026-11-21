@@ -3,8 +3,7 @@
 //! C API: `mining_rs.h`.
 //!
 //! Port of parts of the former `components/bm1397/mining.cpp`, verified
-//! against it (`c-reference/c-mining/`) by
-//! `c-reference/tests/mining.rs`.
+//! against its outputs by `tests/mining.rs`.
 
 /// SHA-256. On the device this is mbedTLS, which uses the ESP32 SHA
 /// accelerator (as the C code did); on the host the `sha2` crate.

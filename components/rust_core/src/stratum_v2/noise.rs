@@ -2,7 +2,7 @@
 //! Stratum v2, as initiator. C API: `sv2_noise.h` (unchanged).
 //!
 //! Port of `components/stratum_v2/sv2_noise.c`, verified against it by
-//! `c-reference/tests/sv2_noise.rs` (through the C API). [`Handshake`] and
+//! `tests/sv2_noise.rs` (through the C API). [`Handshake`] and
 //! [`Cipher`] are pure (bytes in, bytes out); [`handshake`], [`Sender::send`]
 //! and [`Receiver::recv`] add the socket I/O through a [`Wire`] (on the device
 //! [`EspWire`], `esp_transport_read/write`). The two directions are separate
@@ -548,8 +548,7 @@ impl Wire for EspWire {
     }
 }
 
-/// The C API (`sv2_noise.h`): what `c-reference/tests/sv2_noise.rs`
-/// compares with the C implementation.
+/// The C API (`sv2_noise.h`).
 pub(crate) mod ffi {
     use super::*;
 

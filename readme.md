@@ -135,10 +135,10 @@ without settings, `-u` one with only the firmware, web UI and OTA data.
 docker run --rm -v "$PWD":/home/builder/project \
     -w /home/builder/project/components/rust_core \
     shufps/esp-idf-builder-rs:5.3.6 \
-    bash -c 'cargo fmt --all --check && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace --release'
+    bash -c 'cargo fmt --all --check && cargo clippy --all-targets -- -D warnings && cargo test --release'
 ```
 
-The host tests include differential tests against the former C/C++
+The host tests include golden tests with the outputs of the former C/C++
 implementations. Details on the Rust component, its layout and the ESP-IDF
 bindings are in [components/rust_core/README.md](components/rust_core/README.md).
 

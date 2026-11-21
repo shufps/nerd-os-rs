@@ -3,7 +3,7 @@
 //! polarity, the 6-bit duty cycle, RPM from the tach counter, the internal
 //! and the external (ASIC diode) temperature, ideality and beta settings.
 //! C API: the former `EMC2101.h` functions. Verified against the C++
-//! driver by `c-reference/tests/emc2101.rs`.
+//! driver by `tests/emc2101.rs`.
 //!
 //! Behaviour notes:
 //! - the duty cycle is a fraction clamped to 0..1, so the boards' initial

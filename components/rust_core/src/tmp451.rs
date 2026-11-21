@@ -4,7 +4,7 @@
 //! the 0.0625 °C format and the per-channel calibration. The multiplexer
 //! (GPIO pins or the FXL6408) is selected through the caller's callback.
 //! Verified against the C++ driver by
-//! `c-reference/tests/sensors.rs`.
+//! `tests/sensors.rs`.
 
 use core::ffi::{c_int, CStr};
 use std::sync::Mutex;

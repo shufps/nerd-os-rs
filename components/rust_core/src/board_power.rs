@@ -6,7 +6,7 @@
 //! the NerdAxe's DS4432U DAC code of a voltage. The pins, the regulator, the
 //! serial port and the ASIC driver are the caller's hooks (GPIOs, or the I2C
 //! expander on the Q1370/Q1373). Verified against the
-//! C++ code by `c-reference/tests/board_power.rs` (the same hardware calls
+//! C++ code by `tests/board_power.rs` (the same hardware calls
 //! and delays in the same order).
 //!
 //! The NerdAxe's DAC code is limited to the DS4432U's 7-bit magnitude, so a

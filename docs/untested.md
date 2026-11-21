@@ -1,8 +1,8 @@
 # Not tested on hardware
 
 These parts of the Rust port were not run on hardware. They are covered
-only by host tests: unit tests, and differential tests against the former
-C/C++ code where those exist. Each entry names the PR, what is missing and
+only by host tests: unit tests, and golden tests with the outputs of the
+former C/C++ code where those exist. Each entry names the PR, what is missing and
 what a test would need. When an entry has been tested, delete it.
 
 ## Stratum

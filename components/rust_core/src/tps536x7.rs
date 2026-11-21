@@ -5,7 +5,7 @@
 //! transactions go through the `Bus` trait (`idf::i2c::SmBus` in the
 //! firmware: the former I2C command links, unchanged).
 //! Verified against the C++ drivers by
-//! `c-reference/tests/tps536x7.rs` (the same SMBus transactions).
+//! `tests/tps536x7.rs` (the same SMBus transactions).
 //!
 //! Behaviour notes:
 //! - a failed SMBus read returns the getter's default (0, or the status

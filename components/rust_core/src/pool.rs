@@ -4,7 +4,7 @@
 //! state in and carry out the returned [`Actions`]. C API: `pool_policy.h`.
 //!
 //! Verified against verbatim copies of the C++ logic by
-//! `c-reference/tests/pool_policy.rs`. In dual-pool mode a disconnected
+//! `tests/pool_policy.rs`. In dual-pool mode a disconnected
 //! pool's difficulty is forgotten, so it does not lower the ASIC difficulty.
 
 pub const PRIMARY: usize = 0;

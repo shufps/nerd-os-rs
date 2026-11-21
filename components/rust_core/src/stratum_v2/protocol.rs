@@ -2,7 +2,7 @@
 //! C API: `sv2_protocol.h` (unchanged function names and signatures).
 //!
 //! Port of `components/stratum_v2/sv2_protocol.c`, verified against it by
-//! `c-reference/tests/sv2_protocol.rs`. Output parameters are only meaningful
+//! `tests/sv2_protocol.rs`. Output parameters are only meaningful
 //! on success (as the callers use them); the C code wrote some of them before
 //! failing, which is not reproduced except for the channel ID of
 //! `sv2_parse_new_extended_mining_job()`.

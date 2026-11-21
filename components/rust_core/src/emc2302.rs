@@ -2,7 +2,7 @@
 //! `main/boards/drivers/EMC2302.cpp`): init (polarity, push-pull outputs,
 //! 19.53 kHz PWM, 5-edge tach), duty cycle per channel, RPM from the tach
 //! counter. C API: the former `EMC2302.h` functions. Verified against the
-//! C++ driver by `c-reference/tests/emc2302.rs`.
+//! C++ driver by `tests/emc2302.rs`.
 //!
 //! Edge cases:
 //! - a tach reading of 0 gives 0 RPM;

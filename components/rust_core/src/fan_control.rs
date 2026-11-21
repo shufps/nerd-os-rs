@@ -5,7 +5,7 @@
 //! ASIC voltage off). The fans are driven through the caller's board hooks;
 //! the settings come from the C++ side (`Config` and board defaults).
 //! Verified against the C++ code by
-//! `c-reference/tests/fan_control.rs`.
+//! `tests/fan_control.rs`.
 //!
 //! The PID is a port of the Arduino PID Library 1.2.x with back-calculation
 //! anti-windup (Brett Beauregard, David Forrest; MIT license), as vendored

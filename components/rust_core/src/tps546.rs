@@ -8,7 +8,7 @@
 //! drivers differ in a few steps of the sequences (`Variant`). The SMBus
 //! transactions go through the `Bus` trait (`idf::i2c::SmBus` in the
 //! firmware: the former I2C command links and register reads). Verified against both C++ drivers by
-//! `c-reference/tests/tps546.rs`.
+//! `tests/tps546.rs`.
 //!
 //! Behaviour notes:
 //! - a failed SMBus word read gives the getter's 0 (also for the

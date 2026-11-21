@@ -3,7 +3,7 @@
 //! limits (validation and the clamping of the stored settings), the ASIC
 //! chip temperatures and the decoding of the PMBus status registers of the
 //! TPS536x7 buck controllers into a board error. C API: `board_core.h`.
-//! Verified against the C++ code by `c-reference/tests/board_core.rs`.
+//! Verified against the C++ code by `tests/board_core.rs`.
 //!
 //! Behaviour notes:
 //! - a stored core voltage is clamped to the board's absolute minimum and

@@ -3,7 +3,7 @@
 //! C API: `stratum_v1.h`; the socket I/O stays in `StratumApi` (C++).
 //!
 //! Port of the codec part of `main/stratum/stratum_api.cpp`, verified against
-//! it by `c-reference/tests/stratum_v1.rs`. Input validation:
+//! it by `tests/stratum_v1.rs`. Input validation:
 //!
 //! * malformed messages (missing or mistyped fields) are rejected,
 //! * `extranonce2_size` must be 1..=16,

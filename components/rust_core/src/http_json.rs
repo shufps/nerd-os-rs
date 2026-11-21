@@ -6,7 +6,7 @@
 //! the number types of the ArduinoJson code (a `float` is written with 6
 //! decimal places, a `double` with 9 unless it is a lossless float), so the
 //! output is byte-identical. C API: `http_json.h`. Verified against the
-//! former handler code by `c-reference/tests/http_json.rs`.
+//! former handler code by `tests/http_json.rs`.
 //!
 //! Difference: `coreVoltageActual` of a NaN or out-of-range output voltage is
 //! 0 or saturated; the C++ `(int)` cast of such a float was undefined.

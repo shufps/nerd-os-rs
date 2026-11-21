@@ -24,11 +24,11 @@ jobs:
       uses: actions/checkout@v3
       with:
         submodules: recursive
-    - name: rust_core host tests (incl. differential tests against the former C/C++ code)
+    - name: rust_core host tests (incl. golden tests with the outputs of the former C/C++ code)
       run: |
         docker run --rm --user root -e CARGO_TARGET_DIR=/tmp/target -v $PWD:/home/builder/project \
         -w /home/builder/project/components/rust_core shufps/esp-idf-builder-rs:5.3.6 bash -c \
-        'cargo fmt --all --check && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace --release'
+        'cargo fmt --all --check && cargo clippy --all-targets -- -D warnings && cargo test --release'
 
   build-check:
     needs: [ca-bundle-test, rust-tests]

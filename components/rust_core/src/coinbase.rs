@@ -4,7 +4,7 @@
 //! the coinbase data of a stratum `mining.notify`. C API: `coinbase_decoder.h`.
 //!
 //! This is a port of the former C component `coinbase_decoder`. It reproduces
-//! the C behaviour exactly (verified by `c-reference/tests/differential.rs`)
+//! the C behaviour exactly (verified by `tests/coinbase.rs`)
 //! for well-formed input. Malformed input is handled as follows:
 //!
 //! * a coinbase_1 that ends inside the block height push is rejected with

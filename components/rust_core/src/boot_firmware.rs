@@ -540,7 +540,7 @@ impl Hooks for Firmware {
 /// The firmware's entry point (the ESP-IDF main task).
 #[cfg(target_os = "espidf")]
 #[no_mangle]
-pub fn app_main() {
+pub extern "C" fn app_main() {
     let mut f = Firmware::default();
     crate::boot::start(&mut f);
     while crate::boot::idle(&mut f) {}

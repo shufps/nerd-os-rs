@@ -1,14 +1,17 @@
-//! Rust parts of the ESP-Miner firmware.
+//! The ESP-Miner firmware.
 //!
 //! This crate is built as a single static library and linked into the ESP-IDF
-//! firmware by `CMakeLists.txt`. Every module exposes a C ABI that matches a
-//! header in `include/`, so C/C++ callers do not notice the language change.
+//! firmware by `CMakeLists.txt`; its entry point is `app_main()`
+//! (`boot_firmware.rs`). C calls into it only through `app_main`,
+//! `ws_log_enqueue` and the callbacks it registers.
 //!
 //! All Rust code of the firmware must live in this one crate: two Rust static
 //! libraries in the same firmware would each bring their own copy of `std`.
 
 // every unsafe block says why it is sound
 #![warn(clippy::undocumented_unsafe_blocks)]
+// symbols C calls must use the C ABI
+#![deny(clippy::no_mangle_with_rust_abi)]
 
 pub mod ajson;
 pub mod alerts;

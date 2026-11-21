@@ -176,7 +176,7 @@ pub(crate) mod api {
     /// A formatted log line (`malloc()`ed) for the socket; false if the
     /// queue is full or not there (the caller frees it then). Must not log.
     #[no_mangle]
-    pub fn ws_log_enqueue(line: *mut c_char) -> bool {
+    pub extern "C" fn ws_log_enqueue(line: *mut c_char) -> bool {
         match TX.get() {
             Some(tx) => tx.try_send(Line(line)).is_ok(),
             None => false,

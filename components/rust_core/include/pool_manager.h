@@ -3,8 +3,7 @@
  * components/rust_core/src/pool_manager.rs): pool selection (failover or
  * dual pool), the connections (Stratum v1 over TCP/TLS, Stratum v2 over
  * Noise), share submission, statistics, coinbase verification and the ping
- * tasks. The C++ code reaches it through the inline class in
- * main/stratum/stratum_manager.h. Thread-safe; the calls before
+ * tasks. Thread-safe; the calls before
  * pool_mgr_create() return neutral values.
  */
 

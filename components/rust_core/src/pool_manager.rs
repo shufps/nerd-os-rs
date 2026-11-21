@@ -6,9 +6,8 @@
 //! the pool policy (`pool.rs`) which pools are connected, hands the pool
 //! messages to `pool_dispatch.rs`, submits shares, keeps the statistics
 //! (`pool_stats.rs`) and the coinbase verification (`pool_coinbase.rs`), and
-//! starts the ping tasks (`ping.rs`; the ICMP session stays in
-//! `ping_task.cpp`). C API: `pool_manager.h`, wrapped by the inline class in
-//! `main/stratum/stratum_manager.h`.
+//! starts the ping tasks (`ping.rs`, `ping_session.rs`). C API:
+//! `pool_manager.h`.
 //!
 //! The manager lock (`m_mutex`, not recursive) is the mutex around the pool
 //! configs; it is held where the C++ code held it.

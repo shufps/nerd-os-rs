@@ -4,8 +4,7 @@
 //! hashrate, and the system task: every 5 s it updates the display (IP,
 //! found block overlay, error overlay, values) and pushes a history sample.
 //! The display is reached through [`crate::display`], the board through
-//! `board_api.rs`. C API: `system_state.h`, wrapped by the inline
-//! class in `main/system.h`.
+//! `board_api.rs`. C API: `system_state.h`.
 //!
 //! The strings that change at runtime (WiFi status, SSID, IP address) are
 //! copied out under a lock, so a reader never sees a half-written string.

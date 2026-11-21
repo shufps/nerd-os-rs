@@ -7,9 +7,7 @@
 //! (regulator, fans, temperature sensors, ethernet and CAN options, control
 //! pins) on the Rust drivers, the power sequencing (`board_power.rs`). The
 //! firmware is built for one board; it is chosen at runtime by its
-//! `BOARD_*` id. C API: `board.h` of rust_core, wrapped by the inline class
-//! in `main/boards/board.h`, which keeps the display theme, the ASIC object
-//! and the self test (C++).
+//! `BOARD_*` id. C API: `board_rs.h`.
 //!
 //! The class hierarchy is flattened: each method matches the board id the
 //! way the C++ overrides did.

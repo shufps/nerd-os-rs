@@ -27,11 +27,8 @@ add_compile_definitions(LV_MEM_CUSTOM_REALLOC=lv_psram_realloc)
 #add_compile_definitions(CONFIG_FREERTOS_USE_TRACE_FACILITY=1)
 #add_compile_definitions(CONFIG_FREERTOS_USE_STATS_FORMATTING_FUNCTIONS=1)
 
-# adds -I./main; needed for components to have
-# access to main include files
+# adds -I./main: LVGL finds lvgl_psram.h (LV_MEM_CUSTOM_INCLUDE above)
 include_directories("./main")
-
-# this are only header files
 
 # (Not part of the boilerplate)
 # This example uses an extra component for common functions such as Wi-Fi and Ethernet connection.

@@ -5,7 +5,7 @@
 # tcp_transport: sv2_noise.h includes esp_transport.h; driver/esp_adc: the
 # headers layout_check.c checks the Rust mirrors of the IDF structs against
 idf_component_register(SRCS "posix_stubs.c" "layout_check.c" "ws_log.c" INCLUDE_DIRS "include"
-    REQUIRES tcp_transport PRIV_REQUIRES driver esp_adc esp_wifi mbedtls lwip esp_http_client esp_app_format esp_http_server esp_netif esp_eth esp_partition app_update spiffs nvs_flash espressif__mdns lvgl esp_lcd)
+    REQUIRES tcp_transport PRIV_REQUIRES driver esp_adc esp_wifi mbedtls lwip esp_http_client esp_app_format esp_http_server esp_netif esp_eth esp_partition app_update spiffs nvs_flash espressif__mdns lvgl esp_lcd esp_psram)
 
 if(IDF_TARGET STREQUAL "esp32s3")
     set(RUST_TARGET "xtensa-esp32s3-espidf")
@@ -66,8 +66,7 @@ target_link_libraries(rust_core_lib INTERFACE __idf_lvgl__lvgl __idf_main)
 
 # See posix_stubs.c; -u makes the linker take our definition.
 target_link_libraries(${COMPONENT_LIB} INTERFACE "-u chmod")
-# the firmware entry point is in Rust (src/boot_firmware.rs); it takes the
-# C++ boot steps from main.cpp (boot_cpp_hooks), which nothing else references
-target_link_libraries(${COMPONENT_LIB} INTERFACE "-u app_main" "-u boot_cpp_hooks")
+# the firmware entry point is in Rust (src/boot_firmware.rs)
+target_link_libraries(${COMPONENT_LIB} INTERFACE "-u app_main")
 # the websocket log hook (ws_log.c), referenced only by the Rust library
 target_link_libraries(${COMPONENT_LIB} INTERFACE "-u ws_log_install" "-u ws_log_uninstall")

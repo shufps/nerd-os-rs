@@ -1,8 +1,7 @@
 //! The boot steps of the firmware (port of the hooks of `main/main.cpp`):
 //! the IDF setup, the board, the tasks, the network setup, all reached
-//! directly, with the display and its self test. Only the creation of the
-//! remaining C++ objects stays in C++ (`boot_cpp_hooks()`, main.cpp): the
-//! `Board`, the `System` module and the `StratumManager`.
+//! directly, with the display and its self test (formerly C++ objects
+//! created in `main/main.cpp`).
 
 use crate::idf::idf_const;
 use core::ffi::{c_char, c_int, c_void, CStr};
@@ -17,6 +16,12 @@ use crate::log::log;
 
 const TAG: &CStr = c"nerd*axe";
 
+#[cfg(target_os = "espidf")]
+const _: () = assert!(
+    crate::sdkconfig::SPIRAM,
+    "firmware will not work without psram"
+);
+
 /// the task watchdog: an hour (the stratum task feeds it)
 const WATCHDOG_TIMEOUT_MS: u32 = 3600 * 1000;
 idf_const!(RST_TASK_WDT: c_int = esp_reset_reason_t_ESP_RST_TASK_WDT, 6);
@@ -24,16 +29,6 @@ idf_const!(ESP_ERR_INVALID_STATE: EspErr = ESP_ERR_INVALID_STATE, 0x103);
 idf_const!(CAP_PSRAM: u32 = MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT, (1 << 10) | (1 << 2));
 idf_const!(CAP_DEFAULT: u32 = MALLOC_CAP_DEFAULT, 1 << 12);
 idf_const!(CAP_INTERNAL: u32 = MALLOC_CAP_INTERNAL, 1 << 11);
-
-#[cfg(target_os = "espidf")]
-pub use crate::idf::raw::boot_cpp_hooks_t as CppHooks;
-#[cfg(not(target_os = "espidf"))]
-/// `boot_cpp_hooks_t` (boot.h): the steps on the C++ objects.
-pub struct CppHooks {
-    pub board_create: Option<unsafe extern "C" fn()>,
-    pub system_set_board: Option<unsafe extern "C" fn()>,
-    pub create_stratum_manager: Option<unsafe extern "C" fn(dual: bool)>,
-}
 
 #[cfg(target_os = "espidf")]
 pub use crate::idf::raw::esp_task_wdt_config_t as WdtConfig;
@@ -48,7 +43,7 @@ pub struct WdtConfig {
 #[cfg(target_os = "espidf")]
 mod sys {
     pub use crate::idf::raw::{
-        boot_cpp_hooks, esp_event_loop_create_default, esp_netif_init, esp_task_wdt_init,
+        esp_event_loop_create_default, esp_netif_init, esp_psram_get_size, esp_task_wdt_init,
         gpio_install_isr_service, heap_caps_calloc, heap_caps_free,
         mbedtls_platform_set_calloc_free, nvs_flash_init,
     };
@@ -73,6 +68,9 @@ mod sys {
     pub unsafe fn heap_caps_free(_: *mut c_void) {}
     pub unsafe fn nvs_flash_init() -> EspErr {
         ESP_OK
+    }
+    pub unsafe fn esp_psram_get_size() -> usize {
+        0
     }
     pub unsafe fn gpio_install_isr_service(_: c_int) -> EspErr {
         ESP_OK
@@ -115,13 +113,30 @@ unsafe extern "C" fn psram_free(p: *mut c_void) {
     sys::heap_caps_free(p)
 }
 
-/// A step of the C++ side (all are set by main.cpp).
-fn call(hook: Option<unsafe extern "C" fn()>) {
-    if let Some(f) = hook {
-        // SAFETY: the hooks are C++ functions set by main.cpp (boot_cpp_hooks()), callable from the
-        // main task
-        unsafe { f() }
-    }
+/// The board the firmware is built for (`BOARD`, build.rs).
+fn board_id() -> Option<crate::board_profile::BoardId> {
+    use crate::board_profile::BoardId::*;
+    Some(match crate::sdkconfig::BOARD {
+        "NERDAXE" => NerdAxe,
+        "NERDAXEGAMMA" => NerdAxeGamma,
+        "NERDAXEGAIA" => NerdAxeGaia,
+        "NERDQAXEPLUS" => NerdQAxePlus,
+        "NERDOCTAXEPLUS" => NerdOctaxePlus,
+        "NERDQAXEPLUS2" => NerdQAxePlus2,
+        "NERDQX" => NerdQX,
+        "NERDHAXEGAMMA" => NerdHaxeGamma,
+        "NERDEKO" => NerdEko,
+        "NERDOCTAXEGAMMA" => NerdOctaxeGamma,
+        "Q1370" => Q1370,
+        "Q1373" => Q1373,
+        _ => return None,
+    })
+}
+
+/// A profile string of the board info.
+fn info_text(p: *const c_char) -> std::borrow::Cow<'static, str> {
+    // SAFETY: the profile's strings are c"..." literals (or NULL)
+    unsafe { crate::board::ffi::static_text(p) }.to_string_lossy()
 }
 
 fn board_info() -> crate::board::ffi::Info {
@@ -149,20 +164,9 @@ unsafe extern "C" fn on_preferred_changed() {
 }
 
 /// The firmware's boot steps.
+#[derive(Default)]
 pub struct Firmware {
-    cpp: &'static CppHooks,
     eth_started: bool,
-}
-
-impl Firmware {
-    /// # Safety
-    /// `cpp` valid for the program's lifetime.
-    pub unsafe fn new(cpp: *const CppHooks) -> Self {
-        Firmware {
-            cpp: &*cpp,
-            eth_started: false,
-        }
-    }
 }
 
 fn cfg_str(key: &[u8], def: &str) -> Vec<u8> {
@@ -220,7 +224,11 @@ impl Hooks for Firmware {
     }
 
     fn board_create(&mut self) {
-        call(self.cpp.board_create)
+        let id = board_id();
+        if !id.is_some_and(|id| crate::board::ffi::board_create(id as c_int)) {
+            log!(Error, c"board", "no board {}", crate::sdkconfig::BOARD);
+            std::process::abort();
+        }
     }
 
     /// The W5500 if the board has Ethernet; before and after the board init,
@@ -258,7 +266,17 @@ impl Hooks for Firmware {
     }
 
     fn system_set_board(&mut self) {
-        call(self.cpp.system_set_board)
+        // SAFETY: a plain query
+        let psram = unsafe { sys::esp_psram_get_size() };
+        log!(Info, TAG, "PSRAM found with {}MB", psram / (1024 * 1024));
+        let i = board_info();
+        log!(
+            Info,
+            TAG,
+            "Found Device Model: {}",
+            info_text(i.device_model)
+        );
+        log!(Info, TAG, "Found Board Version: {}", i.version);
     }
 
     fn self_test_enabled(&mut self) -> bool {
@@ -272,7 +290,7 @@ impl Hooks for Firmware {
     /// Powers the ASICs and shows on the display whether all were found
     /// (checks the soldering, not the hashrate); formerly `Board::selfTest()`.
     fn self_test(&mut self) {
-        use crate::board::ffi::{board_init_asics, board_is_axe, board_power_value, static_text};
+        use crate::board::ffi::{board_init_asics, board_is_axe, board_power_value};
         // the NerdAxe family's core voltage is lower
         let (vmin, vmax) = if board_is_axe() {
             (1.0, 1.35)
@@ -280,8 +298,7 @@ impl Hooks for Firmware {
             (1.1, 1.4)
         };
         crate::display::init();
-        // SAFETY: a profile string of the board info (a c"..." literal)
-        let model = unsafe { static_text(board_info().asic_model) }.to_string_lossy();
+        let model = info_text(board_info().asic_model);
         crate::display::log(&format!(
             "\nSelfTest initiated, wait...\r\nTesting chip: {model}\n\n\n\n\n\
              [Warning] Only checks soldering\nHashrate not checked"
@@ -392,11 +409,7 @@ impl Hooks for Firmware {
     }
 
     fn create_stratum_manager(&mut self, mode: PoolMode) {
-        if let Some(f) = self.cpp.create_stratum_manager {
-            // SAFETY: the hook is a C++ function set by main.cpp (boot_cpp_hooks()), called from
-            // the main task
-            unsafe { f(mode == PoolMode::Dual) }
-        }
+        crate::pool_manager::ffi::pool_mgr_create(mode == PoolMode::Dual);
     }
 
     fn stratum_load_settings(&mut self) {
@@ -558,8 +571,7 @@ impl Hooks for Firmware {
 #[cfg(target_os = "espidf")]
 #[no_mangle]
 pub extern "C" fn app_main() {
-    // SAFETY: boot_cpp_hooks() returns a pointer to a static const table in main.cpp, valid forever
-    let mut f = unsafe { Firmware::new(sys::boot_cpp_hooks()) };
+    let mut f = Firmware::default();
     crate::boot::start(&mut f);
     while crate::boot::idle(&mut f) {}
 }

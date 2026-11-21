@@ -1,10 +1,9 @@
+# The fonts and images of the display (C arrays) and the web UI; the
+# firmware itself is in components/rust_core.
 idf_component_register(
 SRCS
-    "main.cpp"
-    "boards/board.cpp"
     "./displays/images/ui_font_DigitalNumbers16.c"
     "./displays/images/ui_font_DigitalNumbers28.c"
-    "./displays/images/ui_font_DigitalNumbers16.c"
     "./displays/images/ui_font_OpenSansBold13.c"
     "./displays/images/ui_font_OpenSansBold14.c"
     "./displays/images/ui_font_OpenSansBold24.c"
@@ -19,40 +18,11 @@ SRCS
     "./displays/images/themes/themes.c"
     "./otp/qrcodegen.cpp"
 
-
-
 INCLUDE_DIRS
-    "."
-    "tasks"
-    "http_server"
-    "displays"
     "displays/images"
-    "boards"
-    "boards/drivers"
-    "network"
 
 REQUIRES
-    "app_update"
-    "driver"
-    "esp_adc"
-    "esp_app_format"
-    "esp_partition"
-    "espcoredump"
-    "esp_event"
-    "esp_http_server"
-    "esp_http_client"
-    "esp_netif"
-    "esp_timer"
-    "esp_wifi"
-    "esp_lcd"
-    "esp_psram"
-    "tcp_transport"
-    "nvs_flash"
-    "spiffs"
-    "vfs"
     "lvgl"
-    "lwip"
-    "esp_eth"
     "rust_core"
 
 )

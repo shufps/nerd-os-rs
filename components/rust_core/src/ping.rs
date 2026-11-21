@@ -5,7 +5,7 @@
 //!
 //! The statistics lock is only held to read or update the numbers, never
 //! across a ping round (about 9 s) and never together with the manager
-//! lock, so `StratumManager::loadSettings()` (manager lock, then
+//! lock, so `pool_mgr_load_settings()` (manager lock, then
 //! `reset()`) never waits for a round.
 
 use core::ffi::c_int;

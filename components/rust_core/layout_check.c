@@ -36,7 +36,6 @@
 #include "esp_event.h"
 #include "esp_timer.h"
 #include "esp_task_wdt.h"
-#include "boot.h"
 #include "mbedtls/x509_crt.h"
 #include "esp_mac.h"
 #include "esp_intr_alloc.h"

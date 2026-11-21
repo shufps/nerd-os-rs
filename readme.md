@@ -197,7 +197,7 @@ kept in the build directory's CMake cache).
 | Path | Content |
 | --- | --- |
 | `components/rust_core/` | the Rust firmware core ([README](components/rust_core/README.md)) |
-| `main/` | entry glue, display (LVGL), board facade, web UI (`main/http_server/axe-os/`) |
+| `main/` | display fonts and images (C arrays), web UI (`main/http_server/axe-os/`) |
 | `docs/API.md` | REST API |
 | `docker/` | build image and helper scripts |
 | `monitoring/` | InfluxDB + Grafana setup |

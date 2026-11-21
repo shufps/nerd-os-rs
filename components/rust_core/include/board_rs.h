@@ -2,7 +2,7 @@
  * The board (implemented in Rust, components/rust_core/src/board.rs): the
  * constants and settings, the hardware of all NerdQAxe and NerdAxe boards
  * (regulator, fans, temperature sensors, ethernet and CAN options) and the
- * power sequencing. Wrapped by the inline class in main/boards/board.h.
+ * power sequencing.
  */
 
 #ifndef BOARD_RS_H

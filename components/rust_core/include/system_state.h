@@ -2,7 +2,7 @@
  * The system module (implemented in Rust, components/rust_core/src/system.rs):
  * the device state the HTTP API and the display read, the board error, the
  * current hashrate and the system task (display updates and history
- * samples every 5 s). Wrapped by the inline class in main/system.h.
+ * samples every 5 s).
  * Thread-safe; the changing strings are copied out.
  */
 

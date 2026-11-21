@@ -69,8 +69,7 @@ fn main() {
     // ... and the Rust API that replaced it, used as the firmware does.
     cpp()
         .file("cpp-shim/wrap_current.cpp")
-        .include("../../../main/stratum")
-        .include("../../../main")
+        .include("main-shim")
         .include("../include")
         .flag("-include")
         .flag("cpp-shim/host_shim.h")
@@ -86,7 +85,7 @@ fn main() {
             "cpp-shim/ref_jobs.cpp",
         ])
         .include("c-mining")
-        .include("../../../main")
+        .include("main-shim")
         .include("../include")
         // ESP-IDF headers pull in <stdlib.h> (exit), host headers do not.
         .flag("-include")
@@ -139,7 +138,7 @@ fn main() {
         .include("cpp-shim")
         .include("shim")
         .include("c-sv2")
-        .include("../../../main")
+        .include("main-shim")
         .include("../include")
         .compile("sv2_jobs_reference");
 
@@ -443,7 +442,7 @@ fn main() {
         .std("c++17")
         .warnings(false)
         .file("c-config/keys_ref.cpp")
-        .include("../../../main")
+        .include("main-shim")
         .include("../include")
         .include("shim-sdkconfig")
         .define("NVS_CONFIG_HOST_ACCESSORS", None)
@@ -503,8 +502,7 @@ fn main() {
             .std("c++17")
             .warnings(false)
             .files(files)
-            .include("../../../main")
-            .include("../../../main/http_server")
+            .include("main-shim")
             .include("arduinojson")
             .include("../include")
             .include("shim-sdkconfig")
@@ -559,7 +557,7 @@ fn main() {
         "c-fan",
         "c-fan-shim",
         "arduinojson",
-        "../../../main/nvs_config.h",
+        "main-shim",
         "c-manager",
         "shim",
         "cpp",

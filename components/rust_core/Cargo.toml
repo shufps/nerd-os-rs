@@ -11,6 +11,11 @@ description = "Rust parts of the ESP-Miner firmware, linked into the ESP-IDF bui
 # rlib:      used by host tests and the c-reference crate
 crate-type = ["staticlib", "rlib"]
 
+[features]
+# GET /api/debug/screen: the display content as BMP (development only: the
+# display can show the OTP enrollment QR code)
+screenshot = []
+
 [dependencies]
 bech32 = { version = "0.11", default-features = false, features = ["alloc"] }
 bs58 = { version = "0.5", default-features = false, features = ["alloc"] }

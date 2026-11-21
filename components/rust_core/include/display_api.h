@@ -28,6 +28,10 @@ void disp_hide_error(void);
 /* the values of all pages, then a refresh; toggle: the pool shown (0/1) */
 void disp_update(int toggle);
 
+/* implemented in Rust (display_shot.rs): every flushed area, for the
+ * development screenshot route (a no-op without it) */
+void disp_shadow_flush(int x1, int y1, int x2, int y2, const uint16_t *px);
+
 #ifdef __cplusplus
 }
 #endif

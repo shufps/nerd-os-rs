@@ -25,6 +25,7 @@
 
 #include "nvs_config.h"
 #include "displayDriver.h"
+#include "display_api.h"
 
 #pragma GCC diagnostic ignored "-Wmissing-field-initializers"
 
@@ -100,6 +101,8 @@ void DisplayDriver::lvglFlushCallback(lv_disp_drv_t* drv, const lv_area_t* area,
     int offsetx2 = area->x2;
     int offsety1 = area->y1;
     int offsety2 = area->y2;
+    // the development screenshot copy (a no-op in normal builds)
+    disp_shadow_flush(offsetx1, offsety1, offsetx2, offsety2, (const uint16_t *) colorMap);
     // Copy buffer content to the display
     esp_lcd_panel_draw_bitmap(panelHandle, offsetx1, offsety1, offsetx2 + 1, offsety2 + 1, colorMap);
 }

@@ -5,7 +5,7 @@
 # tcp_transport: sv2_noise.h includes esp_transport.h; driver/esp_adc: the
 # headers layout_check.c checks the Rust mirrors of the IDF structs against
 idf_component_register(SRCS "posix_stubs.c" "layout_check.c" "ws_log.c" INCLUDE_DIRS "include"
-    REQUIRES tcp_transport PRIV_REQUIRES driver esp_adc esp_wifi mbedtls lwip esp_http_client esp_app_format esp_http_server esp_netif esp_eth esp_partition app_update spiffs nvs_flash espressif__mdns)
+    REQUIRES tcp_transport PRIV_REQUIRES driver esp_adc esp_wifi mbedtls lwip esp_http_client esp_app_format esp_http_server esp_netif esp_eth esp_partition app_update spiffs nvs_flash espressif__mdns lvgl esp_lcd)
 
 if(IDF_TARGET STREQUAL "esp32s3")
     set(RUST_TARGET "xtensa-esp32s3-espidf")
@@ -29,6 +29,14 @@ else()
     set(BUILD_STD_FEATURES "panic_immediate_abort")
 endif()
 
+# GET /api/debug/screen (the display as BMP), for development only
+option(RUST_CORE_SCREENSHOT "Display screenshot route (development only)" OFF)
+if(RUST_CORE_SCREENSHOT)
+    set(RUST_FEATURES "--features" "screenshot")
+else()
+    set(RUST_FEATURES "")
+endif()
+
 # the Kconfig values for the Rust constants (build.rs, src/sdkconfig.rs)
 idf_build_get_property(RUST_CORE_SDKCONFIG SDKCONFIG)
 
@@ -36,7 +44,7 @@ idf_build_get_property(RUST_CORE_SDKCONFIG SDKCONFIG)
 add_custom_target(rust_core_cargo
     COMMAND ${CMAKE_COMMAND} -E env CARGO_TARGET_DIR=${CARGO_TARGET_DIR} RUST_CORE_SDKCONFIG=${RUST_CORE_SDKCONFIG}
             RUST_CORE_COMPILE_COMMANDS=${CMAKE_BINARY_DIR}/compile_commands.json
-            ${CARGO} build --release --locked --target ${RUST_TARGET}
+            ${CARGO} build --release --locked --target ${RUST_TARGET} ${RUST_FEATURES}
             -Zbuild-std=std,panic_abort -Zbuild-std-features=${BUILD_STD_FEATURES}
     WORKING_DIRECTORY ${COMPONENT_DIR}
     BYPRODUCTS ${RUST_LIB}

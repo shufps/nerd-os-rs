@@ -13,3 +13,7 @@
 #include "mbedtls/platform.h"
 #include "mbedtls/ssl.h"
 #include "mdns.h"
+#include "lvgl.h"
+#include "esp_lcd_panel_io.h"
+#include "esp_lcd_panel_ops.h"
+#include "esp_lcd_panel_vendor.h"

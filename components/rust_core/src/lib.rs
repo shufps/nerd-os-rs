@@ -36,6 +36,7 @@ pub mod crt_bundle;
 pub mod crypto;
 pub mod cutil;
 pub mod discord;
+pub mod display_shot;
 pub mod dns;
 pub mod ds4432u;
 pub mod emc2101;

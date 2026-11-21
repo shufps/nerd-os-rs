@@ -321,7 +321,9 @@ fn method(m: Method) -> httpd::Method {
 
 unsafe fn register_routes(ctx: *mut ServerCtx) {
     let s = server();
-    for rt in ROUTES.iter() {
+    // the extra routes first: the table ends with the file handler's
+    // wildcard, which would shadow them
+    for rt in http_routes::EXTRA.iter().chain(ROUTES.iter()) {
         let builtin = matches!(rt.handler, Handler::Recovery | Handler::Options);
         let cpp = if builtin {
             None
@@ -333,6 +335,8 @@ unsafe fn register_routes(ctx: *mut ServerCtx) {
                     Handler::Ota => Some(crate::ota_upload::firmware_update as httpd::HandlerFn),
                     Handler::OtaWww => Some(crate::ota_upload::www_update as httpd::HandlerFn),
                     Handler::Coredump => Some(crate::http_coredump::handler as httpd::HandlerFn),
+                    #[cfg(feature = "screenshot")]
+                    Handler::Screenshot => Some(crate::display_shot::handler as httpd::HandlerFn),
                     Handler::CanNodes => Some(crate::http_can::nodes as httpd::HandlerFn),
                     Handler::CanSlaveAction => Some(crate::http_can::action as httpd::HandlerFn),
                     Handler::CanSlavePatch => Some(crate::http_can::patch as httpd::HandlerFn),

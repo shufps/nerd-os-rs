@@ -66,6 +66,9 @@ pub enum Handler {
     ProfilesGet,
     ProfilesPatch,
     ProfileApply,
+    /// GET /api/debug/screen (development)
+    #[cfg(feature = "screenshot")]
+    Screenshot,
 }
 
 /// What runs before the handler, and when the route exists.
@@ -93,6 +96,18 @@ pub mod flag {
     /// only outside recovery mode
     pub const NORMAL_ONLY: u16 = 1 << 10;
 }
+
+/// The routes of optional development features, registered before
+/// [`ROUTES`] (not part of the table the reference test compares).
+#[cfg(feature = "screenshot")]
+pub static EXTRA: [Route; 1] = [r(
+    c"/api/debug/screen",
+    Method::Get,
+    Handler::Screenshot,
+    API | OTP,
+)];
+#[cfg(not(feature = "screenshot"))]
+pub static EXTRA: [Route; 0] = [];
 
 /// One route of the table.
 #[derive(Clone, Copy, Debug)]

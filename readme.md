@@ -175,6 +175,21 @@ esp-coredump --chip esp32s3 info_corefile --core-format raw \
 Or read it from a connected device: `./docker/idf.sh -p /dev/ttyACM0 coredump-info`
 (from the matching build directory). Only share dumps with people you trust.
 
+### Display screenshots (development)
+
+A development build can return the display content as a BMP image, for
+comparing screens without looking at the device. It is off in normal builds:
+the display can show the OTP enrollment QR code.
+
+```bash
+./docker/idf.sh -DRUST_CORE_SCREENSHOT=ON reconfigure
+./docker/idf.sh build
+curl -o screen.bmp http://<device>/api/debug/screen
+```
+
+`-DRUST_CORE_SCREENSHOT=OFF reconfigure` turns it off again (the option is
+kept in the build directory's CMake cache).
+
 ## Repository layout
 
 | Path | Content |

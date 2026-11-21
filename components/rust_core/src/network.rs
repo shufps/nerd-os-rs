@@ -12,6 +12,7 @@
 
 use crate::idf::idf_const;
 use core::ffi::{c_char, c_int, c_void, CStr};
+use core::ptr::NonNull;
 use std::ffi::CString;
 use std::sync::atomic::{AtomicBool, AtomicPtr, Ordering};
 use std::sync::{Condvar, Mutex, OnceLock};
@@ -22,6 +23,54 @@ use crate::idf::{EspErr, ESP_OK};
 use crate::log::log;
 use crate::netmgr::{act as nact, ffi as netmgr};
 use crate::wifi::{act, ffi as wifi_state};
+
+/// A netif that lives for the rest of the firmware (the default WiFi ones,
+/// the ETH one once its setup succeeded): only these reach the netif calls.
+#[derive(Clone, Copy)]
+pub struct NetifRef(NonNull<c_void>);
+
+// SAFETY: esp_netif objects may be used from any task (esp_netif locks)
+unsafe impl Send for NetifRef {}
+// SAFETY: as Send
+unsafe impl Sync for NetifRef {}
+
+impl NetifRef {
+    /// # Safety
+    /// `p` is NULL or a live netif that is never destroyed.
+    pub unsafe fn permanent(p: *mut c_void) -> Option<Self> {
+        NonNull::new(p).map(Self)
+    }
+
+    fn as_ptr(self) -> *mut c_void {
+        self.0.as_ptr()
+    }
+}
+
+/// A netif slot, set once.
+struct NetifSlot(AtomicPtr<c_void>);
+
+impl NetifSlot {
+    const fn new() -> Self {
+        Self(AtomicPtr::new(core::ptr::null_mut()))
+    }
+    fn get(&self) -> Option<NetifRef> {
+        // only NetifRefs are stored (set())
+        NonNull::new(self.0.load(Ordering::Acquire)).map(NetifRef)
+    }
+    fn set(&self, n: NetifRef) {
+        self.0.store(n.as_ptr(), Ordering::Release);
+    }
+}
+
+/// An esp_timer that is never deleted.
+#[derive(Clone, Copy)]
+#[cfg_attr(not(target_os = "espidf"), allow(dead_code))]
+pub struct Timer(NonNull<c_void>);
+
+// SAFETY: the esp_timer API may be called from any task
+unsafe impl Send for Timer {}
+// SAFETY: as Send
+unsafe impl Sync for Timer {}
 
 const TAG: &CStr = c"wifi";
 const TAG_NET: &CStr = c"netmgr";
@@ -87,7 +136,7 @@ mod sys {
     pub fn timer_create(
         cb: unsafe extern "C" fn(*mut c_void),
         name: &'static CStr,
-    ) -> Result<*mut c_void, EspErr> {
+    ) -> Result<Timer, EspErr> {
         let args = raw::esp_timer_create_args_t {
             callback: Some(cb),
             arg: core::ptr::null_mut(),
@@ -99,13 +148,15 @@ mod sys {
         // SAFETY: `args` (with the static `name`) and `t` are live locals; esp_timer copies
         // the args, `cb` is a valid extern "C" fn and the arg pointer is unused
         match unsafe { raw::esp_timer_create(&args, &mut t) } {
-            ESP_OK => Ok(t.cast()),
+            ESP_OK => NonNull::new(t.cast())
+                .map(Timer)
+                .ok_or(crate::idf::ESP_FAIL),
             e => Err(e),
         }
     }
-    pub fn timer_start_once(t: *mut c_void, us: u64) -> EspErr {
-        // SAFETY: `t` is the handle from `timer_create` (BACKOFF_TIMER), never deleted
-        unsafe { raw::esp_timer_start_once(t.cast(), us) }
+    pub fn timer_start_once(t: Timer, us: u64) -> EspErr {
+        // SAFETY: a timer from esp_timer_create, never deleted (Timer)
+        unsafe { raw::esp_timer_start_once(t.0.as_ptr().cast(), us) }
     }
     /// `esp_wifi_init(WIFI_INIT_CONFIG_DEFAULT())`
     pub fn wifi_init_default() -> EspErr {
@@ -250,29 +301,30 @@ mod sys {
         // SAFETY: `r` is a live local the call fills
         (unsafe { raw::esp_wifi_sta_get_ap_info(&mut r) } == ESP_OK).then_some(r.rssi)
     }
-    pub fn netif_create_ap() -> *mut c_void {
-        // SAFETY: no arguments; requires esp_netif_init/esp_wifi_init (done in wifi_init)
-        unsafe { raw::esp_netif_create_default_wifi_ap().cast() }
+    pub fn netif_create_ap() -> Option<NetifRef> {
+        // SAFETY: no arguments; requires esp_netif_init/esp_wifi_init (done in wifi_init);
+        // the default netifs are never destroyed
+        unsafe { NetifRef::permanent(raw::esp_netif_create_default_wifi_ap().cast()) }
     }
-    pub fn netif_create_sta() -> *mut c_void {
-        // SAFETY: no arguments; requires esp_netif_init/esp_wifi_init (done in wifi_init)
-        unsafe { raw::esp_netif_create_default_wifi_sta().cast() }
+    pub fn netif_create_sta() -> Option<NetifRef> {
+        // SAFETY: as netif_create_ap
+        unsafe { NetifRef::permanent(raw::esp_netif_create_default_wifi_sta().cast()) }
     }
-    pub fn set_hostname(netif: *mut c_void, name: &CStr) -> EspErr {
-        // SAFETY: `netif` is the STA netif from `netif_create_sta` (never destroyed) and
-        // `name` a NUL-terminated string that esp_netif copies
-        unsafe { raw::esp_netif_set_hostname(netif.cast(), name.as_ptr()) }
+    pub fn set_hostname(netif: NetifRef, name: &CStr) -> EspErr {
+        // SAFETY: a live netif (NetifRef) and a NUL-terminated string esp_netif copies
+        unsafe { raw::esp_netif_set_hostname(netif.as_ptr().cast(), name.as_ptr()) }
     }
-    pub fn set_default_netif(netif: *mut c_void) -> EspErr {
-        // SAFETY: `netif` is a live netif (ETH from w5500 or the STA one), checked non-null
-        unsafe { raw::esp_netif_set_default_netif(netif.cast()) }
+    pub fn set_default_netif(netif: NetifRef) -> EspErr {
+        // SAFETY: a live netif (NetifRef)
+        unsafe { raw::esp_netif_set_default_netif(netif.as_ptr().cast()) }
     }
     /// Makes the DNS servers of `netif` (from its DHCP lease) the global
     /// resolver's: with WiFi and Ethernet registered, lwIP does not always
     /// take the Ethernet lease's servers when WiFi never had one, and pool
     /// host lookups fail. `public_fallback`: 8.8.8.8 / 1.1.1.1 for a slot
     /// the lease left empty (Ethernet).
-    pub fn apply_dns(netif: *mut c_void, public_fallback: bool) {
+    pub fn apply_dns(netif: NetifRef, public_fallback: bool) {
+        let netif = netif.as_ptr();
         let slots = [
             (raw::esp_netif_dns_type_t_ESP_NETIF_DNS_MAIN, [8u8, 8, 8, 8]),
             (raw::esp_netif_dns_type_t_ESP_NETIF_DNS_BACKUP, [1, 1, 1, 1]),
@@ -365,10 +417,10 @@ mod sys {
     pub fn timer_create(
         _: unsafe extern "C" fn(*mut c_void),
         _: &'static CStr,
-    ) -> Result<*mut c_void, EspErr> {
-        Ok(core::ptr::null_mut())
+    ) -> Result<Timer, EspErr> {
+        Ok(Timer(NonNull::dangling()))
     }
-    pub fn timer_start_once(_: *mut c_void, _: u64) -> EspErr {
+    pub fn timer_start_once(_: Timer, _: u64) -> EspErr {
         ESP_OK
     }
     pub fn wifi_init_default() -> EspErr {
@@ -410,19 +462,19 @@ mod sys {
     pub fn sta_rssi() -> Option<i8> {
         None
     }
-    pub fn netif_create_ap() -> *mut c_void {
-        core::ptr::null_mut()
+    pub fn netif_create_ap() -> Option<NetifRef> {
+        None
     }
-    pub fn netif_create_sta() -> *mut c_void {
-        core::ptr::null_mut()
+    pub fn netif_create_sta() -> Option<NetifRef> {
+        None
     }
-    pub fn set_hostname(_: *mut c_void, _: &CStr) -> EspErr {
+    pub fn set_hostname(_: NetifRef, _: &CStr) -> EspErr {
         ESP_OK
     }
-    pub fn set_default_netif(_: *mut c_void) -> EspErr {
+    pub fn set_default_netif(_: NetifRef) -> EspErr {
         ESP_OK
     }
-    pub fn apply_dns(_: *mut c_void, _: bool) {}
+    pub fn apply_dns(_: NetifRef, _: bool) {}
     pub unsafe fn got_ip(_: *mut c_void) -> [u8; 4] {
         [0; 4]
     }
@@ -444,11 +496,11 @@ fn delay_ms(ms: u64) {
 // WiFi (connect.cpp)
 
 static WIFI_INITED: AtomicBool = AtomicBool::new(false);
-static NETIF_AP: AtomicPtr<c_void> = AtomicPtr::new(core::ptr::null_mut());
-static NETIF_STA: AtomicPtr<c_void> = AtomicPtr::new(core::ptr::null_mut());
+static NETIF_AP: NetifSlot = NetifSlot::new();
+static NETIF_STA: NetifSlot = NetifSlot::new();
 /// the reconnect backoff (a timer: a delay in the handler blocked the
 /// default event loop)
-static BACKOFF_TIMER: AtomicPtr<c_void> = AtomicPtr::new(core::ptr::null_mut());
+static BACKOFF_TIMER: OnceLock<Timer> = OnceLock::new();
 /// the station MAC as text
 static MAC: OnceLock<CString> = OnceLock::new();
 /// the last scan's records
@@ -485,8 +537,7 @@ fn run_actions(a: u32) {
         set_wifi_status("LAN Connected!");
     }
     if a & act::BACKOFF != 0 {
-        let t = BACKOFF_TIMER.load(Ordering::Acquire);
-        if !t.is_null() {
+        if let Some(&t) = BACKOFF_TIMER.get() {
             sys::timer_start_once(t, 1_000_000);
         }
     }
@@ -537,7 +588,7 @@ pub fn ap_ssid() -> String {
     format!("Nerdaxe_{:02X}{:02X}", mac[4], mac[5])
 }
 
-fn init_softap() -> *mut c_void {
+fn init_softap() -> Option<NetifRef> {
     let netif = sys::netif_create_ap();
     check(
         sys::set_ap_config(ap_ssid().as_bytes()),
@@ -561,7 +612,7 @@ pub fn softap_on() {
     crate::system::set_ap_state(true);
 }
 
-fn init_sta(ssid: &[u8], pass: &[u8]) -> *mut c_void {
+fn init_sta(ssid: &[u8], pass: &[u8]) -> Option<NetifRef> {
     let netif = sys::netif_create_sta();
     wifi_state::wifi_state_set_has_ssid(!ssid.is_empty());
     if pass.is_empty() {
@@ -572,10 +623,12 @@ fn init_sta(ssid: &[u8], pass: &[u8]) -> *mut c_void {
 }
 
 /// Starts WiFi as access point and station; the station's netif.
-pub fn wifi_init(ssid: &[u8], pass: &[u8], hostname: &CStr) -> *mut c_void {
+pub fn wifi_init(ssid: &[u8], pass: &[u8], hostname: &CStr) -> Option<NetifRef> {
     if !WIFI_INITED.load(Ordering::Acquire) {
         match sys::timer_create(backoff_done, c"wifi_backoff") {
-            Ok(t) => BACKOFF_TIMER.store(t, Ordering::Release),
+            Ok(t) => {
+                let _ = BACKOFF_TIMER.set(t);
+            }
             Err(e) => check(e, "esp_timer_create"),
         }
         check(
@@ -596,11 +649,15 @@ pub fn wifi_init(ssid: &[u8], pass: &[u8], hostname: &CStr) -> *mut c_void {
     softap_on();
 
     // the netifs only once
-    if NETIF_AP.load(Ordering::Acquire).is_null() {
-        NETIF_AP.store(init_softap(), Ordering::Release);
+    if NETIF_AP.get().is_none() {
+        if let Some(n) = init_softap() {
+            NETIF_AP.set(n);
+        }
     }
-    if NETIF_STA.load(Ordering::Acquire).is_null() {
-        NETIF_STA.store(init_sta(ssid, pass), Ordering::Release);
+    if NETIF_STA.get().is_none() {
+        if let Some(n) = init_sta(ssid, pass) {
+            NETIF_STA.set(n);
+        }
     }
 
     let e = sys::wifi_start();
@@ -609,8 +666,8 @@ pub fn wifi_init(ssid: &[u8], pass: &[u8], hostname: &CStr) -> *mut c_void {
     }
     check(sys::set_ps_none(), "esp_wifi_set_ps");
 
-    let sta = NETIF_STA.load(Ordering::Acquire);
-    if !sta.is_null() {
+    let sta = NETIF_STA.get();
+    if let Some(sta) = sta {
         let e = sys::set_hostname(sta, hostname);
         if e != ESP_OK {
             log!(Warn, TAG, "esp_netif_set_hostname failed: {}", err_name(e));
@@ -703,7 +760,6 @@ const NET_ETH_IP: u8 = 1 << 1;
 static NET_BITS: Mutex<u8> = Mutex::new(0);
 static NET_CHANGED: Condvar = Condvar::new();
 static NET_INITED: AtomicBool = AtomicBool::new(false);
-static PREFERRED_NETIF: AtomicPtr<c_void> = AtomicPtr::new(core::ptr::null_mut());
 
 type Hook = unsafe extern "C" fn();
 /// main: reconnect the pools when the preferred interface changes
@@ -775,12 +831,11 @@ pub fn shutdown_ap_once() {
 /// An interface event: the decisions in `netmgr.rs`, the actions here.
 fn on_event(ev: Event) {
     let eth = crate::w5500::netif();
-    let sta = NETIF_STA.load(Ordering::Acquire);
+    let sta = NETIF_STA.get();
     let mut preferred = 0;
     // SAFETY: `preferred` is a live local the call writes to
-    let a = unsafe {
-        netmgr::netmgr_event(ev as c_int, !eth.is_null(), !sta.is_null(), &mut preferred)
-    };
+    let a =
+        unsafe { netmgr::netmgr_event(ev as c_int, eth.is_some(), sta.is_some(), &mut preferred) };
 
     let set = if a & nact::SET_WIFI_BIT != 0 {
         NET_WIFI_IP
@@ -823,10 +878,9 @@ fn on_event(ev: Event) {
     let netif = match preferred {
         2 => eth,
         1 => sta,
-        _ => core::ptr::null_mut(),
+        _ => None,
     };
-    PREFERRED_NETIF.store(netif, Ordering::Release);
-    if a & nact::SET_DEFAULT != 0 && !netif.is_null() {
+    if let (true, Some(netif)) = (a & nact::SET_DEFAULT != 0, netif) {
         let e = sys::set_default_netif(netif);
         if e != ESP_OK {
             log!(

@@ -89,7 +89,13 @@ impl Buf {
     fn new() -> Option<Buf> {
         // SAFETY: heap_caps_malloc has no preconditions; a NULL result yields None
         let p = unsafe { sys::heap_caps_malloc(UPLOAD_CHUNK, CAP_INTERNAL_8BIT) } as *mut u8;
-        (!p.is_null()).then_some(Buf(p))
+        if p.is_null() {
+            return None;
+        }
+        // SAFETY: a fresh UPLOAD_CHUNK-byte allocation; zeroed so that slice() never
+        // exposes uninitialised bytes
+        unsafe { core::ptr::write_bytes(p, 0, UPLOAD_CHUNK) };
+        Some(Buf(p))
     }
     fn slice(&mut self) -> &mut [u8] {
         // SAFETY: self.0 is the non-null UPLOAD_CHUNK-byte allocation owned by self, and &mut self

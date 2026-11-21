@@ -256,8 +256,10 @@ impl Client {
 
     /// Sends the request with `body` (kept by the client until `perform`).
     pub fn perform_with_body(&self, body: &[u8]) -> EspErr {
-        // SAFETY: the handle comes from a successful `esp_http_client_init` and is only freed in `drop`; the client keeps the `body`
-        // pointer (not a copy), which stays borrowed until `perform` below returns.
+        // SAFETY: the handle comes from a successful `esp_http_client_init` and is
+        // only freed in `drop`; the client keeps the `body` pointer (not a copy):
+        // it is borrowed until `perform` returns and cleared right after, so a
+        // later request cannot read it
         unsafe {
             let e = sys::esp_http_client_set_post_field(
                 self.0,
@@ -267,7 +269,9 @@ impl Client {
             if e != ESP_OK {
                 return e;
             }
-            sys::esp_http_client_perform(self.0)
+            let e = sys::esp_http_client_perform(self.0);
+            sys::esp_http_client_set_post_field(self.0, core::ptr::null(), 0);
+            e
         }
     }
 

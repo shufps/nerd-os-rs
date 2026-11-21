@@ -120,7 +120,10 @@ Still to test:
 - the WiFi scan in the portal (`/api/v2/wifi/scan` with the AP active);
 - the WiFi reconnect backoff after a lost AP;
 - a board without Ethernet;
-- an ETH init failure (cleanup path).
+- an ETH init failure (cleanup path). Since the soundness fixes it tears down
+  in the IDF order (glue, netif, driver, PHY/MAC) and leaks MAC/PHY instead of
+  freeing them when the driver refuses to uninstall. Needs a W5500 that fails
+  after the driver install, for example a missing interrupt line.
 
 ## GitHub updater on the Rust repository (`webflasher-rs`)
 

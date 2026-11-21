@@ -121,9 +121,14 @@ static FANS: OnceLock<FanController> = OnceLock::new();
 static TASK: OnceLock<PowerTask> = OnceLock::new();
 
 fn mutex() -> *mut c_void {
-    // SAFETY: xQueueCreateMutex takes only the queue type; run once by OnceLock
-    LOCK.get_or_init(|| Lock(unsafe { sys::xQueueCreateMutex(RECURSIVE_MUTEX) }.cast()))
-        .0
+    LOCK.get_or_init(|| {
+        // SAFETY: xQueueCreateMutex takes only the queue type; run once by OnceLock
+        let h = unsafe { sys::xQueueCreateMutex(RECURSIVE_MUTEX) };
+        // at boot; without the lock no hardware access would be safe
+        assert!(!h.is_null(), "hardware mutex: out of memory");
+        Lock(h.cast())
+    })
+    .0
 }
 
 /// Takes the hardware lock (recursive).

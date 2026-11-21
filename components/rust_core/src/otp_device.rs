@@ -164,9 +164,12 @@ pub fn start_enrollment() -> c_int {
     }
 }
 
-fn opt(p: *const c_char) -> Option<&'static [u8]> {
-    // SAFETY: only called from otp_dev_init(), whose contract is NUL-terminated
-    // strings (or NULL, checked); the bytes are copied before it returns
+/// The bytes of `p` (None for NULL).
+///
+/// # Safety
+/// `p` is NULL or NUL-terminated and stays valid for `'a`.
+unsafe fn opt<'a>(p: *const c_char) -> Option<&'a [u8]> {
+    // SAFETY: NUL-terminated and alive (caller contract); NULL is checked
     (!p.is_null()).then(|| unsafe { CStr::from_ptr(p) }.to_bytes())
 }
 
@@ -181,7 +184,8 @@ pub(crate) mod ffi {
         model: *const c_char,
     ) {
         let s = |p| {
-            opt(p)
+            // SAFETY: the strings of this call (its contract); copied at once
+            unsafe { opt(p) }
                 .map(|b| String::from_utf8_lossy(b).into_owned())
                 .unwrap_or_default()
         };

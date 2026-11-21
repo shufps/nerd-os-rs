@@ -76,11 +76,34 @@ idf_const!(
 );
 idf_const!(DEFAULT_TTL: c_int = IP_DEFAULT_TTL, 64);
 
+/// The address as text (not lwIP's `ipaddr_ntoa()`: its one static
+/// buffer would be shared by both pools' ping callbacks).
+#[cfg(target_os = "espidf")]
+fn ip_text(a: &IpAddr) -> String {
+    idf_const!(IPADDR_TYPE_V4: u32 = lwip_ip_addr_type_IPADDR_TYPE_V4, 0);
+    if a.type_ as u32 == IPADDR_TYPE_V4 {
+        // SAFETY: the type says the IPv4 member is the active one
+        let v = unsafe { a.u_addr.ip4.addr }.to_ne_bytes();
+        format!("{}.{}.{}.{}", v[0], v[1], v[2], v[3])
+    } else {
+        // SAFETY: not IPv4: the IPv6 member is the active one
+        let w = unsafe { a.u_addr.ip6.addr };
+        let b: Vec<u8> = w.iter().flat_map(|x| x.to_ne_bytes()).collect();
+        let b: [u8; 16] = b.try_into().unwrap_or([0; 16]);
+        std::net::Ipv6Addr::from(b).to_string()
+    }
+}
+
+#[cfg(not(target_os = "espidf"))]
+fn ip_text(_: &IpAddr) -> String {
+    "?".into()
+}
+
 #[cfg(target_os = "espidf")]
 mod sys {
     pub use crate::idf::raw::{
         esp_ping_delete_session, esp_ping_get_profile, esp_ping_new_session, esp_ping_start,
-        esp_ping_stop, ipaddr_aton, ipaddr_ntoa,
+        esp_ping_stop, ipaddr_aton,
     };
 }
 
@@ -89,9 +112,6 @@ mod sys {
     use super::*;
     pub unsafe fn ipaddr_aton(_: *const c_char, _: *mut IpAddr) -> c_int {
         0
-    }
-    pub unsafe fn ipaddr_ntoa(_: *const IpAddr) -> *const c_char {
-        c"?".as_ptr()
     }
     pub unsafe fn esp_ping_new_session(
         _: *const Config,
@@ -172,9 +192,7 @@ unsafe extern "C" fn on_success(hdl: *mut c_void, args: *mut c_void) {
         core::mem::size_of::<IpAddr>() as u32,
     ) == ESP_OK;
     let ip = if ok_ip {
-        CStr::from_ptr(sys::ipaddr_ntoa(&addr))
-            .to_string_lossy()
-            .into_owned()
+        ip_text(&addr)
     } else {
         "?.?.?.?".into()
     };

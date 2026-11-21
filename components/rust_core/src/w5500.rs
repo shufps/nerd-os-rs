@@ -215,9 +215,9 @@ mod sys {
         let e = unsafe { raw::esp_eth_driver_install(&cfg, &mut h) };
         (e, h)
     }
-    pub fn driver_uninstall(h: *mut c_void) {
+    pub fn driver_uninstall(h: *mut c_void) -> EspErr {
         // SAFETY: `h` is the handle from driver_install; release clears it afterwards
-        unsafe { raw::esp_eth_driver_uninstall(h) };
+        unsafe { raw::esp_eth_driver_uninstall(h) }
     }
     pub fn set_mac(h: *mut c_void, mac: &mut [u8; 6]) -> EspErr {
         // SAFETY: `h` is the installed driver handle and `mac` a 6-byte buffer, the size
@@ -301,7 +301,9 @@ mod sys {
     pub fn driver_install(_: *mut c_void, _: *mut c_void) -> (EspErr, *mut c_void) {
         (ESP_FAIL, core::ptr::null_mut())
     }
-    pub fn driver_uninstall(_: *mut c_void) {}
+    pub fn driver_uninstall(_: *mut c_void) -> EspErr {
+        ESP_OK
+    }
     pub fn set_mac(_: *mut c_void, _: &mut [u8; 6]) -> EspErr {
         ESP_FAIL
     }
@@ -472,13 +474,27 @@ fn sw_reset(cs: c_int) {
 
 /// Releases what `early_init()` set up, in reverse order.
 fn release(d: &mut Driver) {
-    if !d.handle.is_null() {
-        sys::driver_uninstall(d.handle);
-        d.handle = core::ptr::null_mut();
-    }
+    // as the IDF example tears it down: the glue holds a reference on the
+    // driver, which refuses to uninstall while it is attached
     if !d.glue.is_null() {
         sys::glue_del(d.glue);
         d.glue = core::ptr::null_mut();
+    }
+    if !d.netif.is_null() {
+        NETIF.store(core::ptr::null_mut(), Ordering::Release);
+        sys::netif_destroy(d.netif);
+        d.netif = core::ptr::null_mut();
+    }
+    if !d.handle.is_null() {
+        let e = sys::driver_uninstall(d.handle);
+        d.handle = core::ptr::null_mut();
+        if e != ESP_OK {
+            // the driver may still use MAC and PHY: leak them rather than
+            // free objects in use
+            log!(Error, TAG, "driver uninstall failed: {}", err_name(e));
+            d.mac = core::ptr::null_mut();
+            d.phy = core::ptr::null_mut();
+        }
     }
     if !d.phy.is_null() {
         sys::phy_del(d.phy);
@@ -491,11 +507,6 @@ fn release(d: &mut Driver) {
     if d.we_init_bus {
         sys::spi_bus_free();
         d.we_init_bus = false;
-    }
-    if !d.netif.is_null() {
-        NETIF.store(core::ptr::null_mut(), Ordering::Release);
-        sys::netif_destroy(d.netif);
-        d.netif = core::ptr::null_mut();
     }
 }
 

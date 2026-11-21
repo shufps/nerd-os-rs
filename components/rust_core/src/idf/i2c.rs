@@ -21,6 +21,7 @@ const FREQ_HZ: u32 = 100_000;
 /// `I2C_MASTER_TIMEOUT_TICKS` / `SMBUS_DEFAULT_TIMEOUT`
 pub const TIMEOUT: Ticks = ms_to_ticks(1000);
 
+idf_const!(ESP_ERR_NO_MEM: EspErr = ESP_ERR_NO_MEM, 0x101);
 idf_const!(pub MODE_MASTER: u32 = i2c_mode_t_I2C_MODE_MASTER, 1);
 idf_const!(WRITE_BIT: u8 = i2c_rw_t_I2C_MASTER_WRITE, 0);
 idf_const!(READ_BIT: u8 = i2c_rw_t_I2C_MASTER_READ, 1);
@@ -94,8 +95,9 @@ mod sys {
     ) -> EspErr {
         ESP_FAIL
     }
+    /// a placeholder link (never dereferenced: every call fails)
     pub unsafe fn i2c_cmd_link_create() -> Cmd {
-        core::ptr::null_mut()
+        core::ptr::NonNull::dangling().as_ptr()
     }
     pub unsafe fn i2c_cmd_link_delete(_: Cmd) {}
     pub unsafe fn i2c_master_start(_: Cmd) -> EspErr {
@@ -125,6 +127,9 @@ fn transaction(build: impl FnOnce(Cmd)) -> EspErr {
     // exactly once here; it does not escape.
     unsafe {
         let cmd = sys::i2c_cmd_link_create();
+        if cmd.is_null() {
+            return ESP_ERR_NO_MEM;
+        }
         build(cmd);
         let err = sys::i2c_master_cmd_begin(PORT, cmd, TIMEOUT);
         sys::i2c_cmd_link_delete(cmd);
@@ -282,7 +287,12 @@ pub fn smbus_write_block(addr: u8, command: u8, data: &[u8]) -> EspErr {
 /// Removes the driver.
 pub fn delete() -> EspErr {
     // SAFETY: plain call with the port number; the driver checks whether it is installed.
-    unsafe { sys::i2c_driver_delete(PORT) }
+    let err = unsafe { sys::i2c_driver_delete(PORT) };
+    if err == ESP_OK {
+        // a later init() installs it again
+        INSTALLED.store(false, std::sync::atomic::Ordering::Release);
+    }
+    err
 }
 
 static INSTALLED: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);

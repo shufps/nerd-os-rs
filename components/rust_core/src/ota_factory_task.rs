@@ -114,6 +114,9 @@ impl Internal {
             log!(Error, TAG, "alloc failed: buf");
             return None;
         }
+        // SAFETY: a fresh CHUNK-byte allocation; zeroed so that slice() never exposes
+        // uninitialised bytes
+        unsafe { core::ptr::write_bytes(p, 0, CHUNK) };
         Some(Internal(p))
     }
     fn slice(&mut self) -> &mut [u8] {

@@ -4,7 +4,6 @@
 #include "mining_rs.h"
 #include "stratum_v1.h"
 #include "sv2_protocol.h"
-#include "sv2_session.h"
 #include "pool_policy.h"
 #include "stratum_task_loop.h"
 #include "asic_driver.h"

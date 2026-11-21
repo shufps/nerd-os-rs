@@ -1,58 +1,56 @@
 //! What the pool manager does with pool messages (port of
 //! `StratumManager::dispatch()` for Stratum v1 and
 //! `StratumTaskV2::drainEvents()` for Stratum v2): statistics and stored
-//! extranonce and the job sources (`jobs.rs`) here in Rust, connection
-//! flags and coinbase verification through hooks.
+//! extranonce and the job sources (`jobs.rs`) here, connection flags and
+//! coinbase verification through the manager's [`V1Hooks`] / [`V2Hooks`].
 //!
 //! `SubmitShares.Success` counts its shares at once instead of once per
 //! share: the count comes from the pool and can be as large as `0xFFFFFFFF`.
 
 use core::ffi::{c_char, c_int, CStr};
+use std::sync::Mutex;
 
 use crate::jobs;
 use crate::log::log;
 use crate::pool_coinbase::Handle as Coinbase;
 use crate::pool_stats::Handle as Stats;
 use crate::stratum_v1::method::*;
+use crate::stratum_v1::session::Session as V1Session;
 use crate::stratum_v1::{Message, MiningNotify};
-use crate::stratum_v2::session::{event_kind, CEvent};
-use crate::stratum_v2::ExtJob;
+use crate::stratum_v2::session::{Event, ExtendedJob, Session as V2Session};
 
-/// `pool_v1_hooks_t`: the C++ side of a Stratum v1 message. `pool` is the
-/// pool the message came from.
-#[repr(C)]
-pub struct V1Hooks {
-    pub ctx: *mut core::ffi::c_void,
+/// The manager's side of a Stratum v1 message. `pool` is the pool the
+/// message came from.
+pub trait V1Hooks {
     /// The subscribe response was unusable: reconnect.
-    pub setup_failed: unsafe extern "C" fn(ctx: *mut core::ffi::c_void, pool: c_int),
+    fn setup_failed(&mut self, pool: c_int);
     /// Whether no notify was handled since connecting; clears the flag.
-    pub take_first_job: unsafe extern "C" fn(ctx: *mut core::ffi::c_void, pool: c_int) -> bool,
+    fn take_first_job(&mut self, pool: c_int) -> bool;
     /// The pool sends valid work (pool selection).
-    pub valid_notify: unsafe extern "C" fn(ctx: *mut core::ffi::c_void, pool: c_int),
+    fn valid_notify(&mut self, pool: c_int);
     /// Coinbase verification of a notify (needs the pool config).
-    pub process_coinbase:
-        unsafe extern "C" fn(ctx: *mut core::ffi::c_void, pool: c_int, notify: *const MiningNotify),
+    fn process_coinbase(&mut self, pool: c_int, notify: &MiningNotify);
 }
 
-/// `pool_v2_hooks_t`: the C++ side of the Stratum v2 session events.
-#[repr(C)]
-pub struct V2Hooks {
-    pub ctx: *mut core::ffi::c_void,
-    /// Coinbase verification, then `job_source_sv2_extended()`. Takes
-    /// ownership of `job` (free with `sv2_ext_job_free()`).
-    pub extended_job: unsafe extern "C" fn(
-        ctx: *mut core::ffi::c_void,
+/// The manager's side of the Stratum v2 session events.
+pub trait V2Hooks {
+    /// Coinbase verification, then `jobs::sv2_extended()`.
+    fn extended_job(
+        &mut self,
         pool: c_int,
-        job: *mut ExtJob,
+        job: ExtendedJob,
+        clean: bool,
         extranonce_size: u8,
         pool_difficulty: u32,
-    ),
+    );
     /// The connection is unusable: reconnect.
-    pub setup_failed: unsafe extern "C" fn(ctx: *mut core::ffi::c_void, pool: c_int),
+    fn setup_failed(&mut self, pool: c_int);
     /// The pool sends valid work (pool selection).
-    pub valid_notify: unsafe extern "C" fn(ctx: *mut core::ffi::c_void, pool: c_int),
+    fn valid_notify(&mut self, pool: c_int);
 }
 
+/// # Safety
+/// `p` is NULL or NUL-terminated and outlives the result.
 unsafe fn text<'a>(p: *const c_char) -> std::borrow::Cow<'a, str> {
     if p.is_null() {
         "".into()
@@ -64,10 +62,10 @@ unsafe fn text<'a>(p: *const c_char) -> std::borrow::Cow<'a, str> {
 /// Acts on one parsed v1 message (`ok`: the parser's result).
 ///
 /// # Safety
-/// `m` comes from the v1 parser; the hooks are valid.
+/// `m` comes from the v1 parser (its strings NULL or NUL-terminated).
 #[allow(clippy::too_many_arguments)]
 unsafe fn handle_v1(
-    h: &V1Hooks,
+    h: &mut impl V1Hooks,
     stats: &Stats,
     coinbase: &Coinbase,
     pool: c_int,
@@ -84,7 +82,7 @@ unsafe fn handle_v1(
                 tag,
                 "invalid mining.subscribe response, reconnecting ..."
             );
-            (h.setup_failed)(h.ctx, pool);
+            h.setup_failed(pool);
         }
         return;
     }
@@ -100,11 +98,11 @@ unsafe fn handle_v1(
                 return;
             };
             stats.with(|s| s.set_network_difficulty(pool, n.target));
-            (h.process_coinbase)(h.ctx, pool, n);
-            let first = (h.take_first_job)(h.ctx, pool);
+            h.process_coinbase(pool, n);
+            let first = h.take_first_job(pool);
             jobs::v1_notify(pool, n, m.should_abandon_work != 0 || first);
             if n.ntime != 0 {
-                (h.valid_notify)(h.ctx, pool);
+                h.valid_notify(pool);
             }
         }
         MINING_SET_DIFFICULTY => {
@@ -160,30 +158,35 @@ unsafe fn handle_v1(
 }
 
 /// Acts on one SV2 session event.
-///
-/// # Safety
-/// The hooks are valid; `ev` comes from the session.
-unsafe fn handle_v2(
-    h: &V2Hooks,
+fn handle_v2(
+    h: &mut impl V2Hooks,
     stats: &Stats,
     pool: c_int,
     tag: &CStr,
-    ev: &CEvent,
+    ev: Event,
     last_submit_us: u64,
     now_us: u64,
 ) {
-    use event_kind::*;
-    match ev.kind {
-        NETWORK_DIFFICULTY => stats.with(|s| s.set_network_difficulty(pool, ev.value)),
-        POOL_DIFFICULTY => stats.with(|s| s.set_pool_difficulty(pool, ev.value)),
-        SET_TARGET => {
-            stats.with(|s| s.set_pool_difficulty(pool, ev.value));
-            jobs::sv2_set_difficulty(pool, ev.value);
+    match ev {
+        Event::NetworkDifficulty(nbits) => stats.with(|s| s.set_network_difficulty(pool, nbits)),
+        Event::PoolDifficulty(d) => stats.with(|s| s.set_pool_difficulty(pool, d)),
+        Event::SetTarget(d) => {
+            stats.with(|s| s.set_pool_difficulty(pool, d));
+            jobs::sv2_set_difficulty(pool, d);
         }
         // the standard channel rolls version bits 13-28
-        STANDARD_JOB => jobs::sv2_standard(pool, &ev.job, 0x1fffe000, ev.value),
-        EXTENDED_JOB => (h.extended_job)(h.ctx, pool, ev.ext_job, ev.extranonce_size, ev.value),
-        SHARES_ACCEPTED => {
+        Event::StandardJob {
+            job,
+            pool_difficulty,
+            clean,
+        } => jobs::sv2_standard(pool, &job, clean, 0x1fffe000, pool_difficulty),
+        Event::ExtendedJob {
+            job,
+            extranonce_size,
+            pool_difficulty,
+            clean,
+        } => h.extended_job(pool, job, clean, extranonce_size, pool_difficulty),
+        Event::SharesAccepted(n) => {
             if last_submit_us > 0 {
                 // tenths of a millisecond, without float formatting
                 let tenths = now_us.saturating_sub(last_submit_us) / 100;
@@ -191,99 +194,77 @@ unsafe fn handle_v2(
                     Info,
                     tag,
                     "Shares accepted: {} ({}.{} ms)",
-                    ev.value,
+                    n,
                     tenths / 10,
                     tenths % 10
                 );
             } else {
-                log!(Info, tag, "Shares accepted: {}", ev.value);
+                log!(Info, tag, "Shares accepted: {}", n);
             }
-            stats.with(|s| s.shares_accepted(pool, ev.value, now_us));
+            stats.with(|s| s.shares_accepted(pool, n, now_us));
         }
-        SHARE_REJECTED => stats.with(|s| s.share_result(pool, false, now_us)),
+        Event::ShareRejected(_) => stats.with(|s| s.share_result(pool, false, now_us)),
         // drop the connection like a pool error instead of silently mining nothing
-        SETUP_FAILED => (h.setup_failed)(h.ctx, pool),
+        Event::SetupFailed => h.setup_failed(pool),
         // used by the manager for pool selection
-        VALID_NOTIFY => (h.valid_notify)(h.ctx, pool),
-        _ => {}
+        Event::ValidNotify => h.valid_notify(pool),
     }
 }
 
-fn tag_or(tag: *const c_char, default: &CStr) -> &CStr {
-    if tag.is_null() {
-        default
-    } else {
-        // SAFETY: a NUL-terminated string that outlives the call (caller contract)
-        unsafe { CStr::from_ptr(tag) }
-    }
-}
-
-pub(crate) mod ffi {
-    use super::*;
-    use crate::stratum_v1::session::ffi::{log_parsed, Handle as V1Session};
-    use crate::stratum_v2::session::ffi::{take_event, Handle as V2Session};
-
-    /// Parses `line` and acts on it (the former `StratumManager::dispatch()`
-    /// after its pool check, which stays with the caller and its lock).
-    ///
-    /// # Safety
-    /// Valid hooks and handles, `line` and `tag` NUL-terminated (`tag` may be
-    /// NULL).
-    #[allow(clippy::too_many_arguments)]
-    pub unsafe extern "C" fn pool_dispatch_v1(
-        hooks: *const V1Hooks,
-        session: *mut V1Session,
-        stats: &Stats,
-        coinbase: &Coinbase,
-        pool: c_int,
-        tag: *const c_char,
-        line: *const c_char,
-        now_us: u64,
-    ) {
-        if line.is_null() {
-            return;
-        }
-        let mut m = Message::zeroed();
-        let ok = (*session).with(|s| s.parse(CStr::from_ptr(line).to_bytes(), &mut m));
-        log_parsed(ok, &m);
-        let tag = tag_or(tag, c"stratum");
-        handle_v1(&*hooks, stats, coinbase, pool, tag, &m, ok, now_us);
+/// Parses `line` and acts on it (the former `StratumManager::dispatch()`
+/// after its pool check, which stays with the caller and its lock).
+#[allow(clippy::too_many_arguments)]
+pub fn dispatch_v1(
+    h: &mut impl V1Hooks,
+    session: &Mutex<V1Session>,
+    stats: &Stats,
+    coinbase: &Coinbase,
+    pool: c_int,
+    tag: &CStr,
+    line: &[u8],
+    now_us: u64,
+) {
+    let mut m = Message::zeroed();
+    let ok = session
+        .lock()
+        .unwrap_or_else(|e| e.into_inner())
+        .parse(line, &mut m);
+    // SAFETY: m was filled by the parser and is freed only below
+    unsafe {
+        crate::stratum_v1::session::ffi::log_parsed(ok, &m);
+        handle_v1(h, stats, coinbase, pool, tag, &m, ok, now_us);
         crate::stratum_v1::ffi::stratum_v1_message_free(&mut m);
     }
+}
 
-    /// Takes every pending session event and acts on it (the former
-    /// `StratumTaskV2::drainEvents()`).
-    ///
-    /// # Safety
-    /// Valid hooks and handles, `tag` NUL-terminated or NULL.
-    pub unsafe extern "C" fn pool_drain_v2(
-        hooks: *const V2Hooks,
-        session: *mut V2Session,
-        stats: &Stats,
-        pool: c_int,
-        tag: *const c_char,
-        last_submit_us: u64,
-        now_us: u64,
-    ) {
-        let tag = tag_or(tag, c"stratum_v2");
-        while let Some(ev) = take_event(&*session) {
-            handle_v2(&*hooks, stats, pool, tag, &ev, last_submit_us, now_us);
-        }
+/// Takes every pending session event and acts on it (the former
+/// `StratumTaskV2::drainEvents()`).
+pub fn drain_v2(
+    h: &mut impl V2Hooks,
+    session: &Mutex<V2Session>,
+    stats: &Stats,
+    pool: c_int,
+    tag: &CStr,
+    last_submit_us: u64,
+    now_us: u64,
+) {
+    loop {
+        // not locked while acting on the event: the hooks submit nothing,
+        // but the job pipeline must not wait for a share submit either
+        let ev = session
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .next_event();
+        let Some(ev) = ev else { break };
+        handle_v2(h, stats, pool, tag, ev, last_submit_us, now_us);
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::ffi::*;
     use super::*;
     use crate::jobs::test_support::{fresh, take};
     use crate::pool_stats::PoolSummary;
-    use crate::stratum_v1::session::ffi::{
-        stratum_v1_session_free, stratum_v1_session_new, Handle as V1Session,
-    };
-    use crate::stratum_v2::session::ffi::{sv2_session_new, Handle as V2Session};
-    use crate::stratum_v2::session::Event;
-    use core::ffi::c_void;
 
     /// What the hooks saw, in order.
     #[derive(Default)]
@@ -292,53 +273,33 @@ mod tests {
         first_job: bool,
     }
 
-    unsafe fn rec<'a>(ctx: *mut c_void) -> &'a mut Rec {
-        &mut *(ctx as *mut Rec)
-    }
-
-    unsafe extern "C" fn setup_failed(ctx: *mut c_void, pool: c_int) {
-        rec(ctx).calls.push(format!("setup_failed {pool}"));
-    }
-    unsafe extern "C" fn take_first_job(ctx: *mut c_void, _pool: c_int) -> bool {
-        core::mem::replace(&mut rec(ctx).first_job, false)
-    }
-    unsafe extern "C" fn valid_notify(ctx: *mut c_void, pool: c_int) {
-        rec(ctx).calls.push(format!("valid_notify {pool}"));
-    }
-    unsafe extern "C" fn process_coinbase(ctx: *mut c_void, pool: c_int, n: *const MiningNotify) {
-        rec(ctx)
-            .calls
-            .push(format!("coinbase {pool} {}", text((*n).coinbase_1)));
-    }
-    unsafe extern "C" fn extended_job(
-        ctx: *mut c_void,
-        pool: c_int,
-        job: *mut ExtJob,
-        size: u8,
-        d: u32,
-    ) {
-        rec(ctx)
-            .calls
-            .push(format!("extended {pool} {} {size} {d}", (*job).job_id));
-        crate::stratum_v2::ffi::sv2_ext_job_free(job);
-    }
-
-    fn v1_hooks(r: &mut Rec) -> V1Hooks {
-        V1Hooks {
-            ctx: r as *mut Rec as *mut c_void,
-            setup_failed,
-            take_first_job,
-            valid_notify,
-            process_coinbase,
+    impl V1Hooks for Rec {
+        fn setup_failed(&mut self, pool: c_int) {
+            self.calls.push(format!("setup_failed {pool}"));
+        }
+        fn take_first_job(&mut self, _pool: c_int) -> bool {
+            core::mem::replace(&mut self.first_job, false)
+        }
+        fn valid_notify(&mut self, pool: c_int) {
+            self.calls.push(format!("valid_notify {pool}"));
+        }
+        fn process_coinbase(&mut self, pool: c_int, n: &MiningNotify) {
+            // SAFETY: a parsed notify
+            let c1 = unsafe { text(n.coinbase_1) };
+            self.calls.push(format!("coinbase {pool} {c1}"));
         }
     }
 
-    fn v2_hooks(r: &mut Rec) -> V2Hooks {
-        V2Hooks {
-            ctx: r as *mut Rec as *mut c_void,
-            extended_job,
-            setup_failed,
-            valid_notify,
+    impl V2Hooks for Rec {
+        fn extended_job(&mut self, pool: c_int, job: ExtendedJob, _: bool, size: u8, d: u32) {
+            self.calls
+                .push(format!("extended {pool} {} {size} {d}", job.job_id));
+        }
+        fn setup_failed(&mut self, pool: c_int) {
+            V1Hooks::setup_failed(self, pool)
+        }
+        fn valid_notify(&mut self, pool: c_int) {
+            V1Hooks::valid_notify(self, pool)
         }
     }
 
@@ -347,7 +308,7 @@ mod tests {
     }
 
     struct V1 {
-        session: *mut V1Session,
+        session: Mutex<V1Session>,
         stats: Stats,
         coinbase: Coinbase,
         rec: Rec,
@@ -357,7 +318,7 @@ mod tests {
     impl V1 {
         fn new() -> Self {
             Self {
-                session: stratum_v1_session_new(),
+                session: Mutex::new(V1Session::default()),
                 stats: Stats::new(true, 0, 0),
                 coinbase: Coinbase::default(),
                 rec: Rec::default(),
@@ -366,26 +327,16 @@ mod tests {
         }
 
         fn line(&mut self, pool: c_int, line: &str, now_us: u64) {
-            let line = std::ffi::CString::new(line).unwrap();
-            let hooks = v1_hooks(&mut self.rec);
-            unsafe {
-                pool_dispatch_v1(
-                    &hooks,
-                    self.session,
-                    &self.stats,
-                    &self.coinbase,
-                    pool,
-                    core::ptr::null(),
-                    line.as_ptr(),
-                    now_us,
-                )
-            };
-        }
-    }
-
-    impl Drop for V1 {
-        fn drop(&mut self) {
-            unsafe { stratum_v1_session_free(self.session) };
+            dispatch_v1(
+                &mut self.rec,
+                &self.session,
+                &self.stats,
+                &self.coinbase,
+                pool,
+                c"stratum",
+                line.as_bytes(),
+                now_us,
+            );
         }
     }
 
@@ -408,7 +359,7 @@ mod tests {
         let mut t = V1::new();
         t.line(1, SUBSCRIBE, 0);
         // the first notify abandons the pool's old jobs
-        jobs::sv2_standard(1, &old_job(), 0, 1);
+        jobs::sv2_standard(1, &old_job(), false, 0, 1);
         unsafe { jobs::JOB_TABLES[0].store(jobs::build(1, 0, false, |d| d), 3) };
         t.rec.first_job = true;
         t.line(1, &NOTIFY.replace('\n', ""), 0);
@@ -432,15 +383,14 @@ mod tests {
         );
     }
 
-    fn old_job() -> crate::stratum_v2::session::CJob {
-        crate::stratum_v2::session::CJob {
+    fn old_job() -> crate::stratum_v2::session::StandardJob {
+        crate::stratum_v2::session::StandardJob {
             job_id: 1,
             version: 0,
             merkle_root: [0; 32],
             prev_hash: [0; 32],
             ntime: 1,
             nbits: 0,
-            clean_jobs: false,
         }
     }
 
@@ -509,7 +459,7 @@ mod tests {
     }
 
     struct V2 {
-        session: *mut V2Session,
+        session: Mutex<V2Session>,
         stats: Stats,
         rec: Rec,
         _jobs: std::sync::MutexGuard<'static, ()>,
@@ -518,7 +468,7 @@ mod tests {
     impl V2 {
         fn new() -> Self {
             Self {
-                session: sv2_session_new(true),
+                session: Mutex::new(V2Session::new(true)),
                 stats: Stats::new(false, 0, 0),
                 rec: Rec::default(),
                 _jobs: fresh(),
@@ -526,19 +476,16 @@ mod tests {
         }
 
         fn drain(&mut self, events: Vec<Event>) {
-            unsafe { (*self.session).with(|s| s.events.extend(events)) };
-            let hooks = v2_hooks(&mut self.rec);
-            unsafe {
-                pool_drain_v2(
-                    &hooks,
-                    self.session,
-                    &self.stats,
-                    0,
-                    core::ptr::null(),
-                    0,
-                    1,
-                )
-            };
+            self.session.lock().unwrap().events.extend(events);
+            drain_v2(
+                &mut self.rec,
+                &self.session,
+                &self.stats,
+                0,
+                c"stratum_v2",
+                0,
+                1,
+            );
         }
     }
 

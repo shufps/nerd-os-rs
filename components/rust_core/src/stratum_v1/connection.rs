@@ -1,8 +1,8 @@
 //! The Stratum v1 connection loop (port of `StratumTaskV1::protocolLoop()`
 //! and the send/receive loops of `StratumApi`): setup requests, receiving
-//! lines, handing them to the manager. The socket is the C++ transport,
-//! reached through [`Io`]; the task's flags and the manager through [`Hooks`].
-//! C API: `stratum_v1.h`.
+//! lines, handing them to the manager. The socket is reached through [`Io`];
+//! the task's flags and the manager through [`Hooks`]. C API (send, submit,
+//! receive; for the reference tests): `stratum_v1.h`.
 //!
 //! Behaviour notes:
 //! * a stop or reconnect request is noticed on every receive timeout, not
@@ -191,9 +191,8 @@ pub struct Setup<'a> {
     pub extranonce_subscribe: bool,
 }
 
-/// Why the connection loop ended (`stratum_v1_exit_t`).
+/// Why the connection loop ended.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-#[repr(C)]
 pub enum Exit {
     SetupSendFailed,
     SocketDisconnected,
@@ -359,55 +358,6 @@ mod ffi {
         }
     }
 
-    /// `stratum_v1_hooks_t`: the task and the manager.
-    #[repr(C)]
-    pub struct CHooks {
-        pub ctx: *mut c_void,
-        pub stop_requested: unsafe extern "C" fn(*mut c_void) -> bool,
-        pub reconnect_requested: unsafe extern "C" fn(*mut c_void) -> bool,
-        pub keepalive_enabled: unsafe extern "C" fn(*mut c_void) -> bool,
-        pub connected: unsafe extern "C" fn(*mut c_void),
-        pub dispatch: unsafe extern "C" fn(*mut c_void, *const c_char),
-        pub setup_failed: unsafe extern "C" fn(*mut c_void) -> bool,
-    }
-
-    impl Hooks for &CHooks {
-        // SAFETY (all): the C++ side provides valid callbacks for its context.
-        fn stop_requested(&mut self) -> bool {
-            unsafe { (self.stop_requested)(self.ctx) }
-        }
-        fn reconnect_requested(&mut self) -> bool {
-            unsafe { (self.reconnect_requested)(self.ctx) }
-        }
-        fn keepalive_enabled(&mut self) -> bool {
-            unsafe { (self.keepalive_enabled)(self.ctx) }
-        }
-        fn connected(&mut self) {
-            unsafe { (self.connected)(self.ctx) }
-        }
-        fn dispatch(&mut self, line: &[u8]) {
-            // The manager takes a C string (cut at a NUL byte, as before).
-            let mut c = crate::cutil::until_nul(line).to_vec();
-            c.push(0);
-            unsafe { (self.dispatch)(self.ctx, c.as_ptr() as *const c_char) }
-        }
-        fn setup_failed(&mut self) -> bool {
-            unsafe { (self.setup_failed)(self.ctx) }
-        }
-    }
-
-    /// `stratum_v1_setup_t`
-    #[repr(C)]
-    pub struct CSetup {
-        pub device: *const c_char,
-        pub asic: *const c_char,
-        pub version: *const c_char,
-        pub user: *const c_char,
-        pub password: *const c_char,
-        pub difficulty: u32,
-        pub extranonce_subscribe: bool,
-    }
-
     unsafe fn bytes<'a>(p: *const c_char) -> &'a [u8] {
         if p.is_null() {
             &[]
@@ -481,33 +431,6 @@ mod ffi {
             }
             Err(_) => core::ptr::null_mut(),
         }
-    }
-
-    /// Runs the connection loop until the connection ends; returns why
-    /// (`stratum_v1_exit_t`).
-    ///
-    /// # Safety
-    /// All pointers valid; `session` from `stratum_v1_session_new()`, `lines`
-    /// from `stratum_v1_lines_new()`.
-    #[no_mangle]
-    pub unsafe extern "C" fn stratum_v1_run(
-        io: *const CIo,
-        hooks: *const CHooks,
-        setup: *const CSetup,
-        session: *const super::super::session::ffi::Handle,
-        lines: *mut LineBuffer,
-    ) -> c_int {
-        let s = &*setup;
-        let setup = Setup {
-            device: bytes(s.device),
-            asic: bytes(s.asic),
-            version: bytes(s.version),
-            user: bytes(s.user),
-            password: bytes(s.password),
-            difficulty: s.difficulty,
-            extranonce_subscribe: s.extranonce_subscribe,
-        };
-        run(&mut &*io, &mut &*hooks, &setup, &(*session).0, &mut *lines) as c_int
     }
 }
 

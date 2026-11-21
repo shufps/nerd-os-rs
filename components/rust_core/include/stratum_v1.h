@@ -159,10 +159,8 @@ bool stratum_v1_build_job(const mining_notify *notify, const char *extranonce1, 
                           uint32_t extranonce2, stratum_v1_job_t *job);
 
 /*
- * The connection loop (StratumTaskV1::protocolLoop): sends the setup requests,
- * then receives lines and hands them to the manager until the connection
- * ends. The socket is the C++ transport (stratum_io_t), the task's flags and
- * the manager are reached through stratum_v1_hooks_t.
+ * The socket of the connection functions below (the C++ transport of the
+ * former connection loop; used by the reference tests).
  */
 typedef struct {
     void *ctx;
@@ -172,54 +170,19 @@ typedef struct {
     void (*delay_ms)(void *ctx, uint32_t ms);
 } stratum_io_t;
 
-typedef struct {
-    void *ctx;
-    bool (*stop_requested)(void *ctx); // stop flag or power shutdown
-    bool (*reconnect_requested)(void *ctx);
-    bool (*keepalive_enabled)(void *ctx);
-    void (*connected)(void *ctx); // the first valid line arrived
-    void (*dispatch)(void *ctx, const char *line);
-    bool (*setup_failed)(void *ctx); // the manager found the connection unusable
-} stratum_v1_hooks_t;
-
-typedef struct {
-    const char *device;
-    const char *asic;
-    const char *version;
-    const char *user;
-    const char *password;
-    uint32_t difficulty; // mining.suggest_difficulty
-    bool extranonce_subscribe;
-} stratum_v1_setup_t;
-
-typedef enum {
-    STRATUM_V1_EXIT_SETUP_SEND_FAILED,
-    STRATUM_V1_EXIT_SOCKET_DISCONNECTED,
-    STRATUM_V1_EXIT_RECEIVE_FAILED,
-    STRATUM_V1_EXIT_RECONNECT_REQUESTED,
-    STRATUM_V1_EXIT_INVALID_JSON,
-    STRATUM_V1_EXIT_STOP_REQUESTED,
-    STRATUM_V1_EXIT_SETUP_FAILED,
-} stratum_v1_exit_t;
-
 /* Sends all of data (logged as "tx"); false on an error or when the socket
  * makes no progress for 3 attempts. */
 bool stratum_v1_send_all(const stratum_io_t *io, const uint8_t *data, size_t len);
 
 /* Formats a mining.submit in the session and sends it; version: the rolled
  * version bits (delta). false if it does not fit (1024 bytes) or the send
- * failed. Safe to call while the connection task runs stratum_v1_run(). */
+ * failed. Safe to call while another task receives. */
 bool stratum_v1_submit(const stratum_io_t *io, stratum_v1_session_t *session, const char *user, const char *job_id,
                        const char *extranonce2, uint32_t ntime, uint32_t nonce, uint32_t version);
 
 /* Blocks until a complete line arrived (returned as a malloc()ed string the
  * caller frees) or the connection failed (NULL). */
 char *stratum_v1_receive_line(const stratum_io_t *io, stratum_v1_lines_t *lines);
-
-/* Runs the connection loop until the connection ends. Resets the session and
- * the line buffer first. Returns a stratum_v1_exit_t. */
-int stratum_v1_run(const stratum_io_t *io, const stratum_v1_hooks_t *hooks, const stratum_v1_setup_t *setup,
-                   stratum_v1_session_t *session, stratum_v1_lines_t *lines);
 
 #ifdef __cplusplus
 }

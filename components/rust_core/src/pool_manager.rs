@@ -40,19 +40,18 @@ use crate::pool::{self as policy, Event as PolicyEvent};
 use crate::pool::{Actions, PoolState};
 use crate::pool_coinbase as cb;
 use crate::pool_coinbase::{Outcome, VerifyConfig};
-use crate::pool_dispatch::ffi::{pool_dispatch_v1, pool_drain_v2};
-use crate::pool_dispatch::{V1Hooks, V2Hooks};
+use crate::pool_dispatch::{self as dispatch, V1Hooks, V2Hooks};
 use crate::pool_stats as stats;
 use crate::sdkconfig as k;
 use crate::stratum_config::PoolConfig;
 use crate::stratum_transport::{Kind, Transport};
 use crate::stratum_v1::connection::{self as v1, Io, Transfer};
 use crate::stratum_v1::lines::LineBuffer;
-use crate::stratum_v1::session::ffi::{stratum_v1_session_new, Handle as V1Session};
+use crate::stratum_v1::session::Session as V1Session;
 use crate::stratum_v1::MiningNotify;
-use crate::stratum_v2::connection::ffi::{sv2_run, CHooks as Sv2Hooks, CSetup as Sv2Setup};
-use crate::stratum_v2::session::ffi::{sv2_session_new, sv2_session_submit, Handle as V2Session};
-use crate::stratum_v2::ExtJob;
+use crate::stratum_v2::connection::{self as v2, FrameIo, Readiness};
+use crate::stratum_v2::protocol::FrameHeader;
+use crate::stratum_v2::session::{ExtendedJob, Session as V2Session};
 
 const TAG: &CStr = c"stratum-manager";
 const RECONNECT_PERIOD_US: u64 = 30_000_000;
@@ -152,12 +151,14 @@ enum Proto {
     V1 {
         tcp: Transport,
         tls: Transport,
-        session: Box<V1Session>,
+        /// boxed like the v2 session
+        session: Box<Mutex<V1Session>>,
         lines: Mutex<LineBuffer>,
     },
     V2 {
         noise: Transport,
-        session: Box<V2Session>,
+        /// boxed: its pending jobs would crowd the task stack
+        session: Box<Mutex<V2Session>>,
         /// (no 64-bit atomics on the ESP32-S3)
         last_submit_us: Mutex<u64>,
     },
@@ -169,15 +170,14 @@ impl Proto {
         if sv2 {
             Proto::V2 {
                 noise: Transport::new(Kind::Noise),
-                // SAFETY: a new session, owned by the protocol from here on
-                session: unsafe { Box::from_raw(sv2_session_new(true)) },
+                session: Box::new(Mutex::new(V2Session::new(true))),
                 last_submit_us: Mutex::new(0),
             }
         } else {
             Proto::V1 {
                 tcp: Transport::new(Kind::Tcp),
                 tls: Transport::new(Kind::Tls),
-                session: unsafe { Box::from_raw(stratum_v1_session_new()) },
+                session: Box::default(),
                 lines: Mutex::new(LineBuffer::default()),
             }
         }
@@ -408,7 +408,7 @@ impl Task {
                 // mining.submit takes the rolled bits (delta), not the version
                 let delta = version_rolled ^ version_base;
                 let user = lock(&self.config).user.clone();
-                v1::send_tracked(&mut TIo(self.transport(&proto)), &session.0, |s| {
+                v1::send_tracked(&mut TIo(self.transport(&proto)), session, |s| {
                     s.submit(
                         user.to_bytes(),
                         job_id.to_bytes(),
@@ -424,33 +424,27 @@ impl Task {
                 session,
                 last_submit_us,
             } => {
-                if noise.noise_ctx().is_null() {
+                if !noise.is_secured() {
                     log!(Error, self.tag, "Cannot submit share: no connection");
                     return;
                 }
-                let mut buf = [0u8; SV2_SUBMIT_BUF];
                 // the session picks extended or standard and counts the
                 // sequence number
-                let len = unsafe {
-                    sv2_session_submit(
-                        &**session as *const V2Session as *mut V2Session,
-                        buf.as_mut_ptr(),
-                        buf.len(),
-                        job_id.as_ptr(),
-                        extranonce2.as_ptr(),
-                        ntime,
-                        nonce,
-                        version_rolled,
-                    )
-                };
-                if len < 0 {
+                let frame = lock(session).submit(
+                    job_id.to_bytes(),
+                    extranonce2.to_bytes(),
+                    ntime,
+                    nonce,
+                    version_rolled,
+                );
+                let Some(frame) = frame.filter(|f| f.len() <= SV2_SUBMIT_BUF) else {
                     log!(Error, self.tag, "Failed to build SubmitShares frame");
                     return;
-                }
+                };
                 *lock(last_submit_us) = now_us();
-                // through the transport: its lock protects the Noise context
+                // through the transport: its lock protects the Noise keys
                 // against a concurrent close()
-                if noise.send(&buf[..len as usize]) != len {
+                if noise.send(&frame) != frame.len() as c_int {
                     log!(Error, self.tag, "Failed to send share");
                 }
             }
@@ -583,7 +577,7 @@ impl crate::stratum_task::Hooks for Ctx {
 }
 
 impl Ctx {
-    fn v1_loop(&self, session: &V1Session, lines: &Mutex<LineBuffer>) {
+    fn v1_loop(&self, session: &Mutex<V1Session>, lines: &Mutex<LineBuffer>) {
         let t = self.t;
         t.setup_failed.store(false, Release);
         // the first job clears the queue, whatever its clean flag says
@@ -618,12 +612,12 @@ impl Ctx {
             &mut TIo(t.transport(&self.proto)),
             &mut hooks,
             &setup,
-            &session.0,
+            session,
             &mut lock(lines),
         );
     }
 
-    fn v2_loop(&self, session: &V2Session) {
+    fn v2_loop(&self, session: &Mutex<V2Session>) {
         let t = self.t;
         t.setup_failed.store(false, Release);
         let (host, port, user) = {
@@ -636,32 +630,29 @@ impl Ctx {
                 board_str(sys::bapi_asic_model()),
             )
         };
-        let setup = Sv2Setup {
-            host: host.as_ptr(),
+        let setup = v2::Setup {
+            host: host.to_bytes(),
             port,
-            vendor: vendor.as_ptr(),
-            hw_version: hw.as_ptr(),
-            user: user.as_ptr(),
+            vendor: vendor.to_bytes(),
+            hw_version: hw.to_bytes(),
+            user: user.to_bytes(),
             // extended channels only (standard channel support disabled)
             extended: true,
         };
-        let hooks = Sv2Hooks {
-            ctx: self as *const Ctx as *mut c_void,
-            link: sv2_link,
-            exit_requested: sv2_exit_requested,
-            connected: sv2_connected,
-            drain_events: sv2_drain_events,
-            setup_failed: sv2_setup_failed,
-        };
-        // SAFETY: hooks, setup and session outlive the call
-        unsafe { sv2_run(&hooks, &setup, session) };
+        let mut hooks = V2Loop { c: self, session };
+        v2::run(
+            &mut NoiseIo(t.transport(&self.proto)),
+            &mut hooks,
+            &setup,
+            session,
+        );
     }
 }
 
 struct V1Loop<'a> {
     m: &'static Manager,
     t: &'static Task,
-    session: &'a V1Session,
+    session: &'a Mutex<V1Session>,
 }
 
 impl v1::Hooks for V1Loop<'_> {
@@ -679,10 +670,9 @@ impl v1::Hooks for V1Loop<'_> {
         self.t.connected.store(true, Release);
     }
     fn dispatch(&mut self, line: &[u8]) {
-        // a C string, cut at a NUL byte
-        let mut c = crate::cutil::until_nul(line).to_vec();
-        c.push(0);
-        self.m.dispatch(self.t.pool, &c, self.session);
+        // cut at a NUL byte, as the C string it once was
+        let line = crate::cutil::until_nul(line);
+        self.m.dispatch(self.t.pool, line, self.session);
         self.t.log_stack_low();
     }
     fn setup_failed(&mut self) -> bool {
@@ -690,119 +680,109 @@ impl v1::Hooks for V1Loop<'_> {
     }
 }
 
-unsafe fn ctx<'a>(p: *mut c_void) -> &'a Ctx {
-    &*(p as *const Ctx)
-}
+/// SV2 frames through the transport's Noise channel.
+struct NoiseIo<'a>(&'a Transport);
 
-unsafe extern "C" fn sv2_link(
-    p: *mut c_void,
-    noise: *mut *mut c_void,
-    t: *mut *mut c_void,
-) -> bool {
-    let c = ctx(p);
-    let tr = c.t.transport(&c.proto);
-    *noise = tr.noise_ctx();
-    *t = tr.handle().cast();
-    !(*noise).is_null() && !(*t).is_null()
-}
-
-unsafe extern "C" fn sv2_exit_requested(p: *mut c_void) -> bool {
-    let t = ctx(p).t;
-    t.stop.load(Acquire) || t.reconnect.load(Acquire) || crate::power_mgmt::is_shutdown()
-}
-
-unsafe extern "C" fn sv2_connected(p: *mut c_void) {
-    let c = ctx(p);
-    c.m.on_event(c.t.pool, PolicyEvent::Connected);
-    c.t.connected.store(true, Release);
-}
-
-unsafe extern "C" fn sv2_drain_events(p: *mut c_void) {
-    let c = ctx(p);
-    let Proto::V2 {
-        session,
-        last_submit_us,
-        ..
-    } = &*c.proto
-    else {
-        return;
-    };
-    let hooks = V2Hooks {
-        ctx: p,
-        extended_job: sv2_extended_job,
-        setup_failed: sv2_hook_setup_failed,
-        valid_notify: sv2_hook_valid_notify,
-    };
-    // statistics in Rust, everything else through the hooks
-    pool_drain_v2(
-        &hooks,
-        &**session as *const V2Session as *mut V2Session,
-        &c.m.stats,
-        c.t.pool as c_int,
-        c.t.tag.as_ptr(),
-        *lock(last_submit_us),
-        now_us(),
-    );
-    c.t.log_stack_low();
-}
-
-unsafe extern "C" fn sv2_setup_failed(p: *mut c_void) -> bool {
-    ctx(p).t.setup_failed.load(Acquire)
-}
-
-unsafe extern "C" fn sv2_hook_setup_failed(p: *mut c_void, _: c_int) {
-    // drop the connection like a pool error instead of mining nothing
-    ctx(p).t.setup_failed.store(true, Release);
-}
-
-unsafe extern "C" fn sv2_hook_valid_notify(p: *mut c_void, _: c_int) {
-    ctx(p).t.valid_notify.store(true, Release);
-}
-
-/// Coinbase verification, then the job source; frees the job.
-unsafe extern "C" fn sv2_extended_job(
-    p: *mut c_void,
-    _: c_int,
-    job: *mut ExtJob,
-    extranonce_size: u8,
-    pool_difficulty: u32,
-) {
-    let c = ctx(p);
-    let j = &*job;
-    // SV2: coinbase_prefix | extranonce_prefix | extranonce2 | suffix; the
-    // verification gets coinbase_1 = prefix + extranonce_prefix, an empty
-    // extranonce1 and the full extranonce size, so that coinbase_2 (the
-    // suffix) starts with the nSequence
-    if !j.coinbase_prefix.is_null()
-        && j.coinbase_prefix_len > 0
-        && !j.coinbase_suffix.is_null()
-        && j.coinbase_suffix_len > 0
-    {
-        let prefix = core::slice::from_raw_parts(j.coinbase_prefix, j.coinbase_prefix_len as usize);
-        let suffix = core::slice::from_raw_parts(j.coinbase_suffix, j.coinbase_suffix_len as usize);
-        let en_len = (j.extranonce_prefix_len as usize).min(j.extranonce_prefix.len());
-        let mut c1 = crate::cutil::to_hex(prefix);
-        c1 += &crate::cutil::to_hex(&j.extranonce_prefix[..en_len]);
-        let c2 = crate::cutil::to_hex(suffix);
-        if let (Ok(c1), Ok(c2)) = (CString::new(c1), CString::new(c2)) {
-            c.m.process_coinbase_v2(
-                c.t.pool,
-                &c1,
-                &c2,
-                j.version,
-                j.nbits,
-                extranonce_size as i32,
-            );
-        }
+impl FrameIo for NoiseIo<'_> {
+    fn wait_readable(&mut self, ms: u32) -> Readiness {
+        self.0.poll_read(ms)
     }
-    crate::jobs::sv2_extended(
-        c.t.pool as c_int,
-        j,
-        extranonce_size,
-        SV2_VERSION_MASK,
-        pool_difficulty,
-    );
-    crate::stratum_v2::ffi::sv2_ext_job_free(job);
+    fn send(&mut self, frame: &[u8]) -> bool {
+        self.0.send(frame) == frame.len() as c_int
+    }
+    fn recv(&mut self, buf: &mut [u8]) -> Option<FrameHeader> {
+        self.0.recv_frame(buf)
+    }
+}
+
+/// The task's side of the SV2 connection loop and its session events.
+struct V2Loop<'a> {
+    c: &'a Ctx,
+    session: &'a Mutex<V2Session>,
+}
+
+impl v2::Hooks for V2Loop<'_> {
+    fn exit_requested(&mut self) -> bool {
+        let t = self.c.t;
+        t.stop.load(Acquire) || t.reconnect.load(Acquire) || crate::power_mgmt::is_shutdown()
+    }
+    fn connected(&mut self) {
+        let c = self.c;
+        c.m.on_event(c.t.pool, PolicyEvent::Connected);
+        c.t.connected.store(true, Release);
+    }
+    fn drain_events(&mut self) {
+        let Proto::V2 { last_submit_us, .. } = &*self.c.proto else {
+            return;
+        };
+        let last_submit_us = *lock(last_submit_us);
+        let (c, session) = (self.c, self.session);
+        // statistics in Rust, everything else through the hooks
+        dispatch::drain_v2(
+            self,
+            session,
+            &c.m.stats,
+            c.t.pool as c_int,
+            c.t.tag,
+            last_submit_us,
+            now_us(),
+        );
+        c.t.log_stack_low();
+    }
+    fn setup_failed(&mut self) -> bool {
+        self.c.t.setup_failed.load(Acquire)
+    }
+}
+
+impl V2Hooks for V2Loop<'_> {
+    fn setup_failed(&mut self, _: c_int) {
+        // drop the connection like a pool error instead of mining nothing
+        self.c.t.setup_failed.store(true, Release);
+    }
+
+    fn valid_notify(&mut self, _: c_int) {
+        self.c.t.valid_notify.store(true, Release);
+    }
+
+    /// Coinbase verification, then the job source.
+    fn extended_job(
+        &mut self,
+        _: c_int,
+        job: ExtendedJob,
+        clean: bool,
+        extranonce_size: u8,
+        pool_difficulty: u32,
+    ) {
+        let c = self.c;
+        // SV2: coinbase_prefix | extranonce_prefix | extranonce2 | suffix; the
+        // verification gets coinbase_1 = prefix + extranonce_prefix, an empty
+        // extranonce1 and the full extranonce size, so that coinbase_2 (the
+        // suffix) starts with the nSequence
+        if !job.coinbase_prefix.is_empty() && !job.coinbase_suffix.is_empty() {
+            let en_len = job.extranonce_prefix.len().min(32);
+            let mut c1 = crate::cutil::to_hex(&job.coinbase_prefix);
+            c1 += &crate::cutil::to_hex(&job.extranonce_prefix[..en_len]);
+            let c2 = crate::cutil::to_hex(&job.coinbase_suffix);
+            if let (Ok(c1), Ok(c2)) = (CString::new(c1), CString::new(c2)) {
+                c.m.process_coinbase_v2(
+                    c.t.pool,
+                    &c1,
+                    &c2,
+                    job.version,
+                    job.nbits,
+                    extranonce_size as i32,
+                );
+            }
+        }
+        crate::jobs::sv2_extended(
+            c.t.pool as c_int,
+            job,
+            clean,
+            extranonce_size,
+            SV2_VERSION_MASK,
+            pool_difficulty,
+        );
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -843,51 +823,48 @@ struct DispatchCtx<'a> {
     cfg: &'a [PoolConfig; 2],
 }
 
-unsafe fn dctx<'a>(p: *mut c_void) -> &'a DispatchCtx<'a> {
-    &*(p as *const DispatchCtx)
-}
-
-unsafe extern "C" fn v1_setup_failed(p: *mut c_void, pool: c_int) {
-    if let Some(t) = dctx(p).m.task(pool as usize) {
-        t.setup_failed.store(true, Release);
+impl V1Hooks for DispatchCtx<'_> {
+    fn setup_failed(&mut self, pool: c_int) {
+        if let Some(t) = self.m.task(pool as usize) {
+            t.setup_failed.store(true, Release);
+        }
     }
-}
 
-unsafe extern "C" fn v1_take_first_job(p: *mut c_void, pool: c_int) -> bool {
-    dctx(p)
-        .m
-        .task(pool as usize)
-        .is_some_and(|t| t.first_job.swap(false, AcqRel))
-}
+    fn take_first_job(&mut self, pool: c_int) -> bool {
+        self.m
+            .task(pool as usize)
+            .is_some_and(|t| t.first_job.swap(false, AcqRel))
+    }
 
-unsafe extern "C" fn v1_valid_notify(p: *mut c_void, pool: c_int) {
-    if let Some(t) = dctx(p).m.task(pool as usize) {
-        t.valid_notify.store(true, Release);
+    fn valid_notify(&mut self, pool: c_int) {
+        if let Some(t) = self.m.task(pool as usize) {
+            t.valid_notify.store(true, Release);
+        }
     }
-}
 
-unsafe extern "C" fn v1_process_coinbase(p: *mut c_void, pool: c_int, notify: *const MiningNotify) {
-    let d = dctx(p);
-    let Some(n) = notify.as_ref() else { return };
-    if n.coinbase_1.is_null() || n.coinbase_2.is_null() || !(0..2).contains(&pool) {
-        return;
+    fn process_coinbase(&mut self, pool: c_int, n: &MiningNotify) {
+        if n.coinbase_1.is_null() || n.coinbase_2.is_null() || !(0..2).contains(&pool) {
+            return;
+        }
+        let c = &self.cfg[pool as usize];
+        // Stratum v2 pools are verified in V2Loop::extended_job()
+        if c.is_sv2() {
+            return;
+        }
+        let vc = verify_config(pool);
+        // SAFETY: the parser's NUL-terminated strings, alive for this call
+        let (c1, c2) = unsafe { (CStr::from_ptr(n.coinbase_1), CStr::from_ptr(n.coinbase_2)) };
+        let o = self.m.coinbase.process_v1(
+            pool,
+            c1.to_bytes(),
+            c2.to_bytes(),
+            n.version,
+            n.target,
+            Some(c.user.to_bytes()),
+            vc,
+        );
+        self.m.apply_verify_outcome(self.cfg, pool, &o);
     }
-    let c = &d.cfg[pool as usize];
-    // Stratum v2 pools are verified in sv2_extended_job()
-    if c.is_sv2() {
-        return;
-    }
-    let vc = verify_config(pool);
-    let o = d.m.coinbase.process_v1(
-        pool,
-        CStr::from_ptr(n.coinbase_1).to_bytes(),
-        CStr::from_ptr(n.coinbase_2).to_bytes(),
-        n.version,
-        n.target,
-        Some(c.user.to_bytes()),
-        vc,
-    );
-    d.m.apply_verify_outcome(d.cfg, pool, &o);
 }
 
 /// The verification settings of a pool.
@@ -1015,7 +992,7 @@ impl Manager {
     }
 
     /// Hands a Stratum v1 line to `pool_dispatch.rs`.
-    fn dispatch(&self, pool: usize, line: &[u8], session: &V1Session) {
+    fn dispatch(&self, pool: usize, line: &[u8], session: &Mutex<V1Session>) {
         let cfg = self.lock();
         if !self.policy.accepts_notify_from(pool as i32) {
             return;
@@ -1024,26 +1001,17 @@ impl Manager {
             log!(Error, TAG, "stratum task is null");
             return;
         };
-        let d = DispatchCtx { m: self, cfg: &cfg };
-        let hooks = V1Hooks {
-            ctx: &d as *const DispatchCtx as *mut c_void,
-            setup_failed: v1_setup_failed,
-            take_first_job: v1_take_first_job,
-            valid_notify: v1_valid_notify,
-            process_coinbase: v1_process_coinbase,
-        };
-        unsafe {
-            pool_dispatch_v1(
-                &hooks,
-                session as *const V1Session as *mut V1Session,
-                &self.stats,
-                &self.coinbase,
-                pool as c_int,
-                t.tag.as_ptr(),
-                line.as_ptr() as *const c_char,
-                now_us(),
-            )
-        };
+        let mut d = DispatchCtx { m: self, cfg: &cfg };
+        dispatch::dispatch_v1(
+            &mut d,
+            session,
+            &self.stats,
+            &self.coinbase,
+            pool as c_int,
+            t.tag,
+            line,
+            now_us(),
+        );
     }
 
     fn process_coinbase_v2(

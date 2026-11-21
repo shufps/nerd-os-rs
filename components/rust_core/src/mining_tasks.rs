@@ -492,7 +492,7 @@ pub(crate) mod ffi {
 mod tests {
     use super::*;
     use crate::jobs::test_support::fresh;
-    use crate::stratum_v2::session::CJob;
+    use crate::stratum_v2::session::{ExtendedJob, StandardJob};
 
     #[derive(Default)]
     struct Fake {
@@ -569,16 +569,15 @@ mod tests {
     }
 
     fn standard(pool: c_int, job_id: u32, pool_diff: u32) {
-        let job = CJob {
+        let job = StandardJob {
             job_id,
             version: 0x2000_0000,
             merkle_root: [3; 32],
             prev_hash: [4; 32],
             ntime: 0x66f0_0000,
             nbits: 0x1703_a30c,
-            clean_jobs: false,
         };
-        jobs::sv2_standard(pool, &job, 0x1fffe000, pool_diff);
+        jobs::sv2_standard(pool, &job, false, 0x1fffe000, pool_diff);
     }
 
     #[test]
@@ -593,10 +592,18 @@ mod tests {
         // no work yet
         assert!(!task.send_next(&mut env));
 
-        let mut ext: crate::stratum_v2::ExtJob = unsafe { core::mem::zeroed() };
-        ext.job_id = 3;
-        ext.ntime = 1;
-        jobs::sv2_extended(1, &ext, 4, 0x1fffe000, 1024);
+        let ext = ExtendedJob {
+            job_id: 3,
+            version: 0,
+            prev_hash: [0; 32],
+            ntime: 1,
+            nbits: 0,
+            merkle_path: Vec::new(),
+            coinbase_prefix: Vec::new(),
+            coinbase_suffix: Vec::new(),
+            extranonce_prefix: Vec::new(),
+        };
+        jobs::sv2_extended(1, ext, false, 4, 0x1fffe000, 1024);
         assert!(task.send_next(&mut env));
         assert!(task.send_next(&mut env));
         assert_eq!(env.sent, [(0, 512), (1, 512)]);

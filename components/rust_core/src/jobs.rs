@@ -592,7 +592,8 @@ pub fn v1_set_next_extranonce(pool: c_int, extranonce: Option<&[u8]>, extranonce
 /// A standard channel job (merkle root and prevhash from the pool).
 pub fn sv2_standard(
     pool: c_int,
-    job: &crate::stratum_v2::session::CJob,
+    job: &crate::stratum_v2::session::StandardJob,
+    clean: bool,
     version_mask: u32,
     difficulty: u32,
 ) {
@@ -613,7 +614,7 @@ pub fn sv2_standard(
     if ok.is_none() {
         return;
     }
-    if job.clean_jobs {
+    if clean {
         master().clean(pool);
     }
     log!(
@@ -630,21 +631,16 @@ pub fn sv2_standard(
 /// An extended channel job.
 pub fn sv2_extended(
     pool: c_int,
-    job: &crate::stratum_v2::ExtJob,
+    mut job: crate::stratum_v2::session::ExtendedJob,
+    clean: bool,
     extranonce_size: u8,
     version_mask: u32,
     difficulty: u32,
 ) {
-    let path = (job.merkle_path_count as usize).min(job.merkle_path.len());
-    let prefix = (job.extranonce_prefix_len as usize).min(job.extranonce_prefix.len());
-    // SAFETY: the coinbase parts hold their stated lengths (or are null).
-    let bytes = |p: *mut u8, len: u16| unsafe {
-        if p.is_null() || len == 0 {
-            Vec::new()
-        } else {
-            core::slice::from_raw_parts(p, len as usize).to_vec()
-        }
-    };
+    job.merkle_path
+        .truncate(crate::stratum_v2::protocol::MAX_MERKLE_BRANCHES);
+    job.extranonce_prefix.truncate(32);
+    let job_id = job.job_id;
     let ok = with_pool(pool, |w| {
         w.extended = Some(Extended {
             job_id: job.job_id,
@@ -654,18 +650,18 @@ pub fn sv2_extended(
             nbits: job.nbits,
             version_mask,
             difficulty,
-            coinbase_prefix: bytes(job.coinbase_prefix, job.coinbase_prefix_len),
-            coinbase_suffix: bytes(job.coinbase_suffix, job.coinbase_suffix_len),
-            extranonce_prefix: job.extranonce_prefix[..prefix].to_vec(),
+            coinbase_prefix: job.coinbase_prefix,
+            coinbase_suffix: job.coinbase_suffix,
+            extranonce_prefix: job.extranonce_prefix,
             extranonce_size,
-            merkle_path: job.merkle_path[..path].to_vec(),
+            merkle_path: job.merkle_path,
         });
         w.active = Active::Extended;
     });
     if ok.is_none() {
         return;
     }
-    if job.clean_jobs {
+    if clean {
         master().clean(pool);
     }
     log!(
@@ -673,7 +669,7 @@ pub fn sv2_extended(
         c"create_jobs_sv2",
         "({}) SV2 extended job {} ready, diff={}",
         pool_str(pool),
-        job.job_id,
+        job_id,
         difficulty
     );
     trigger();
@@ -791,7 +787,7 @@ pub(crate) mod test_support {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::stratum_v2::session::CJob;
+    use crate::stratum_v2::session::{ExtendedJob, StandardJob};
 
     use super::test_support::{fresh as serial, take};
 
@@ -848,22 +844,21 @@ mod tests {
         assert_eq!(unsafe { take(build(1, 1, false, |d| d)) }.3, "000001");
     }
 
-    fn cjob(job_id: u32, clean: bool) -> CJob {
-        CJob {
+    fn std_job(job_id: u32) -> StandardJob {
+        StandardJob {
             job_id,
             version: 0x2000_0000,
             merkle_root: [1; 32],
             prev_hash: [2; 32],
             ntime: 0x66f0_0000,
             nbits: 0x1703_a30c,
-            clean_jobs: clean,
         }
     }
 
     #[test]
     fn standard_job_is_sent_once_and_switching_back_to_v1_invalidates() {
         let _s = serial();
-        sv2_standard(0, &cjob(42, false), 0x1fffe000, 1024);
+        sv2_standard(0, &std_job(42), false, 0x1fffe000, 1024);
         assert_eq!(
             unsafe { take(build(0, 0, false, |d| d)) },
             (1024, 1024, "42".into(), "".into(), 0, 0x1fffe000)
@@ -873,7 +868,7 @@ mod tests {
         let before = TRIGGERS.load(core::sync::atomic::Ordering::Relaxed);
         sv2_set_difficulty(0, 2048);
         assert_eq!(TRIGGERS.load(core::sync::atomic::Ordering::Relaxed), before);
-        sv2_standard(0, &cjob(43, false), 0x1fffe000, 2048);
+        sv2_standard(0, &std_job(43), false, 0x1fffe000, 2048);
         assert_eq!(unsafe { take(build(0, 0, false, |d| d)) }.2, "43");
 
         // a v1 message makes v1 active again, starting invalid
@@ -884,18 +879,18 @@ mod tests {
     #[test]
     fn extended_job_builds_per_extranonce2() {
         let _s = serial();
-        let mut ext: crate::stratum_v2::ExtJob = unsafe { core::mem::zeroed() };
-        ext.job_id = 7;
-        ext.ntime = 1;
-        let mut prefix = [0xab_u8; 4];
-        let mut suffix = [0xcd_u8; 4];
-        ext.coinbase_prefix = prefix.as_mut_ptr();
-        ext.coinbase_prefix_len = 4;
-        ext.coinbase_suffix = suffix.as_mut_ptr();
-        ext.coinbase_suffix_len = 4;
-        ext.extranonce_prefix[..2].copy_from_slice(&[1, 2]);
-        ext.extranonce_prefix_len = 2;
-        sv2_extended(1, &ext, 6, 0x1fffe000, 512);
+        let ext = ExtendedJob {
+            job_id: 7,
+            version: 0,
+            prev_hash: [0; 32],
+            ntime: 1,
+            nbits: 0,
+            merkle_path: Vec::new(),
+            coinbase_prefix: vec![0xab; 4],
+            coinbase_suffix: vec![0xcd; 4],
+            extranonce_prefix: vec![1, 2],
+        };
+        sv2_extended(1, ext, false, 6, 0x1fffe000, 512);
         let a = build(1, 1, false, |d| d);
         let b = build(1, 2, false, |d| d);
         let (ra, rb) = unsafe { ((*a).merkle_root, (*b).merkle_root) };
@@ -910,7 +905,7 @@ mod tests {
     fn table_stores_clones_and_cleans() {
         let _s = serial();
         let t = &JOB_TABLES[3];
-        sv2_standard(1, &cjob(9, false), 0, 1);
+        sv2_standard(1, &std_job(9), false, 0, 1);
         let job = build(1, 0, false, |d| d);
         unsafe { t.store(job, 5) };
         let c = t.clone_job(5);
@@ -918,7 +913,7 @@ mod tests {
         assert!(t.clone_job(6).is_null());
         assert!(t.clone_job(200).is_null());
         // out-of-range ID: freed, not stored
-        sv2_standard(1, &cjob(10, false), 0, 1);
+        sv2_standard(1, &std_job(10), false, 0, 1);
         unsafe { t.store(build(1, 0, false, |d| d), 200) };
         assert_eq!(t.clean(0), 0);
         assert_eq!(t.clean(1), 1);
@@ -928,9 +923,9 @@ mod tests {
     #[test]
     fn clean_flag_and_abandon_clear_the_master_table() {
         let _s = serial();
-        sv2_standard(0, &cjob(1, false), 0, 1);
+        sv2_standard(0, &std_job(1), false, 0, 1);
         unsafe { master().store(build(0, 0, false, |d| d), 1) };
-        sv2_standard(0, &cjob(2, true), 0, 1);
+        sv2_standard(0, &std_job(2), true, 0, 1);
         assert!(master().clone_job(1).is_null());
 
         let (id, cb1, cb2) = (c"1".into(), c"01".into(), c"02".into());

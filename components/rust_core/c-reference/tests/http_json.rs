@@ -331,7 +331,8 @@ fn system_info() {
         s.history_start = s.history_current - r.below(4_000_000);
         s.history_span_ms = r.below(4_000_000);
         s.history_limit = [0u32, 1, 10, 100, 2000][r.below(5) as usize];
-        let rust = String::from_utf8(http_json::system_info(&s).serialize()).unwrap();
+        // SAFETY: the test's snapshot points at its own live strings and arrays
+        let rust = String::from_utf8(unsafe { http_json::system_info(&s) }.serialize()).unwrap();
         let reference = unsafe {
             take(ref_system_info(
                 &s,
@@ -352,7 +353,8 @@ fn system_info() {
     let mut temps = Vec::new();
     let mut s = snapshot(&mut r, &mut st, &mut temps);
     s.vout = f32::NAN;
-    let rust = String::from_utf8(http_json::system_info(&s).serialize()).unwrap();
+    // SAFETY: the test's snapshot points at its own live strings and arrays
+    let rust = String::from_utf8(unsafe { http_json::system_info(&s) }.serialize()).unwrap();
     assert!(rust.contains("\"coreVoltageActual\":0,"));
     // not vacuous: histories with rows were compared
     assert!(checked_history > 100, "{checked_history}");
@@ -383,7 +385,8 @@ fn asic_info() {
             voltage_options: volts.as_ptr(),
             voltage_count: volts.len(),
         };
-        let rust = String::from_utf8(http_json::asic_info(&a).serialize()).unwrap();
+        // SAFETY: the test's snapshot points at its own live strings and arrays
+        let rust = String::from_utf8(unsafe { http_json::asic_info(&a) }.serialize()).unwrap();
         let reference = unsafe { take(ref_asic_info(&a)) };
         same(&rust, &reference, "asic");
     }
@@ -500,7 +503,8 @@ fn dashboard() {
         d.history_start = d.history_current - r.below(4_000_000);
         d.history_span_ms = r.below(4_000_000);
         d.history_limit = [0u32, 1, 10, 100, 2000][r.below(5) as usize];
-        let rust = String::from_utf8(http_json::dashboard(&d).serialize()).unwrap();
+        // SAFETY: the test's snapshot points at its own live strings and arrays
+        let rust = String::from_utf8(unsafe { http_json::dashboard(&d) }.serialize()).unwrap();
         let reference = unsafe {
             take(ref_dashboard(
                 &d,
@@ -538,7 +542,8 @@ fn v2_system_and_identify() {
             free_heap: r.u64() & 0xffff_ffff,
             free_heap_int: r.u64() & 0xffff_ffff,
         };
-        let rust = String::from_utf8(http_json::v2_system(&v).serialize()).unwrap();
+        // SAFETY: the test's snapshot points at its own live strings and arrays
+        let rust = String::from_utf8(unsafe { http_json::v2_system(&v) }.serialize()).unwrap();
         same(&rust, &unsafe { take(ref_v2_system(&v)) }, "v2 system");
         let i = V2Identify {
             device_model: st.pick(&mut r),
@@ -549,13 +554,16 @@ fn v2_system_and_identify() {
             core_dump_download: true,
             can_enabled: r.bool(),
         };
-        let rust = String::from_utf8(http_json::v2_identify(&i).serialize()).unwrap();
+        // SAFETY: the test's snapshot points at its own live strings and arrays
+        let rust = String::from_utf8(unsafe { http_json::v2_identify(&i) }.serialize()).unwrap();
         same(&rust, &unsafe { take(ref_v2_identify(&i)) }, "v2 identify");
         let without = V2Identify {
             core_dump_download: false,
             ..i
         };
-        let rust = String::from_utf8(http_json::v2_identify(&without).serialize()).unwrap();
+        // SAFETY: the test's snapshot points at its own live strings and arrays
+        let rust =
+            String::from_utf8(unsafe { http_json::v2_identify(&without) }.serialize()).unwrap();
         assert!(rust.contains("\"coreDumpDownload\":false,"));
     }
 }
@@ -586,7 +594,8 @@ fn small_documents() {
             prefix: st.pick(&mut r),
             enabled: r.bool(),
         };
-        let rust = String::from_utf8(http_json::influx_info(&i).serialize()).unwrap();
+        // SAFETY: the test's snapshot points at its own live strings and arrays
+        let rust = String::from_utf8(unsafe { http_json::influx_info(&i) }.serialize()).unwrap();
         same(&rust, &unsafe { take(ref_influx_info(&i)) }, "influx");
 
         let e = r.bool();
@@ -616,7 +625,8 @@ fn small_documents() {
                 }
             })
             .collect();
-        let rust = String::from_utf8(http_json::wifi_scan(&nets).serialize()).unwrap();
+        // SAFETY: the test's snapshot points at its own live strings and arrays
+        let rust = String::from_utf8(unsafe { http_json::wifi_scan(&nets) }.serialize()).unwrap();
         same(
             &rust,
             &unsafe { take(ref_wifi_scan(nets.as_ptr(), nets.len() as u16)) },
@@ -690,14 +700,16 @@ fn v2_settings() {
             invert_screen: r.bool(),
             auto_screen_off: r.bool(),
         };
-        let rust = String::from_utf8(http_json::v2_settings(&s).serialize()).unwrap();
+        // SAFETY: the test's snapshot points at its own live strings and arrays
+        let rust = String::from_utf8(unsafe { http_json::v2_settings(&s) }.serialize()).unwrap();
         same(
             &rust,
             &unsafe { take(ref_v2_settings(&s)) },
             &format!("settings round {round}"),
         );
         s.has_pid_use_max = true;
-        let rust = String::from_utf8(http_json::v2_settings(&s).serialize()).unwrap();
+        // SAFETY: the test's snapshot points at its own live strings and arrays
+        let rust = String::from_utf8(unsafe { http_json::v2_settings(&s) }.serialize()).unwrap();
         same(
             &rust,
             &unsafe { take(ref_v2_settings_nerdaxe(&s)) },
@@ -809,7 +821,8 @@ fn can_swarm() {
             fans,
         };
         // raw bytes: the slaves' model strings may be any bytes
-        let rust = http_json::can_swarm(&m).serialize();
+        // SAFETY: the test's snapshot points at its own live strings and arrays
+        let rust = unsafe { http_json::can_swarm(&m) }.serialize();
         let reference = unsafe {
             let p = ref_can_swarm(&m);
             let b = CStr::from_ptr(p).to_bytes().to_vec();

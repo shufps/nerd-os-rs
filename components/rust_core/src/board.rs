@@ -1524,11 +1524,15 @@ pub(crate) mod ffi {
     }
 
     /// A profile string (a `'static` C string literal, or NULL).
-    pub(crate) fn static_text(p: *const c_char) -> &'static CStr {
+    ///
+    /// # Safety
+    /// `p` is NULL or a `'static` NUL-terminated string (the profile's
+    /// strings in [`Info`] are `c"..."` literals, board_profile.rs).
+    pub(crate) unsafe fn static_text(p: *const c_char) -> &'static CStr {
         if p.is_null() {
             c""
         } else {
-            // SAFETY: the profiles hold only `c"..."` literals (board_profile.rs)
+            // SAFETY: a 'static C string (caller contract)
             unsafe { CStr::from_ptr(p) }
         }
     }

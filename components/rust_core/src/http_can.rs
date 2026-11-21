@@ -80,7 +80,10 @@ pub fn nodes(req: &mut Request) -> EspErr {
         fan_count: b.num_fans,
         fans,
     };
-    crate::http_server::send_json(req, &crate::http_json::can_swarm(&m).serialize())
+    // SAFETY: the snapshot's strings are this function's live CStrings, the MAC
+    // string and static profile literals; `asic_temps` holds `asic_count` values
+    let doc = unsafe { crate::http_json::can_swarm(&m) };
+    crate::http_server::send_json(req, &doc.serialize())
 }
 
 /// `PATCH /api/v2/can/nodes/{id}`: frequency, voltage, fans, display

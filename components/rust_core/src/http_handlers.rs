@@ -180,7 +180,8 @@ fn v2_identify(req: &mut Request) -> EspErr {
         core_dump_download: k::ESP_COREDUMP_ENABLE_TO_FLASH,
         can_enabled: cfg_flag(b"can_enabled", 0),
     };
-    send_doc(req, http_json::v2_identify(&v))
+    // SAFETY: static profile strings
+    send_doc(req, unsafe { http_json::v2_identify(&v) })
 }
 
 fn v2_system(req: &mut Request) -> EspErr {
@@ -206,7 +207,9 @@ fn v2_system(req: &mut Request) -> EspErr {
         free_heap: crate::idf::task::free_heap(CAP_SPIRAM) as u64,
         free_heap_int: crate::idf::task::free_heap(CAP_INTERNAL) as u64,
     };
-    send_doc(req, http_json::v2_system(&v))
+    // SAFETY: the strings are this function's live CStrings, the MAC string and
+    // static profile literals
+    send_doc(req, unsafe { http_json::v2_system(&v) })
 }
 
 // ---------------------------------------------------------------------------
@@ -226,7 +229,8 @@ fn influx_get(req: &mut Request) -> EspErr {
         prefix: prefix.as_ptr(),
         enabled: cfg_flag(b"influx_enable", k::INFLUX_ENABLE_VALUE),
     };
-    send_doc(req, http_json::influx_info(&i))
+    // SAFETY: the strings are this function's live CStrings
+    send_doc(req, unsafe { http_json::influx_info(&i) })
 }
 
 fn influx_patch(req: &mut Request) -> EspErr {
@@ -456,5 +460,6 @@ pub fn wifi_scan(req: &mut Request) -> EspErr {
             authmode: n.authmode,
         })
         .collect();
-    send_doc(req, http_json::wifi_scan(&list))
+    // SAFETY: the SSIDs point into `nets`, alive for the call
+    send_doc(req, unsafe { http_json::wifi_scan(&list) })
 }

@@ -43,8 +43,12 @@ impl Obj {
         self.set(k, Json::Bool(v))
     }
     /// A C string; NULL is `null`.
-    pub(crate) fn cstr(&mut self, k: &str, v: *const c_char) -> &mut Self {
-        self.set(k, cstr(v))
+    ///
+    /// # Safety
+    /// `v` is NULL or NUL-terminated.
+    pub(crate) unsafe fn cstr(&mut self, k: &str, v: *const c_char) -> &mut Self {
+        // SAFETY: caller contract
+        self.set(k, unsafe { cstr(v) })
     }
     pub fn obj(&mut self, k: &str, v: Obj) -> &mut Self {
         self.set(k, v.into())
@@ -72,9 +76,11 @@ pub fn float(v: f32) -> Json {
     Json::Num(Num::F(v))
 }
 
-/// A C string as ArduinoJson stores it: NULL is `null` (the pointers come
-/// from the snapshot structs: NUL-terminated or NULL).
-fn cstr(p: *const c_char) -> Json {
+/// A C string as ArduinoJson stores it: NULL is `null`.
+///
+/// # Safety
+/// `p` is NULL or NUL-terminated.
+unsafe fn cstr(p: *const c_char) -> Json {
     if p.is_null() {
         Json::Null
     } else {
@@ -126,7 +132,11 @@ pub struct ManagerInfo {
 
 /// The stratum manager object; `verbose`: the v2 dashboard (both pools in
 /// failover mode and the dashboard-only fields).
-pub fn manager_info(m: &ManagerInfo, verbose: bool) -> Obj {
+///
+/// # Safety
+/// The string pointers in the snapshot are NULL or NUL-terminated, and
+/// its array pointers hold their stated counts, for the call.
+pub unsafe fn manager_info(m: &ManagerInfo, verbose: bool) -> Obj {
     let mut o = Obj::new();
     o.uint("poolMode", m.config_pool_mode as u64)
         .int("activePoolMode", m.pool_mode as i64)
@@ -356,7 +366,11 @@ fn pid_obj(target: i64, p: u16, i: u16, d: u16) -> Obj {
 }
 
 /// `GET /api/system/info`
-pub fn system_info(s: &SystemInfo) -> Json {
+///
+/// # Safety
+/// The string pointers in the snapshot are NULL or NUL-terminated, and
+/// its array pointers hold their stated counts, for the call.
+pub unsafe fn system_info(s: &SystemInfo) -> Json {
     let on = |v: f64| if s.shutdown { 0.0 } else { v };
     let fans = s.fan_count.clamp(0, 2) as usize;
     let fan = |ch: usize, f: fn(&FanInfo) -> u16| {
@@ -537,7 +551,11 @@ unsafe fn u32_list(p: *const u32, n: usize) -> Vec<Json> {
 }
 
 /// `GET /api/system/asic`
-pub fn asic_info(a: &AsicInfo) -> Json {
+///
+/// # Safety
+/// The string pointers in the snapshot are NULL or NUL-terminated, and
+/// its array pointers hold their stated counts, for the call.
+pub unsafe fn asic_info(a: &AsicInfo) -> Json {
     let mut d = Obj::new();
     d.cstr("ASICModel", a.asic_model)
         .cstr("deviceModel", a.device_model)
@@ -646,7 +664,11 @@ unsafe fn floats(p: *const f32, n: c_int) -> impl Iterator<Item = f32> {
 }
 
 /// `GET /api/v2/dashboard`
-pub fn dashboard(s: &Dashboard) -> Json {
+///
+/// # Safety
+/// The string pointers in the snapshot are NULL or NUL-terminated, and
+/// its array pointers hold their stated counts, for the call.
+pub unsafe fn dashboard(s: &Dashboard) -> Json {
     let on = |v: f64| if s.shutdown { 0.0 } else { v };
     let mut d = Obj::new();
 
@@ -818,7 +840,11 @@ pub struct V2System {
 }
 
 /// `GET /api/v2/system`
-pub fn v2_system(s: &V2System) -> Json {
+///
+/// # Safety
+/// The string pointers in the snapshot are NULL or NUL-terminated, and
+/// its array pointers hold their stated counts, for the call.
+pub unsafe fn v2_system(s: &V2System) -> Json {
     let mut d = Obj::new();
     d.cstr("deviceModel", s.device_model)
         .cstr("asicModel", s.asic_model)
@@ -853,7 +879,11 @@ pub struct V2Identify {
 }
 
 /// `GET /api/v2/identify`
-pub fn v2_identify(s: &V2Identify) -> Json {
+///
+/// # Safety
+/// The string pointers in the snapshot are NULL or NUL-terminated, and
+/// its array pointers hold their stated counts, for the call.
+pub unsafe fn v2_identify(s: &V2Identify) -> Json {
     let mut d = Obj::new();
     d.cstr("deviceModel", s.device_model)
         .cstr("defaultTheme", s.default_theme)
@@ -901,7 +931,10 @@ pub struct InfluxInfo {
     pub enabled: bool,
 }
 
-pub fn influx_info(i: &InfluxInfo) -> Json {
+/// # Safety
+/// The string pointers in the snapshot are NULL or NUL-terminated, and
+/// its array pointers hold their stated counts, for the call.
+pub unsafe fn influx_info(i: &InfluxInfo) -> Json {
     let mut d = Obj::new();
     d.cstr("url", i.url)
         .uint("port", i.port as u64)
@@ -938,7 +971,11 @@ pub struct WifiNetwork {
 }
 
 /// `GET /api/wifi/scan`
-pub fn wifi_scan(nets: &[WifiNetwork]) -> Json {
+///
+/// # Safety
+/// The string pointers in the snapshot are NULL or NUL-terminated, and
+/// its array pointers hold their stated counts, for the call.
+pub unsafe fn wifi_scan(nets: &[WifiNetwork]) -> Json {
     let list = nets
         .iter()
         .map(|n| {
@@ -1021,7 +1058,11 @@ pub struct V2Settings {
 }
 
 /// `GET /api/v2/settings`
-pub fn v2_settings(s: &V2Settings) -> Json {
+///
+/// # Safety
+/// The string pointers in the snapshot are NULL or NUL-terminated, and
+/// its array pointers hold their stated counts, for the call.
+pub unsafe fn v2_settings(s: &V2Settings) -> Json {
     let mut d = Obj::new();
     d.cstr("asicModel", s.asic_model)
         .cstr("deviceModel", s.device_model)
@@ -1135,7 +1176,11 @@ pub struct CanMasterNode {
 
 /// `GET /api/v2/can/swarm`: the fleet totals, the master and the CAN slaves
 /// (from the CAN master's registry).
-pub fn can_swarm(m: &CanMasterNode) -> Json {
+///
+/// # Safety
+/// The string pointers in the snapshot are NULL or NUL-terminated, and
+/// its array pointers hold their stated counts, for the call.
+pub unsafe fn can_swarm(m: &CanMasterNode) -> Json {
     use crate::can_master::ffi as can;
     use crate::can_master::{CONFIG_LEN, SLAVE_MAX, TELEMETRY_LEN};
 

@@ -118,13 +118,16 @@ pub fn bapi_has_hashrate_counter() -> bool {
     info().has_hash_counter
 }
 pub fn bapi_mining_agent() -> &'static CStr {
-    static_text(info().mining_agent)
+    // SAFETY: a profile string of the board info (a c"..." literal)
+    unsafe { static_text(info().mining_agent) }
 }
 pub fn bapi_asic_model() -> &'static CStr {
-    static_text(info().asic_model)
+    // SAFETY: a profile string of the board info (a c"..." literal)
+    unsafe { static_text(info().asic_model) }
 }
 pub fn bapi_device_model() -> &'static CStr {
-    static_text(info().device_model)
+    // SAFETY: a profile string of the board info (a c"..." literal)
+    unsafe { static_text(info().device_model) }
 }
 pub fn bapi_asic_min_difficulty(dual_pool: bool) -> u32 {
     let i = info();

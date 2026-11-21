@@ -24,6 +24,13 @@ use crate::log::log;
 use crate::netmgr::{act as nact, ffi as netmgr};
 use crate::wifi::{act, ffi as wifi_state};
 
+/// The event bases the network code registers for.
+#[derive(Clone, Copy)]
+pub enum Base {
+    Wifi,
+    Ip,
+}
+
 /// A netif that lives for the rest of the firmware (the default WiFi ones,
 /// the ETH one once its setup succeeded): only these reach the netif calls.
 #[derive(Clone, Copy)]
@@ -118,7 +125,11 @@ mod sys {
         // SAFETY: no arguments; returns ESP_ERR_INVALID_STATE if the default loop exists
         unsafe { raw::esp_event_loop_create_default() }
     }
-    pub fn register_handler(base: *const c_char, id: i32, handler: EventHandler) -> EspErr {
+    pub fn register_handler(base: Base, id: i32, handler: EventHandler) -> EspErr {
+        let base = match base {
+            Base::Wifi => wifi_event(),
+            Base::Ip => ip_event(),
+        };
         let mut instance = core::ptr::null_mut();
         // SAFETY: `base` is a static event base, `handler` a valid extern "C" fn and
         // `instance` a live local the call writes the instance handle to
@@ -411,7 +422,7 @@ mod sys {
     pub fn event_loop_create_default() -> EspErr {
         ESP_OK
     }
-    pub fn register_handler(_: *const c_char, _: i32, _: EventHandler) -> EspErr {
+    pub fn register_handler(_: Base, _: i32, _: EventHandler) -> EspErr {
         ESP_OK
     }
     pub fn timer_create(
@@ -632,11 +643,11 @@ pub fn wifi_init(ssid: &[u8], pass: &[u8], hostname: &CStr) -> Option<NetifRef> 
             Err(e) => check(e, "esp_timer_create"),
         }
         check(
-            sys::register_handler(sys::wifi_event(), ESP_EVENT_ANY_ID, wifi_event),
+            sys::register_handler(Base::Wifi, ESP_EVENT_ANY_ID, wifi_event),
             "esp_event_handler_instance_register(WIFI_EVENT)",
         );
         check(
-            sys::register_handler(sys::ip_event(), IP_EVENT_STA_GOT_IP, wifi_event),
+            sys::register_handler(Base::Ip, IP_EVENT_STA_GOT_IP, wifi_event),
             "esp_event_handler_instance_register(IP_EVENT)",
         );
         let e = sys::wifi_init_default();

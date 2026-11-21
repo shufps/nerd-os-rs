@@ -311,7 +311,9 @@ fn system_info(req: &mut Request) -> EspErr {
     s.running_partition = partition.as_ptr();
     s.default_theme = b.default_theme;
 
-    send_doc(req, http_json::system_info(&s))
+    // SAFETY: the strings are this function's live CStrings and static profile
+    // literals
+    send_doc(req, unsafe { http_json::system_info(&s) })
 }
 
 fn system_asic(req: &mut Request) -> EspErr {
@@ -334,7 +336,8 @@ fn system_asic(req: &mut Request) -> EspErr {
         voltage_options: b.voltages,
         voltage_count: b.voltage_count,
     };
-    send_doc(req, http_json::asic_info(&a))
+    // SAFETY: static profile strings and option lists with their counts
+    send_doc(req, unsafe { http_json::asic_info(&a) })
 }
 
 /// `?allTime=1` also clears the persisted all-time stats; that cannot be
@@ -477,7 +480,9 @@ fn dashboard(req: &mut Request) -> EspErr {
     d.history_limit = q.limit;
     d.now_ms = now_ms();
 
-    send_doc(req, http_json::dashboard(&d))
+    // SAFETY: the strings are this function's live CStrings and static profile
+    // literals; the chip arrays point into `chips` (asic_count values each)
+    send_doc(req, unsafe { http_json::dashboard(&d) })
 }
 
 fn v2_settings_get(req: &mut Request) -> EspErr {
@@ -564,7 +569,9 @@ pub(crate) fn v2_settings_doc() -> crate::ajson::Json {
     v.invert_screen = cfg::invert_screen();
     v.auto_screen_off = cfg::auto_screen_off();
 
-    http_json::v2_settings(&v)
+    // SAFETY: the strings are this function's live CStrings and static profile
+    // literals; the option lists are static with their counts
+    unsafe { http_json::v2_settings(&v) }
 }
 
 /// The same structure as `GET /api/v2/settings`, all fields optional; the

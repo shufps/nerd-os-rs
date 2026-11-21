@@ -2,7 +2,7 @@
 //! `StratumTaskBase::task()`): load the config, wait for a host, the network
 //! and the stop flag, resolve, connect, run the protocol loop, tear down,
 //! wait before the next attempt. The task, its transport and the protocol
-//! loop are reached through [`Hooks`]. C API: `stratum_task_loop.h`.
+//! loop are reached through [`Hooks`].
 //!
 //! The reconnect flag is cleared *before* the config is loaded, so a
 //! reconnect requested in between (settings saved with a new pool) is kept.

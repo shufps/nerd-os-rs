@@ -82,9 +82,6 @@ static_assert(STRATUM_V1_SIZES_OK, "stratum_v1.h layout must match rust_core");
 _Static_assert(STRATUM_V1_SIZES_OK, "stratum_v1.h layout must match rust_core");
 #endif
 
-/* Whether line is one syntactically valid JSON value. */
-bool stratum_v1_is_json(const char *line);
-
 /*
  * Session of one connection: assigns message IDs to requests and remembers
  * which request each pending ID belongs to, so responses are classified by
@@ -98,8 +95,6 @@ typedef struct stratum_v1_session stratum_v1_session_t;
 
 stratum_v1_session_t *stratum_v1_session_new(void);
 void stratum_v1_session_free(stratum_v1_session_t *session);
-/* For a new connection: IDs from 1, nothing pending. */
-void stratum_v1_session_reset(stratum_v1_session_t *session);
 
 size_t stratum_v1_session_subscribe(stratum_v1_session_t *session, char *buf, size_t buf_len, const char *device,
                                     const char *asic, const char *version);
@@ -109,10 +104,6 @@ size_t stratum_v1_session_authorize(stratum_v1_session_t *session, char *buf, si
 size_t stratum_v1_session_suggest_difficulty(stratum_v1_session_t *session, char *buf, size_t buf_len,
                                              uint32_t difficulty);
 size_t stratum_v1_session_extranonce_subscribe(stratum_v1_session_t *session, char *buf, size_t buf_len);
-/* version: the rolled version bits (delta), as mining.submit expects. */
-size_t stratum_v1_session_submit(stratum_v1_session_t *session, char *buf, size_t buf_len, const char *user,
-                                 const char *job_id, const char *extranonce2, uint32_t ntime, uint32_t nonce,
-                                 uint32_t version);
 
 /*
  * Parses one JSON-RPC line into *message, which the caller zeroes before.
@@ -136,12 +127,6 @@ typedef struct stratum_v1_lines stratum_v1_lines_t;
 
 stratum_v1_lines_t *stratum_v1_lines_new(void);
 void stratum_v1_lines_free(stratum_v1_lines_t *lines);
-/* The next line as a malloc()ed string, or NULL if no complete line yet. */
-char *stratum_v1_lines_take(stratum_v1_lines_t *lines);
-/* Free space to receive into; *len is 0 when the buffer is full. */
-uint8_t *stratum_v1_lines_space(stratum_v1_lines_t *lines, size_t *len);
-void stratum_v1_lines_commit(stratum_v1_lines_t *lines, size_t n);
-void stratum_v1_lines_clear(stratum_v1_lines_t *lines);
 
 /*
  * Job construction: extranonce2 (the low extranonce2_len bytes of the

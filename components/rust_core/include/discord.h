@@ -15,8 +15,6 @@ extern "C" {
 
 /* reads the alert settings and starts the sender task */
 void discord_start(void);
-/* reads the alert settings again (after they were saved) */
-void discord_load_config(void);
 /* queue an alert; false if it is disabled or the queue is full */
 bool discord_send_test(void);
 bool discord_send_watchdog(void);

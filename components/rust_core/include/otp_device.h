@@ -23,7 +23,6 @@ void otp_dev_init(const char *hostname, const char *mac, const char *model);
 int otp_dev_start_enrollment(void);
 /* the QR code and its modules per side; NULL without one */
 const uint8_t *otp_dev_qr(int *size);
-void otp_dev_destroy_qr(void);
 /* 0 ok, 1 blocked, 2 failed (headers X-OTP-Session / X-TOTP, NULL if absent) */
 int otp_dev_request_check(const char *session, const char *totp, bool force);
 int otp_dev_login_check(const char *totp);

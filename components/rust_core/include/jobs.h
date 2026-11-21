@@ -58,29 +58,6 @@ _Static_assert(JOBS_SIZES_OK, "jobs.h layout must match rust_core");
 #define ASIC_JOBS_MASTER 0
 #define ASIC_JOBS_SLAVE(n) (1 + (n))
 
-/* Takes over job (freed when replaced or cleaned); IDs >= MAX_ASIC_JOBS are
- * freed right away. */
-void asic_jobs_store(int table, bm_job *job, uint8_t asic_job_id);
-/* A copy of the job sent with asic_job_id (free with free_bm_job()), or NULL. */
-bm_job *asic_jobs_clone(int table, uint8_t asic_job_id);
-/* Drops the jobs of pool; returns how many. */
-int asic_jobs_clean(int table, int pool);
-
-/* The pool's work is no longer valid; its jobs are dropped. */
-void job_source_invalidate(int pool);
-/* An SV2 extended channel job (job stays with the caller). */
-void job_source_sv2_extended(int pool, const sv2_ext_job_t *job, uint8_t extranonce_size, uint32_t version_mask,
-                             uint32_t difficulty);
-
-/*
- * The next job for pool (free with free_bm_job()), or NULL without valid
- * work. select_diff maps the pool difficulty to the ASIC difficulty; it is
- * called with the job sources locked. log_new_work: log when the work
- * changed since the last such call.
- */
-bm_job *job_source_build(int pool, uint32_t extranonce2, bool log_new_work,
-                         uint32_t (*select_diff)(void *ctx, int pool, uint32_t pool_diff), void *ctx);
-
 /* Wakes the job creation task (create_jobs_task.cpp). */
 void trigger_job_creation(void);
 

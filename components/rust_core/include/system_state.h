@@ -28,7 +28,6 @@ void system_set_wifi_status(const char *status); /* at most 19 characters */
 void system_set_ssid(const char *ssid);          /* at most 32 characters */
 /* copies into buf (len bytes, NUL-terminated) */
 void system_wifi_status(char *buf, size_t len);
-void system_ssid(char *buf, size_t len);
 void system_ip(char *buf, size_t len);
 /* fixed after system_init() */
 const char *system_hostname(void);

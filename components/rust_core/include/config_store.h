@@ -20,7 +20,6 @@ extern "C" {
 /* Replaces the document with the stored JSON; false if it does not parse
  * (the document is empty then). */
 bool config_load(const uint8_t *json, size_t len);
-void config_clear(void);
 void config_mark_dirty(void);
 
 /* A malloc()ed copy of the string value, else of def; NULL if neither. */
@@ -35,9 +34,6 @@ uint64_t config_get_u64(const char *key, uint64_t def);
 void config_set_u64(const char *key, uint64_t value);
 /* the key exists and is not null */
 bool config_has(const char *key);
-
-/* the fixups after a migration of the old per-setting keys */
-void config_migration_fixups(bool single_fan, uint16_t overheat_default);
 
 /* If the document changed: write gets the JSON (the document stays locked
  * meanwhile); a successful write clears the changed flag. False if the

@@ -388,22 +388,6 @@ typedef struct {
     fan_info_t fans[2]; /* label/p/i/d unused */
 } can_master_node_t;
 
-/* The serialized document in a malloc'ed, NUL-terminated buffer (free());
- * the length in *len; NULL without memory. */
-char *http_json_system_info(const system_info_t *s, size_t *len);
-char *http_json_asic_info(const asic_info_t *a, size_t *len);
-char *http_json_dashboard(const dashboard_t *s, size_t *len);
-char *http_json_v2_system(const v2_system_t *s, size_t *len);
-char *http_json_v2_identify(const v2_identify_t *s, size_t *len);
-char *http_json_alert_info(const alert_info_t *a, size_t *len);
-char *http_json_influx_info(const influx_info_t *i, size_t *len);
-char *http_json_otp_status(bool enabled, size_t *len);
-/* the OTP session response: token, ttlMs, expiresAt */
-char *http_json_otp_session(const char *token, uint32_t ttl_seconds, uint64_t expires_ms, size_t *len);
-char *http_json_wifi_scan(const wifi_network_t *nets, size_t count, size_t *len);
-char *http_json_v2_settings(const v2_settings_t *s, size_t *len);
-char *http_json_can_swarm(const can_master_node_t *m, size_t *len);
-
 /* sizeof of the Rust structs: 0 manager_info_t, 1 fan_info_t,
  * 2 system_info_t, 3 asic_info_t, 4 dashboard_t, 5 v2_system_t,
  * 6 v2_identify_t, 7 alert_info_t, 8 influx_info_t, 9 wifi_network_t,

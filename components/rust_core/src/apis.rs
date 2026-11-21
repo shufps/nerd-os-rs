@@ -2,14 +2,14 @@
 //! Bitcoin price, block height, network hashrate and difficulty, fees. The
 //! responses come from the internet (a custom mempool URL may be plain
 //! HTTP), read with ArduinoJson's rules ([`crate::ajson`]); the HTTP client
-//! is `apis_fetcher.rs`. C API (host tests): `apis.h`.
+//! is `apis_fetcher.rs`.
 //!
 //! Hashrate and difficulty are converted with saturation (negative and NaN:
 //! 0, out of range: `u64::MAX`).
 
 use crate::ajson;
 
-/// `apis_values_t`: what the fetcher shows.
+/// What the fetcher shows.
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct Values {
@@ -24,7 +24,7 @@ pub struct Values {
     pub fastest_fee: u32,
 }
 
-/// `apis_type_t`
+/// The mempool API endpoints.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Api {
     Price = 0,

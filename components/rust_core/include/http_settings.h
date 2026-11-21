@@ -92,14 +92,6 @@ typedef struct {
     void (*set)(void *ctx, uint16_t setting, int index, uint32_t num, const char *text);
 } settings_sink_t;
 
-/* PATCH /api/system (including the flat stratum fields; dual_pool: the pool
- * manager runs in dual pool mode, which also takes poolBalance) and
- * PATCH /api/v2/settings; false if the body is not valid JSON. */
-bool http_settings_v1(const char *body, size_t len, bool dual_pool, const settings_sink_t *sink);
-bool http_settings_v2(const char *body, size_t len, const settings_sink_t *sink);
-/* PATCH /api/v2/influx, PATCH /api/v2/alert. */
-bool http_settings_influx(const char *body, size_t len, const settings_sink_t *sink);
-bool http_settings_alert(const char *body, size_t len, const settings_sink_t *sink);
 /* PATCH /api/v2/can/nodes/{id}: the SETTING_CAN_* commands. */
 bool http_can_node_body(const char *body, size_t len, const settings_sink_t *sink);
 /* PATCH /api/v2/otp: 0 ok (*enabled set), 1 invalid JSON, 2 no bool "enabled". */

@@ -72,7 +72,6 @@ typedef struct {
 bool board_create(int id);
 /* the board's asic_chip_t, and its driver (asic_driver_t) */
 int board_asic_chip(void);
-void board_set_asic(void *asic_driver);
 
 void board_info(board_info_t *out);
 size_t board_info_sizeof(void);

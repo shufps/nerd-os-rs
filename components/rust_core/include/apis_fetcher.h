@@ -16,7 +16,6 @@ extern "C" {
 /* the task entry (one fetch, then every 60 s while enabled) */
 void apis_task(void *arg);
 void apis_enable_fetching(void);
-void apis_disable_fetching(void);
 uint32_t apis_get_price(void);
 uint32_t apis_get_block_height(void);
 uint32_t apis_get_blocks_to_halving(void);

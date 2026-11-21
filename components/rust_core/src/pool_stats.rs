@@ -27,8 +27,12 @@ pub struct Stats {
     pub accepted: [u64; 2],
     pub rejected: [u64; 2],
     pub best_session: [u64; 2],
+    /// per pool (connection state, not session counters: kept across a
+    /// mode switch)
     pub pool_difficulty: [u32; 2],
     pub network_difficulty: [f64; 2],
+    /// failover: the selected pool (its difficulties are shown)
+    pub failover_pool: usize,
     /// all-time best difficulty (persisted by the caller)
     pub total_best: u64,
     /// found since the start (or the last session reset)
@@ -56,6 +60,11 @@ pub struct Event {
 pub struct PoolStats {
     mode: Mode,
     s: Stats,
+}
+
+/// The index of an existing pool.
+fn pool_index(pool: i32) -> Option<usize> {
+    (0..2).contains(&pool).then_some(pool as usize)
 }
 
 impl PoolStats {
@@ -106,14 +115,14 @@ impl PoolStats {
     }
 
     pub fn set_pool_difficulty(&mut self, pool: i32, difficulty: u32) {
-        if let Some(i) = self.slot(pool) {
+        if let Some(i) = pool_index(pool) {
             self.s.pool_difficulty[i] = difficulty;
         }
     }
 
     /// From the nbits of a job; 0 is ignored.
     pub fn set_network_difficulty(&mut self, pool: i32, nbits: u32) {
-        if let (Some(i), true) = (self.slot(pool), nbits != 0) {
+        if let (Some(i), true) = (pool_index(pool), nbits != 0) {
             self.s.network_difficulty[i] = network_difficulty(nbits);
         }
     }
@@ -177,7 +186,8 @@ impl PoolStats {
 
     /// Switches between failover (one shared set of counters) and dual pool
     /// mode: the session counters start over, the all-time values, the
-    /// found blocks and the time of the last share response are kept.
+    /// found blocks, the time of the last share response and the pools'
+    /// difficulties (their connections stay) are kept.
     pub fn set_mode(&mut self, mode: Mode) {
         if mode == self.mode {
             return;
@@ -189,8 +199,18 @@ impl PoolStats {
             total_found_blocks: self.s.total_found_blocks,
             last_response_us: self.s.last_response_us,
             balance: self.s.balance,
+            pool_difficulty: self.s.pool_difficulty,
+            network_difficulty: self.s.network_difficulty,
+            failover_pool: self.s.failover_pool,
             ..Default::default()
         };
+    }
+
+    /// Failover: the pool the manager selected (the one connected).
+    pub fn set_failover_pool(&mut self, pool: i32) {
+        if let Some(i) = pool_index(pool) {
+            self.s.failover_pool = i;
+        }
     }
 
     pub fn reset_session(&mut self) {
@@ -233,12 +253,21 @@ impl PoolStats {
         }
     }
 
+    /// The pool whose difficulties are shown: failover the one that is
+    /// working, dual pool mode as the counters.
+    fn shown_pool(&self) -> usize {
+        match self.mode {
+            Mode::Failover => self.s.failover_pool,
+            Mode::Dual => self.shown(),
+        }
+    }
+
     pub fn pool_difficulty(&self) -> u32 {
-        self.s.pool_difficulty[self.shown()]
+        self.s.pool_difficulty[self.shown_pool()]
     }
 
     pub fn network_difficulty(&self) -> f64 {
-        self.s.network_difficulty[self.shown()]
+        self.s.network_difficulty[self.shown_pool()]
     }
 }
 
@@ -289,6 +318,10 @@ impl Handle {
         self.with(PoolStats::reset_session)
     }
 
+    pub fn set_failover_pool(&self, pool: i32) {
+        self.with(|s| s.set_failover_pool(pool))
+    }
+
     pub fn reset_all_time(&self) {
         self.with(PoolStats::reset_all_time)
     }
@@ -312,12 +345,13 @@ impl Handle {
     pub fn pool(&self, pool: i32) -> PoolSummary {
         self.with(|s| {
             let i = s.slot(pool).unwrap_or(0);
+            let p = pool_index(pool).unwrap_or(0);
             PoolSummary {
                 accepted: s.s.accepted[i],
                 rejected: s.s.rejected[i],
                 best_session: s.s.best_session[i],
-                network_difficulty: s.s.network_difficulty[i],
-                pool_difficulty: s.s.pool_difficulty[i],
+                network_difficulty: s.s.network_difficulty[p],
+                pool_difficulty: s.s.pool_difficulty[p],
             }
         })
     }
@@ -361,9 +395,11 @@ mod tests {
         p.share_result(0, true, 5);
         p.share_result(1, true, 6);
         p.share_result(1, false, 7);
+        // the secondary is the one working
+        p.set_failover_pool(1);
         p.set_pool_difficulty(1, 4096);
-        p.set_network_difficulty(0, NBITS);
-        p.set_network_difficulty(0, 0); // ignored
+        p.set_network_difficulty(1, NBITS);
+        p.set_network_difficulty(1, 0); // ignored
         assert_eq!(
             (p.accepted(), p.rejected(), p.pool_difficulty()),
             (2, 1, 4096)
@@ -410,6 +446,26 @@ mod tests {
         assert_eq!(s.last_response_us, 9);
         p.set_mode(Mode::Failover);
         assert_eq!((p.accepted(), p.stats().last_response_us), (0, 9));
+    }
+
+    #[test]
+    fn difficulties_survive_a_mode_switch() {
+        let mut p = PoolStats::new(Mode::Failover, 0, 0);
+        p.set_pool_difficulty(0, 10000);
+        p.set_network_difficulty(0, NBITS);
+        // dual pool: the primary keeps its connection and its values, the
+        // secondary has none until it sends them
+        p.set_mode(Mode::Dual);
+        assert_eq!(p.pool_difficulty(), 10000);
+        assert_eq!(p.stats().pool_difficulty, [10000, 0]);
+        assert!(p.stats().network_difficulty[0] > 1e13);
+        p.set_pool_difficulty(1, 1024);
+        // back to failover: the selected pool's values are shown, whoever
+        // sent the last ones
+        p.set_mode(Mode::Failover);
+        assert_eq!(p.pool_difficulty(), 10000);
+        p.set_failover_pool(1);
+        assert_eq!(p.pool_difficulty(), 1024);
     }
 
     #[test]

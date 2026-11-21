@@ -1145,6 +1145,8 @@ impl Manager {
 
     /// The statistics (one consistent snapshot).
     pub fn summary(&self) -> stats::Summary {
+        // failover: the selected pool's difficulties
+        self.stats.set_failover_pool(self.policy.display_pool(0));
         self.stats.summary()
     }
 
@@ -1154,7 +1156,7 @@ impl Manager {
 
     /// Blocks found since the start (or the last session reset).
     pub fn found_blocks(&self) -> u32 {
-        self.stats.summary().found_blocks
+        self.summary().found_blocks
     }
 
     pub fn pool_errors(&self) -> c_int {
@@ -1349,7 +1351,7 @@ impl Manager {
 
     pub fn info(&self) -> ManagerInfo {
         let cfg = self.lock();
-        let sum = self.stats.summary();
+        let sum = self.summary();
         let pool = |i: usize| {
             let st = self.stats.pool(i as i32);
             ManagerPool {
@@ -1448,7 +1450,7 @@ impl Manager {
             seconds += 1;
             if seconds % 30 == 0 {
                 // fed only while the pool answers submits (within an hour)
-                let last = self.stats.summary().last_response_us;
+                let last = self.summary().last_response_us;
                 if last != 0 && now_us().saturating_sub(last) < WATCHDOG_RESPONSE_US {
                     // SAFETY: no arguments; feeds the calling task's subscription
                     unsafe { sys::esp_task_wdt_reset() };
@@ -1703,7 +1705,7 @@ pub(crate) mod ffi {
     /// `out` writable.
     #[no_mangle]
     pub unsafe extern "C" fn pool_mgr_summary(out: *mut stats::Summary) {
-        *out = m().map_or_else(Default::default, |m| m.stats.summary());
+        *out = m().map_or_else(Default::default, |m| m.summary());
     }
 
     /// The counters of one pool (zeros before the manager exists).

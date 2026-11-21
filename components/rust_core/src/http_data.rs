@@ -88,11 +88,7 @@ fn stats() -> crate::pool_stats::Summary {
 }
 
 fn manager_info() -> http_json::ManagerInfo {
-    crate::pool_manager::api::pool_mgr_info().unwrap_or_else(|| {
-        // SAFETY: ManagerInfo is plain numbers, bools and nullable pointers,
-        // valid zeroed (no manager yet)
-        unsafe { core::mem::zeroed() }
-    })
+    crate::pool_manager::get().map_or_else(Default::default, |m| m.info())
 }
 
 fn coinbase_info(pool: c_int) -> Option<crate::pool_coinbase::Info> {
@@ -117,7 +113,7 @@ fn history_query(req: &mut Request, v2: bool) -> crate::http_query::HistoryQuery
 fn fan_settings(b: &BoardInfo, ch: usize) -> FanInfo {
     let pid = b.pid[ch];
     FanInfo {
-        label: b.fan_labels[ch].as_ptr(),
+        label: Some(b.fan_labels[ch].into()),
         mode: b.fan_mode[ch],
         manual_speed: cfg::fan_manual_speed(ch),
         overheat_temp: cfg::fan_overheat_temp(ch),
@@ -159,6 +155,8 @@ pub(crate) fn reload_settings() {
 // ---------------------------------------------------------------------------
 // v1
 
+// the snapshot is filled field by field (as the former handler)
+#[allow(clippy::field_reassign_with_default)]
 fn system_info(req: &mut Request) -> EspErr {
     set_json(req);
     let q = history_query(req, false);
@@ -189,12 +187,12 @@ fn system_info(req: &mut Request) -> EspErr {
         })
         .collect();
 
-    let mut s = SystemInfo::zeroed();
+    let mut s = SystemInfo::default();
     s.asic_count = b.asic_count;
     s.small_core_count = small_core_count();
-    s.device_model = b.device_model.as_ptr();
-    s.hostip = hostip.as_ptr();
-    s.mac_addr = crate::network::mac_addr().as_ptr();
+    s.device_model = Some(b.device_model.into());
+    s.hostip = Some(hostip);
+    s.mac_addr = Some(crate::network::mac_addr().into());
     s.wifi_rssi = crate::network::wifi_rssi();
 
     s.power = power_mgmt::get(0);
@@ -221,7 +219,7 @@ fn system_info(req: &mut Request) -> EspErr {
     s.manual_fan_speed = cfg::fan_speed();
     s.fan_count = b.num_fans;
     for ch in 0..2 {
-        let mut f = FanInfo::zeroed();
+        let mut f = FanInfo::default();
         if (ch as c_int) < s.fan_count {
             f = fan_settings(&b, ch);
         }
@@ -245,7 +243,7 @@ fn system_info(req: &mut Request) -> EspErr {
     s.best_session_diff = st.best_session;
     s.manager = manager_info();
 
-    s.asic_temps = asic_temps.as_ptr();
+    s.asic_temps = asic_temps;
 
     s.history_requested = q.requested;
     s.history_start = q.start;
@@ -261,22 +259,25 @@ fn system_info(req: &mut Request) -> EspErr {
     s.pid_i = pid.i;
     s.pid_d = pid.d;
 
-    s.hostname = hostname.as_ptr();
-    s.ssid = ssid.as_ptr();
-    s.stratum_url = urls[0].as_ptr();
+    let [url, fallback_url] = urls;
+    let [user, fallback_user] = users;
+    let [sv2, fallback_sv2] = sv2;
+    s.hostname = Some(hostname);
+    s.ssid = Some(ssid);
+    s.stratum_url = Some(url);
     s.stratum_port = cfg::stratum_port(0);
-    s.stratum_user = users[0].as_ptr();
+    s.stratum_user = Some(user);
     s.stratum_enonce_subscribe = cfg::stratum_enonce_subscribe(0);
     s.stratum_tls = cfg::stratum_tls(0);
-    s.fallback_stratum_url = urls[1].as_ptr();
+    s.fallback_stratum_url = Some(fallback_url);
     s.fallback_stratum_port = cfg::stratum_port(1);
-    s.fallback_stratum_user = users[1].as_ptr();
+    s.fallback_stratum_user = Some(fallback_user);
     s.fallback_stratum_enonce_subscribe = cfg::stratum_enonce_subscribe(1);
     s.fallback_stratum_tls = cfg::stratum_tls(1);
     s.stratum_protocol = cfg::stratum_protocol(0);
     s.fallback_stratum_protocol = cfg::stratum_protocol(1);
-    s.sv2_authority_pubkey = sv2[0].as_ptr();
-    s.fallback_sv2_authority_pubkey = sv2[1].as_ptr();
+    s.sv2_authority_pubkey = Some(sv2);
+    s.fallback_sv2_authority_pubkey = Some(fallback_sv2);
     s.sv2_channel_type = cfg::sv2_channel_type(0);
     s.fallback_sv2_channel_type = cfg::sv2_channel_type(1);
     s.voltage = power_mgmt::get(1);
@@ -294,27 +295,25 @@ fn system_info(req: &mut Request) -> EspErr {
     s.default_vr_frequency = b.default_vr_frequency;
     s.otp = cfg::otp_enabled();
 
-    s.asic_model = b.asic_model.as_ptr();
+    s.asic_model = Some(b.asic_model.into());
     s.uptime_seconds = uptime_seconds();
-    s.last_reset_reason = crate::system::reset_reason().as_ptr();
-    s.wifi_status = wifi_status.as_ptr();
+    s.last_reset_reason = Some(crate::system::reset_reason().into());
+    s.wifi_status = Some(wifi_status);
     s.free_heap = crate::idf::task::free_heap(CAP_SPIRAM) as u64;
     s.free_heap_int = crate::idf::task::free_heap(CAP_INTERNAL) as u64;
-    s.version = version.as_ptr();
-    s.running_partition = partition.as_ptr();
-    s.default_theme = b.default_theme.as_ptr();
+    s.version = Some(version);
+    s.running_partition = Some(partition);
+    s.default_theme = Some(b.default_theme.into());
 
-    // SAFETY: the strings are this function's live CStrings and static profile
-    // literals
-    send_doc(req, unsafe { http_json::system_info(&s) })
+    send_doc(req, http_json::system_info(&s))
 }
 
 fn system_asic(req: &mut Request) -> EspErr {
     set_json(req);
     let b = board();
     let a = AsicInfo {
-        asic_model: b.asic_model.as_ptr(),
-        device_model: b.device_model.as_ptr(),
+        asic_model: Some(b.asic_model.into()),
+        device_model: Some(b.device_model.into()),
         asic_count: b.asic_count,
         default_frequency: b.default_frequency,
         default_voltage: b.default_voltage_mv,
@@ -323,14 +322,11 @@ fn system_asic(req: &mut Request) -> EspErr {
         abs_max_voltage: b.abs_max_voltage_mv,
         eco_frequency: b.eco_frequency,
         eco_voltage: b.eco_voltage_mv,
-        swarm_color: b.swarm_color.as_ptr(),
-        frequency_options: b.frequencies.as_ptr(),
-        frequency_count: b.frequencies.len(),
-        voltage_options: b.voltages.as_ptr(),
-        voltage_count: b.voltages.len(),
+        swarm_color: Some(b.swarm_color.into()),
+        frequency_options: b.frequencies.to_vec(),
+        voltage_options: b.voltages.to_vec(),
     };
-    // SAFETY: static profile strings and option lists with their counts
-    send_doc(req, unsafe { http_json::asic_info(&a) })
+    send_doc(req, http_json::asic_info(&a))
 }
 
 /// `?allTime=1` also clears the persisted all-time stats; that cannot be
@@ -373,6 +369,8 @@ fn settings_patch(req: &mut Request) -> EspErr {
 // ---------------------------------------------------------------------------
 // v2
 
+// the snapshot is filled field by field (as the former handler)
+#[allow(clippy::field_reassign_with_default)]
 fn dashboard(req: &mut Request) -> EspErr {
     set_json(req);
     let q = history_query(req, true);
@@ -381,7 +379,7 @@ fn dashboard(req: &mut Request) -> EspErr {
     let urls = [cfg::stratum_url(0), cfg::stratum_url(1)];
     let users = [cfg::stratum_user(0), cfg::stratum_user(1)];
 
-    let mut d = Dashboard::zeroed();
+    let mut d = Dashboard::default();
     d.uptime_seconds = uptime_seconds();
     d.shutdown = power_mgmt::is_shutdown();
     d.board_error = crate::system::error().0;
@@ -403,17 +401,13 @@ fn dashboard(req: &mut Request) -> EspErr {
     d.small_core_count = small_core_count();
 
     // per chip: valid and error hashrate (GH/s, the ASIC counters), temp
-    let n = b.asic_count.max(0);
-    let mut chips = vec![0f32; 3 * n.max(1) as usize];
-    for i in 0..n {
-        let u = i as usize;
-        chips[u] = crate::hashrate::api::hashrate_monitor_chip(i);
-        chips[n as usize + u] = crate::hashrate::api::hashrate_monitor_chip_errors(i);
-        chips[2 * n as usize + u] = crate::board_core::CHIP_TEMPS.get(i);
+    for i in 0..b.asic_count.max(0) {
+        d.chip_hashrate
+            .push(crate::hashrate::api::hashrate_monitor_chip(i));
+        d.chip_error_rate
+            .push(crate::hashrate::api::hashrate_monitor_chip_errors(i));
+        d.asic_temps.push(crate::board_core::CHIP_TEMPS.get(i));
     }
-    d.chip_hashrate = chips.as_ptr();
-    d.chip_error_rate = chips[n as usize..].as_ptr();
-    d.asic_temps = chips[2 * n as usize..].as_ptr();
 
     d.watts = power_mgmt::get(0);
     d.min_power = b.min_pin;
@@ -436,11 +430,9 @@ fn dashboard(req: &mut Request) -> EspErr {
     }
 
     d.manager = manager_info();
-    for i in 0..2 {
-        d.pool_host[i] = urls[i].as_ptr();
-        d.pool_user[i] = users[i].as_ptr();
-        d.pool_port[i] = cfg::stratum_port(i) as c_int;
-    }
+    d.pool_host = urls.map(Some);
+    d.pool_user = users.map(Some);
+    d.pool_port = [0, 1].map(|i| cfg::stratum_port(i) as c_int);
 
     d.has_can_extension = crate::board::api::board_has_can_extension();
     d.can_enabled = cfg::can_enabled();
@@ -456,7 +448,7 @@ fn dashboard(req: &mut Request) -> EspErr {
         let r = &info.result;
         c.block_height = r.block_height;
         c.network_difficulty = r.network_difficulty;
-        c.scriptsig = r.scriptsig.as_ptr();
+        c.scriptsig = CString::new(r.scriptsig_bytes()).unwrap_or_default();
         c.total_value_satoshis = r.total_value_satoshis;
         c.user_value_satoshis = r.user_value_satoshis;
         if r.block_height > 0 && c.verify_mode > 0 {
@@ -473,9 +465,7 @@ fn dashboard(req: &mut Request) -> EspErr {
     d.history_limit = q.limit;
     d.now_ms = now_ms();
 
-    // SAFETY: the strings are this function's live CStrings and static profile
-    // literals; the chip arrays point into `chips` (asic_count values each)
-    send_doc(req, unsafe { http_json::dashboard(&d) })
+    send_doc(req, http_json::dashboard(&d))
 }
 
 fn v2_settings_get(req: &mut Request) -> EspErr {
@@ -485,6 +475,7 @@ fn v2_settings_get(req: &mut Request) -> EspErr {
 
 /// The document of `GET /api/v2/settings` (also the source of the first
 /// settings profile).
+#[allow(clippy::field_reassign_with_default)]
 pub(crate) fn v2_settings_doc() -> crate::ajson::Json {
     let b = board();
     let version = CString::new(crate::mdns::fw_version()).unwrap_or_default();
@@ -495,10 +486,10 @@ pub(crate) fn v2_settings_doc() -> crate::ajson::Json {
     let ssid = cfg::wifi_ssid();
     let mempool_url = cfg::mempool_url();
 
-    let mut v = V2Settings::zeroed();
-    v.asic_model = b.asic_model.as_ptr();
-    v.device_model = b.device_model.as_ptr();
-    v.version = version.as_ptr();
+    let mut v = V2Settings::default();
+    v.asic_model = Some(b.asic_model.into());
+    v.device_model = Some(b.device_model.into());
+    v.version = Some(version);
     v.otp = cfg::otp_enabled();
     v.ap_active = crate::netmgr::ap_active();
 
@@ -515,10 +506,8 @@ pub(crate) fn v2_settings_doc() -> crate::ajson::Json {
     v.eco_core_voltage = b.eco_voltage_mv;
     v.abs_min_core_voltage = b.abs_min_voltage_mv;
     v.abs_max_core_voltage = b.abs_max_voltage_mv;
-    v.frequency_options = b.frequencies.as_ptr();
-    v.frequency_count = b.frequencies.len();
-    v.voltage_options = b.voltages.as_ptr();
-    v.voltage_count = b.voltages.len();
+    v.frequency_options = b.frequencies.to_vec();
+    v.voltage_options = b.voltages.to_vec();
 
     v.pool_mode = cfg::pool_mode();
     v.pool_balance = cfg::pool_balance();
@@ -528,9 +517,9 @@ pub(crate) fn v2_settings_doc() -> crate::ajson::Json {
 
     for p in 0..2 {
         let pool = &mut v.pools[p];
-        pool.url = urls[p].as_ptr();
-        pool.user = users[p].as_ptr();
-        pool.sv2_authority_pubkey = sv2[p].as_ptr();
+        pool.url = Some(urls[p].clone());
+        pool.user = Some(users[p].clone());
+        pool.sv2_authority_pubkey = Some(sv2[p].clone());
         pool.coinbase_verify_mode = cfg::coinbase_verify_mode(p);
         pool.coinbase_max_fee = cfg::coinbase_max_fee(p);
         pool.coinbase_verify_force = cfg::coinbase_verify_force(p);
@@ -553,18 +542,16 @@ pub(crate) fn v2_settings_doc() -> crate::ajson::Json {
         v.pid_use_max = cfg::fan_pid_use_max();
     }
 
-    v.hostname = hostname.as_ptr();
-    v.ssid = ssid.as_ptr();
+    v.hostname = Some(hostname);
+    v.ssid = Some(ssid);
     v.mempool_custom = cfg::mempool_custom();
-    v.mempool_url = mempool_url.as_ptr();
+    v.mempool_url = Some(mempool_url);
 
     v.flip_screen = b.flip_screen;
     v.invert_screen = cfg::invert_screen();
     v.auto_screen_off = cfg::auto_screen_off();
 
-    // SAFETY: the strings are this function's live CStrings and static profile
-    // literals; the option lists are static with their counts
-    unsafe { http_json::v2_settings(&v) }
+    http_json::v2_settings(&v)
 }
 
 /// The same structure as `GET /api/v2/settings`, all fields optional; the

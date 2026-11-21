@@ -47,7 +47,7 @@ pub fn nodes(req: &mut Request) -> EspErr {
         .map(|j| crate::board_core::CHIP_TEMPS.get(j))
         .collect();
 
-    let mut fans = [FanInfo::zeroed(); 2];
+    let mut fans: [FanInfo; 2] = Default::default();
     for (ch, f) in fans.iter_mut().enumerate() {
         f.rpm = power_mgmt::fan_get(ch as c_int, 0);
         f.speed_perc = power_mgmt::fan_get(ch as c_int, 1);
@@ -59,9 +59,9 @@ pub fn nodes(req: &mut Request) -> EspErr {
         }
     }
     let m = CanMasterNode {
-        mac: crate::network::mac_addr().as_ptr(),
-        device_model: b.device_model.as_ptr(),
-        version: version.as_ptr(),
+        mac: Some(crate::network::mac_addr().into()),
+        device_model: Some(b.device_model.into()),
+        version: Some(version),
         shutdown: power_mgmt::is_shutdown(),
         hashrate: crate::system::current_hashrate(),
         power: power_mgmt::get(0),
@@ -75,14 +75,11 @@ pub fn nodes(req: &mut Request) -> EspErr {
         core_voltage: b.asic_voltage_mv,
         flip_screen: b.flip_screen,
         auto_screen_off: crate::cfg::auto_screen_off(),
-        asic_count: temps.len() as c_int,
-        asic_temps: temps.as_ptr(),
+        asic_temps: temps,
         fan_count: b.num_fans,
         fans,
     };
-    // SAFETY: the snapshot's strings are this function's live CStrings, the MAC
-    // string and static profile literals; `asic_temps` holds `asic_count` values
-    let doc = unsafe { crate::http_json::can_swarm(&m) };
+    let doc = crate::http_json::can_swarm(&m);
     crate::http_server::send_json(req, &doc.serialize())
 }
 

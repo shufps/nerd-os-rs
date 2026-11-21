@@ -83,25 +83,6 @@ sha256 6aece9551727835c379585908a635103431f0923107f0ccb09c49e0c0f8ee765
 | {"url":"NerdQAxe++","port":50300,"bucket":"NerdQAxe++","org":"x","prefix":"stratum+tcp://pool.example.com","enabled":1}
 --- sample 7
 | {"enabled":false}
-=== struct_layouts
-count 13
-sha256 5996e92df0b2dbe2237d7551c9813bef0180a75f3eb12e752e842cfe19e1a57c
---- sample 0
-| 0 232
---- sample 1
-| 1 32
---- sample 2
-| 2 816
---- sample 3
-| 3 88
---- sample 4
-| 4 664
---- sample 5
-| 5 104
---- sample 6
-| 6 24
---- sample 7
-| 7 6
 === system_info
 count 4000
 sha256 0f8dc56de6956b3e1331b3dfd40465fae214c7babde59a2c6cf2e26e2c436c7d

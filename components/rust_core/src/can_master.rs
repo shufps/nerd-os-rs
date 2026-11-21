@@ -416,23 +416,24 @@ pub fn registry() -> [u8; REGISTRY_LEN] {
     with(|m| m.registry())
 }
 
-/// A known slave's MAC.
+/// What `f` reads from a known slave.
+fn known<T>(slave: u8, f: impl FnOnce(&Slot) -> T) -> Option<T> {
+    with(|m| m.slot(slave as usize).filter(|s| s.used).map(f))
+}
+
+/// The MAC of a known slave.
 pub fn slave_mac(slave: u8) -> Option<[u8; 6]> {
-    with(|m| m.slot(slave as usize).filter(|s| s.used).map(|s| s.mac))
+    known(slave, |s| s.mac)
 }
 
-/// A known slave's last telemetry (`can_slave_telemetry_t`).
+/// The last telemetry (`can_slave_telemetry_t`) of a known slave.
 pub fn slave_telemetry(slave: u8) -> Option<[u8; TELEMETRY_LEN]> {
-    with(|m| {
-        m.slot(slave as usize)
-            .filter(|s| s.used)
-            .map(|s| s.telemetry)
-    })
+    known(slave, |s| s.telemetry)
 }
 
-/// A known slave's configuration (`can_slave_config_t`).
+/// The last config (`can_slave_config_t`) of a known slave.
 pub fn slave_config(slave: u8) -> Option<[u8; CONFIG_LEN]> {
-    with(|m| m.slot(slave as usize).filter(|s| s.used).map(|s| s.config))
+    known(slave, |s| s.config)
 }
 
 fn with<T>(f: impl FnOnce(&mut Master) -> T) -> T {

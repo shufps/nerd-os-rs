@@ -145,15 +145,14 @@ fn v2_identify(req: &mut Request) -> EspErr {
     set_json(req);
     let b = board_info();
     let v = http_json::V2Identify {
-        device_model: b.device_model.as_ptr(),
-        default_theme: b.default_theme.as_ptr(),
+        device_model: Some(b.device_model.into()),
+        default_theme: Some(b.default_theme.into()),
         otp: cfg_flag(b"otp_enabled", 0),
         ap_active: crate::netmgr::ap_active(),
         core_dump_download: k::ESP_COREDUMP_ENABLE_TO_FLASH,
         can_enabled: cfg_flag(b"can_enabled", 0),
     };
-    // SAFETY: static profile strings
-    send_doc(req, unsafe { http_json::v2_identify(&v) })
+    send_doc(req, http_json::v2_identify(&v))
 }
 
 fn v2_system(req: &mut Request) -> EspErr {
@@ -165,23 +164,21 @@ fn v2_system(req: &mut Request) -> EspErr {
     let ip = crate::system::ip();
     let wifi_status = crate::system::wifi_status();
     let v = http_json::V2System {
-        device_model: b.device_model.as_ptr(),
-        asic_model: b.asic_model.as_ptr(),
-        version: version.as_ptr(),
+        device_model: Some(b.device_model.into()),
+        asic_model: Some(b.asic_model.into()),
+        version: Some(version),
         uptime_seconds: (crate::cutil::now_us() - crate::system::start_us()) / 1_000_000,
-        last_reset_reason: crate::system::reset_reason().as_ptr(),
-        hostname: hostname.as_ptr(),
-        ssid: ssid.as_ptr(),
-        mac_addr: crate::network::mac_addr().as_ptr(),
-        ip_addr: ip.as_ptr(),
-        wifi_status: wifi_status.as_ptr(),
+        last_reset_reason: Some(crate::system::reset_reason().into()),
+        hostname: Some(hostname),
+        ssid: Some(ssid),
+        mac_addr: Some(crate::network::mac_addr().into()),
+        ip_addr: Some(ip),
+        wifi_status: Some(wifi_status),
         wifi_rssi: crate::network::wifi_rssi(),
         free_heap: crate::idf::task::free_heap(CAP_SPIRAM) as u64,
         free_heap_int: crate::idf::task::free_heap(CAP_INTERNAL) as u64,
     };
-    // SAFETY: the strings are this function's live CStrings, the MAC string and
-    // static profile literals
-    send_doc(req, unsafe { http_json::v2_system(&v) })
+    send_doc(req, http_json::v2_system(&v))
 }
 
 // ---------------------------------------------------------------------------
@@ -194,15 +191,14 @@ fn influx_get(req: &mut Request) -> EspErr {
     let org = cfg_str(b"influx_org", k::INFLUX_ORG);
     let prefix = cfg_str(b"influx_prefix", k::INFLUX_PREFIX);
     let i = http_json::InfluxInfo {
-        url: url.as_ptr(),
+        url: Some(url),
         port: config::get_u16(b"influx_port", k::INFLUX_PORT as u16),
-        bucket: bucket.as_ptr(),
-        org: org.as_ptr(),
-        prefix: prefix.as_ptr(),
+        bucket: Some(bucket),
+        org: Some(org),
+        prefix: Some(prefix),
         enabled: cfg_flag(b"influx_enable", k::INFLUX_ENABLE_VALUE),
     };
-    // SAFETY: the strings are this function's live CStrings
-    send_doc(req, unsafe { http_json::influx_info(&i) })
+    send_doc(req, http_json::influx_info(&i))
 }
 
 fn influx_patch(req: &mut Request) -> EspErr {
@@ -424,13 +420,12 @@ pub fn wifi_scan(req: &mut Request) -> EspErr {
         }
     };
     let list: Vec<http_json::WifiNetwork> = nets
-        .iter()
+        .into_iter()
         .map(|n| http_json::WifiNetwork {
-            ssid: n.ssid.as_ptr(),
+            ssid: n.ssid,
             rssi: n.rssi,
             authmode: n.authmode,
         })
         .collect();
-    // SAFETY: the SSIDs point into `nets`, alive for the call
-    send_doc(req, unsafe { http_json::wifi_scan(&list) })
+    send_doc(req, http_json::wifi_scan(&list))
 }

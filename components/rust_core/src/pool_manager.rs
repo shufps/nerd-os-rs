@@ -1371,7 +1371,7 @@ impl Manager {
                 ping_rtt: self.ping_value(i, crate::ping::api::ping_last_rtt),
                 ping_loss: self.ping_value(i, crate::ping::api::ping_recent_loss),
                 verify_blocked: block_reason(self.coinbase_info(i as c_int).blocked)
-                    .map_or(core::ptr::null(), CStr::as_ptr),
+                    .map(CStr::to_owned),
                 protocol: cfg[i].protocol as c_int,
                 encrypted: cfg[i].is_sv2() || cfg[i].tls,
             }
@@ -1600,11 +1600,6 @@ pub(crate) mod api {
         }
     }
 
-    /// The manager's values (None before it exists).
-    pub fn pool_mgr_info() -> Option<ManagerInfo> {
-        m().map(|m| m.info())
-    }
-
     /// Round trip time (ms) of the pool the v1 API shows; 0 without ping.
     pub fn pool_mgr_ping_rtt() -> f64 {
         m().map_or(0.0, |m| m.compat_ping(crate::ping::api::ping_last_rtt))
@@ -1774,7 +1769,7 @@ mod tests {
         assert!(i.dual && !i.fallback && !i.using_fallback);
         assert_eq!(i.pool_mode, 1);
         assert!(!i.pools[0].connected && i.pools[1].connected);
-        assert!(i.pools[0].verify_blocked.is_null());
+        assert!(i.pools[0].verify_blocked.is_none());
         assert_eq!(i.pools[0].ping_rtt, 0.0);
     }
 }

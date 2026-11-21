@@ -2,8 +2,7 @@
 //! snapshots against the outputs of the former ArduinoJson code
 //! (tests/golden/http_json.txt, recorded by the differential tests).
 
-use std::ffi::{c_char, c_int, CString};
-use std::mem::size_of;
+use std::ffi::{c_int, CString};
 use std::sync::Mutex;
 
 use rust_core::http_json::{
@@ -63,30 +62,25 @@ impl Rng {
     }
 }
 
-/// Strings live as long as the test (CString pool).
-struct Strings(Vec<CString>);
-impl Strings {
-    fn pick(&mut self, r: &mut Rng) -> *const c_char {
-        const POOL: [&str; 8] = [
-            "",
-            "NerdQAxe++",
-            "stratum+tcp://pool.example.com",
-            "bc1qxyz.worker\"1\"",
-            "line\nbreak\ttab\\back",
-            "ünïcødé ✓",
-            "ctl\u{1}\u{1f}",
-            "x",
-        ];
-        if r.below(12) == 0 {
-            return std::ptr::null();
-        }
-        let s = CString::new(POOL[r.below(POOL.len() as u64) as usize]).unwrap();
-        self.0.push(s);
-        self.0.last().unwrap().as_ptr()
+/// A string of the pool, sometimes `None` (NULL).
+fn pick(r: &mut Rng) -> Option<CString> {
+    const POOL: [&str; 8] = [
+        "",
+        "NerdQAxe++",
+        "stratum+tcp://pool.example.com",
+        "bc1qxyz.worker\"1\"",
+        "line\nbreak\ttab\\back",
+        "ünïcødé ✓",
+        "ctl\u{1}\u{1f}",
+        "x",
+    ];
+    if r.below(12) == 0 {
+        return None;
     }
+    Some(CString::new(POOL[r.below(POOL.len() as u64) as usize]).unwrap())
 }
 
-fn pool(r: &mut Rng, st: &mut Strings) -> ManagerPool {
+fn pool(r: &mut Rng) -> ManagerPool {
     ManagerPool {
         connected: r.bool(),
         accepted: r.u64(),
@@ -97,15 +91,15 @@ fn pool(r: &mut Rng, st: &mut Strings) -> ManagerPool {
         pool_diff_err: r.bool(),
         ping_rtt: r.f64(),
         ping_loss: r.f64(),
-        verify_blocked: st.pick(r),
+        verify_blocked: pick(r),
         protocol: r.below(3) as c_int,
         encrypted: r.bool(),
     }
 }
 
-fn fan(r: &mut Rng, st: &mut Strings) -> FanInfo {
+fn fan(r: &mut Rng) -> FanInfo {
     FanInfo {
-        label: st.pick(r),
+        label: pick(r),
         mode: [0, 2, 3, 1][r.below(4) as usize],
         manual_speed: r.below(101) as u16,
         overheat_temp: r.below(120) as u16,
@@ -118,7 +112,7 @@ fn fan(r: &mut Rng, st: &mut Strings) -> FanInfo {
     }
 }
 
-fn snapshot(r: &mut Rng, st: &mut Strings, temps: &mut Vec<f32>) -> SystemInfo {
+fn snapshot(r: &mut Rng, temps: &mut Vec<f32>) -> SystemInfo {
     let asic_count = r.below(13) as c_int;
     *temps = (0..asic_count).map(|_| r.f32()).collect();
     let mode = r.below(3) as c_int;
@@ -131,20 +125,21 @@ fn snapshot(r: &mut Rng, st: &mut Strings, temps: &mut Vec<f32>) -> SystemInfo {
         using_fallback: r.bool(),
         dual: mode == 1,
         selected: r.below(2) as c_int,
-        pools: [pool(r, st), pool(r, st)],
+        pools: [pool(r), pool(r)],
         accepted: r.u64(),
         rejected: r.u64(),
         best_session: r.u64(),
         network_difficulty: r.f64(),
         pool_difficulty: r.next() as u32,
     };
-    let fans = [fan(r, st), fan(r, st)];
+    let fans = [fan(r), fan(r)];
+    let pid = (fans[0].target_temp, fans[0].p, fans[0].i, fans[0].d);
     SystemInfo {
         asic_count,
         small_core_count: if r.bool() { 0 } else { r.below(3000) as c_int },
-        device_model: st.pick(r),
-        hostip: st.pick(r),
-        mac_addr: st.pick(r),
+        device_model: pick(r),
+        hostip: pick(r),
+        mac_addr: pick(r),
         wifi_rssi: -(r.below(100) as c_int),
         power: r.f32(),
         max_power: r.f32(),
@@ -184,7 +179,7 @@ fn snapshot(r: &mut Rng, st: &mut Strings, temps: &mut Vec<f32>) -> SystemInfo {
         best_diff: manager.total_best_diff,
         best_session_diff: r.u64(),
         manager,
-        asic_temps: temps.as_ptr(),
+        asic_temps: temps.clone(),
         history_requested: r.below(3) == 0,
         history_start: 0,
         history_span_ms: 0,
@@ -193,26 +188,26 @@ fn snapshot(r: &mut Rng, st: &mut Strings, temps: &mut Vec<f32>) -> SystemInfo {
         now_ms: 0,
         pid_available: r.bool(),
         // getPidSettings(0) is also fan 0's settings
-        pid_target_temp: fans[0].target_temp,
-        pid_p: fans[0].p,
-        pid_i: fans[0].i,
-        pid_d: fans[0].d,
-        hostname: st.pick(r),
-        ssid: st.pick(r),
-        stratum_url: st.pick(r),
+        pid_target_temp: pid.0,
+        pid_p: pid.1,
+        pid_i: pid.2,
+        pid_d: pid.3,
+        hostname: pick(r),
+        ssid: pick(r),
+        stratum_url: pick(r),
         stratum_port: r.next() as u16,
-        stratum_user: st.pick(r),
+        stratum_user: pick(r),
         stratum_enonce_subscribe: r.bool(),
         stratum_tls: r.bool(),
-        fallback_stratum_url: st.pick(r),
+        fallback_stratum_url: pick(r),
         fallback_stratum_port: r.next() as u16,
-        fallback_stratum_user: st.pick(r),
+        fallback_stratum_user: pick(r),
         fallback_stratum_enonce_subscribe: r.bool(),
         fallback_stratum_tls: r.bool(),
         stratum_protocol: r.below(3) as u16,
         fallback_stratum_protocol: r.below(3) as u16,
-        sv2_authority_pubkey: st.pick(r),
-        fallback_sv2_authority_pubkey: st.pick(r),
+        sv2_authority_pubkey: pick(r),
+        fallback_sv2_authority_pubkey: pick(r),
         sv2_channel_type: r.below(3) as u16,
         fallback_sv2_channel_type: r.below(3) as u16,
         voltage: r.f32(),
@@ -229,40 +224,16 @@ fn snapshot(r: &mut Rng, st: &mut Strings, temps: &mut Vec<f32>) -> SystemInfo {
         vr_frequency: r.next() as u32,
         default_vr_frequency: r.next() as u32,
         otp: r.bool(),
-        asic_model: st.pick(r),
+        asic_model: pick(r),
         uptime_seconds: r.below(1 << 40) as i64,
-        last_reset_reason: st.pick(r),
-        wifi_status: st.pick(r),
+        last_reset_reason: pick(r),
+        wifi_status: pick(r),
         free_heap: r.u64() & 0xffff_ffff,
         free_heap_int: r.u64() & 0xffff_ffff,
-        version: st.pick(r),
-        running_partition: st.pick(r),
-        default_theme: st.pick(r),
+        version: pick(r),
+        running_partition: pick(r),
+        default_theme: pick(r),
     }
-}
-
-#[test]
-fn struct_layouts() {
-    let mut rec = Rec::new("http_json", "struct_layouts");
-    let sizes = [
-        size_of::<ManagerInfo>(),
-        size_of::<FanInfo>(),
-        size_of::<SystemInfo>(),
-        size_of::<AsicInfo>(),
-        size_of::<Dashboard>(),
-        size_of::<V2System>(),
-        size_of::<V2Identify>(),
-        size_of::<AlertInfo>(),
-        size_of::<InfluxInfo>(),
-        size_of::<WifiNetwork>(),
-        size_of::<SettingsPool>(),
-        size_of::<V2Settings>(),
-        size_of::<CanMasterNode>(),
-    ];
-    for (which, size) in sizes.iter().enumerate() {
-        rec.add(format!("{which} {size}"));
-    }
-    rec.finish();
 }
 
 #[test]
@@ -278,17 +249,15 @@ fn system_info() {
     }
     let mut checked_history = 0;
     for _ in 0..4000 {
-        let mut st = Strings(Vec::new());
         let mut temps = Vec::new();
-        let mut s = snapshot(&mut r, &mut st, &mut temps);
+        let mut s = snapshot(&mut r, &mut temps);
         // the history window in client time
         s.now_ms = 36_000_000 + r.below(10_000);
         s.history_current = 1_700_000_000_000 + r.below(1_000_000);
         s.history_start = s.history_current - r.below(4_000_000);
         s.history_span_ms = r.below(4_000_000);
         s.history_limit = [0u32, 1, 10, 100, 2000][r.below(5) as usize];
-        // SAFETY: the test's snapshot points at its own live strings and arrays
-        let rust = String::from_utf8(unsafe { http_json::system_info(&s) }.serialize()).unwrap();
+        let rust = String::from_utf8(http_json::system_info(&s).serialize()).unwrap();
         rec.add(format!(
             "start {} cur {} span {} limit {} requested {} now {}\n{rust}",
             s.history_start,
@@ -303,12 +272,10 @@ fn system_info() {
         }
     }
     // a NaN output voltage: 0 instead of the undefined (int) cast
-    let mut st = Strings(Vec::new());
     let mut temps = Vec::new();
-    let mut s = snapshot(&mut r, &mut st, &mut temps);
+    let mut s = snapshot(&mut r, &mut temps);
     s.vout = f32::NAN;
-    // SAFETY: the test's snapshot points at its own live strings and arrays
-    let rust = String::from_utf8(unsafe { http_json::system_info(&s) }.serialize()).unwrap();
+    let rust = String::from_utf8(http_json::system_info(&s).serialize()).unwrap();
     assert!(rust.contains("\"coreVoltageActual\":0,"));
     // not vacuous: histories with rows were compared
     assert!(checked_history > 100, "{checked_history}");
@@ -321,12 +288,11 @@ fn asic_info() {
     let mut r = Rng(0xa51c);
     let mut rec = Rec::new("http_json", "asic_info");
     for _ in 0..500 {
-        let mut st = Strings(Vec::new());
         let freqs: Vec<u32> = (0..r.below(25)).map(|_| r.next() as u32 % 2000).collect();
         let volts: Vec<u32> = (0..r.below(25)).map(|_| r.next() as u32 % 2000).collect();
         let a = AsicInfo {
-            asic_model: st.pick(&mut r),
-            device_model: st.pick(&mut r),
+            asic_model: pick(&mut r),
+            device_model: pick(&mut r),
             asic_count: r.below(13) as c_int,
             default_frequency: r.below(1000) as c_int,
             default_voltage: r.below(1400) as c_int,
@@ -335,14 +301,11 @@ fn asic_info() {
             abs_max_voltage: r.below(1400) as c_int,
             eco_frequency: r.below(1000) as c_int,
             eco_voltage: r.below(1400) as c_int,
-            swarm_color: st.pick(&mut r),
-            frequency_options: freqs.as_ptr(),
-            frequency_count: freqs.len(),
-            voltage_options: volts.as_ptr(),
-            voltage_count: volts.len(),
+            swarm_color: pick(&mut r),
+            frequency_options: freqs.clone(),
+            voltage_options: volts.clone(),
         };
-        // SAFETY: the test's snapshot points at its own live strings and arrays
-        let rust = String::from_utf8(unsafe { http_json::asic_info(&a) }.serialize()).unwrap();
+        let rust = String::from_utf8(http_json::asic_info(&a).serialize()).unwrap();
         rec.add(rust);
     }
     rec.finish();
@@ -370,23 +333,15 @@ fn dashboard() {
     with_history(&mut r);
     let mut seen = [0u32; 3];
     for _ in 0..4000 {
-        let mut st = Strings(Vec::new());
         let mut temps = Vec::new();
         // the manager part and the shared values from the system snapshot
-        let s = snapshot(&mut r, &mut st, &mut temps);
+        let s = snapshot(&mut r, &mut temps);
         let n = s.asic_count;
         let rates: Vec<f32> = (0..n).map(|_| r.f32()).collect();
         let errors: Vec<f32> = (0..n).map(|_| r.f32()).collect();
-        let mut scripts = Vec::new();
-        let mut coinbase = |r: &mut Rng, st: &mut Strings| {
-            let script = st.pick(r);
+        let coinbase = |r: &mut Rng| {
             // never NULL: a char array in coinbase_result_t
-            let script = if script.is_null() {
-                c"".as_ptr()
-            } else {
-                script
-            };
-            scripts.push(script);
+            let script = pick(r).unwrap_or_default();
             DashCoinbase {
                 block_height: if r.bool() { 0 } else { r.next() as u32 },
                 network_difficulty: r.f64(),
@@ -401,7 +356,7 @@ fn dashboard() {
                 force: r.bool(),
             }
         };
-        let cb = [coinbase(&mut r, &mut st), coinbase(&mut r, &mut st)];
+        let cb = [coinbase(&mut r), coinbase(&mut r)];
         let d = Dashboard {
             uptime_seconds: s.uptime_seconds,
             shutdown: s.shutdown,
@@ -422,9 +377,9 @@ fn dashboard() {
             frequency: s.frequency,
             asic_count: n,
             small_core_count: s.small_core_count,
-            chip_hashrate: rates.as_ptr(),
-            chip_error_rate: errors.as_ptr(),
-            asic_temps: temps.as_ptr(),
+            chip_hashrate: rates,
+            chip_error_rate: errors,
+            asic_temps: temps,
             watts: s.power,
             min_power: s.min_power,
             max_power: s.max_power,
@@ -442,9 +397,9 @@ fn dashboard() {
             fan_speed: [s.fans[0].speed_perc, s.fans[1].speed_perc],
             fan_rpm: [s.fans[0].rpm, s.fans[1].rpm],
             manager: s.manager,
-            pool_host: [st.pick(&mut r), st.pick(&mut r)],
+            pool_host: [pick(&mut r), pick(&mut r)],
             pool_port: [r.next() as u16 as c_int, r.next() as u16 as c_int],
-            pool_user: [st.pick(&mut r), st.pick(&mut r)],
+            pool_user: [pick(&mut r), pick(&mut r)],
             has_can_extension: r.bool(),
             can_enabled: r.bool(),
             coinbase: cb,
@@ -460,8 +415,7 @@ fn dashboard() {
         d.history_start = d.history_current - r.below(4_000_000);
         d.history_span_ms = r.below(4_000_000);
         d.history_limit = [0u32, 1, 10, 100, 2000][r.below(5) as usize];
-        // SAFETY: the test's snapshot points at its own live strings and arrays
-        let rust = String::from_utf8(unsafe { http_json::dashboard(&d) }.serialize()).unwrap();
+        let rust = String::from_utf8(http_json::dashboard(&d).serialize()).unwrap();
         rec.add(format!(
             "start {} cur {} span {} limit {} requested {} now {}\n{rust}",
             d.history_start,
@@ -483,44 +437,39 @@ fn v2_system_and_identify() {
     let mut r = Rng(0x2525);
     let mut rec = Rec::new("http_json", "v2_system_and_identify");
     for _ in 0..1000 {
-        let mut st = Strings(Vec::new());
         let v = V2System {
-            device_model: st.pick(&mut r),
-            asic_model: st.pick(&mut r),
-            version: st.pick(&mut r),
+            device_model: pick(&mut r),
+            asic_model: pick(&mut r),
+            version: pick(&mut r),
             uptime_seconds: r.below(1 << 40) as i64,
-            last_reset_reason: st.pick(&mut r),
-            hostname: st.pick(&mut r),
-            ssid: st.pick(&mut r),
-            mac_addr: st.pick(&mut r),
-            ip_addr: st.pick(&mut r),
-            wifi_status: st.pick(&mut r),
+            last_reset_reason: pick(&mut r),
+            hostname: pick(&mut r),
+            ssid: pick(&mut r),
+            mac_addr: pick(&mut r),
+            ip_addr: pick(&mut r),
+            wifi_status: pick(&mut r),
             wifi_rssi: -(r.below(100) as c_int),
             free_heap: r.u64() & 0xffff_ffff,
             free_heap_int: r.u64() & 0xffff_ffff,
         };
-        // SAFETY: the test's snapshot points at its own live strings and arrays
-        let rust = String::from_utf8(unsafe { http_json::v2_system(&v) }.serialize()).unwrap();
+        let rust = String::from_utf8(http_json::v2_system(&v).serialize()).unwrap();
         rec.add(rust);
         let i = V2Identify {
-            device_model: st.pick(&mut r),
-            default_theme: st.pick(&mut r),
+            device_model: pick(&mut r),
+            default_theme: pick(&mut r),
             otp: r.bool(),
             ap_active: r.bool(),
             // the former code was recorded with the core dump download
             core_dump_download: true,
             can_enabled: r.bool(),
         };
-        // SAFETY: the test's snapshot points at its own live strings and arrays
-        let rust = String::from_utf8(unsafe { http_json::v2_identify(&i) }.serialize()).unwrap();
+        let rust = String::from_utf8(http_json::v2_identify(&i).serialize()).unwrap();
         rec.add(rust);
         let without = V2Identify {
             core_dump_download: false,
             ..i
         };
-        // SAFETY: the test's snapshot points at its own live strings and arrays
-        let rust =
-            String::from_utf8(unsafe { http_json::v2_identify(&without) }.serialize()).unwrap();
+        let rust = String::from_utf8(http_json::v2_identify(&without).serialize()).unwrap();
         assert!(rust.contains("\"coreDumpDownload\":false,"));
     }
     rec.finish();
@@ -532,7 +481,6 @@ fn small_documents() {
     let mut r = Rng(0x5a11);
     let mut rec = Rec::new("http_json", "small_documents");
     for _ in 0..2000 {
-        let mut st = Strings(Vec::new());
         // the C++ side reports hasWebhook from the webhook string
         let a = AlertInfo {
             has_webhook: r.bool(),
@@ -546,15 +494,14 @@ fn small_documents() {
         rec.add(rust);
 
         let i = InfluxInfo {
-            url: st.pick(&mut r),
+            url: pick(&mut r),
             port: r.next() as u16,
-            bucket: st.pick(&mut r),
-            org: st.pick(&mut r),
-            prefix: st.pick(&mut r),
+            bucket: pick(&mut r),
+            org: pick(&mut r),
+            prefix: pick(&mut r),
             enabled: r.bool(),
         };
-        // SAFETY: the test's snapshot points at its own live strings and arrays
-        let rust = String::from_utf8(unsafe { http_json::influx_info(&i) }.serialize()).unwrap();
+        let rust = String::from_utf8(http_json::influx_info(&i).serialize()).unwrap();
         rec.add(rust);
 
         let e = r.bool();
@@ -571,17 +518,13 @@ fn small_documents() {
 
         // ssids are char[33] in the scan records: never NULL, at most 32 bytes
         let nets: Vec<WifiNetwork> = (0..r.below(21))
-            .map(|_| {
-                let p = st.pick(&mut r);
-                WifiNetwork {
-                    ssid: if p.is_null() { c"".as_ptr() } else { p },
-                    rssi: r.next() as i8,
-                    authmode: r.below(12) as c_int,
-                }
+            .map(|_| WifiNetwork {
+                ssid: pick(&mut r).unwrap_or_default(),
+                rssi: r.next() as i8,
+                authmode: r.below(12) as c_int,
             })
             .collect();
-        // SAFETY: the test's snapshot points at its own live strings and arrays
-        let rust = String::from_utf8(unsafe { http_json::wifi_scan(&nets) }.serialize()).unwrap();
+        let rust = String::from_utf8(http_json::wifi_scan(&nets).serialize()).unwrap();
         rec.add(rust);
     }
     rec.finish();
@@ -593,28 +536,27 @@ fn v2_settings() {
     let mut r = Rng(0x5e77);
     let mut rec = Rec::new("http_json", "v2_settings");
     for _ in 0..3000 {
-        let mut st = Strings(Vec::new());
         let freqs: Vec<u32> = (0..r.below(25)).map(|_| r.next() as u32 % 2000).collect();
         let volts: Vec<u32> = (0..r.below(25)).map(|_| r.next() as u32 % 2000).collect();
-        let pool = |r: &mut Rng, st: &mut Strings| SettingsPool {
-            url: st.pick(r),
+        let pool = |r: &mut Rng| SettingsPool {
+            url: pick(r),
             port: r.next() as u16,
-            user: st.pick(r),
+            user: pick(r),
             enonce_subscribe: r.bool(),
             tls: r.bool(),
             protocol: r.below(3) as u16,
-            sv2_authority_pubkey: st.pick(r),
+            sv2_authority_pubkey: pick(r),
             sv2_channel_type: r.below(3) as u16,
             sv2_require_auth: r.bool(),
             coinbase_verify_mode: r.below(3) as u16,
             coinbase_max_fee: r.next() as u16,
             coinbase_verify_force: r.bool(),
         };
-        let pools = [pool(&mut r, &mut st), pool(&mut r, &mut st)];
+        let pools = [pool(&mut r), pool(&mut r)];
         let mut s = V2Settings {
-            asic_model: st.pick(&mut r),
-            device_model: st.pick(&mut r),
-            version: st.pick(&mut r),
+            asic_model: pick(&mut r),
+            device_model: pick(&mut r),
+            version: pick(&mut r),
             otp: r.bool(),
             ap_active: r.bool(),
             has_can_extension: r.bool(),
@@ -629,10 +571,8 @@ fn v2_settings() {
             eco_core_voltage: r.below(1400) as c_int,
             abs_min_core_voltage: r.below(1400) as c_int,
             abs_max_core_voltage: r.below(1400) as c_int,
-            frequency_options: freqs.as_ptr(),
-            frequency_count: freqs.len(),
-            voltage_options: volts.as_ptr(),
-            voltage_count: volts.len(),
+            frequency_options: freqs.clone(),
+            voltage_options: volts.clone(),
             pool_mode: r.below(3) as u16,
             pool_balance: r.below(101) as u16,
             stratum_keep: r.bool(),
@@ -641,24 +581,22 @@ fn v2_settings() {
             pools,
             pid_available: r.bool(),
             fan_count: r.below(3) as c_int,
-            fans: [fan(&mut r, &mut st), fan(&mut r, &mut st)],
+            fans: [fan(&mut r), fan(&mut r)],
             invert_fan_polarity: r.bool(),
             has_pid_use_max: false,
             pid_use_max: r.bool(),
-            hostname: st.pick(&mut r),
-            ssid: st.pick(&mut r),
+            hostname: pick(&mut r),
+            ssid: pick(&mut r),
             mempool_custom: r.bool(),
-            mempool_url: st.pick(&mut r),
+            mempool_url: pick(&mut r),
             flip_screen: r.bool(),
             invert_screen: r.bool(),
             auto_screen_off: r.bool(),
         };
-        // SAFETY: the test's snapshot points at its own live strings and arrays
-        let rust = String::from_utf8(unsafe { http_json::v2_settings(&s) }.serialize()).unwrap();
+        let rust = String::from_utf8(http_json::v2_settings(&s).serialize()).unwrap();
         rec.add(rust);
         s.has_pid_use_max = true;
-        // SAFETY: the test's snapshot points at its own live strings and arrays
-        let rust = String::from_utf8(unsafe { http_json::v2_settings(&s) }.serialize()).unwrap();
+        let rust = String::from_utf8(http_json::v2_settings(&s).serialize()).unwrap();
         rec.add(format!("NerdAxe\n{rust}"));
         assert!(rust.contains("\"pidUseMax\":"));
     }
@@ -734,13 +672,12 @@ fn can_swarm() {
             // slaves without telemetry for 10 s go offline
             can_master_tick(now);
         }
-        let mut st = Strings(Vec::new());
         let temps: Vec<f32> = (0..r.below(13)).map(|_| r.f32()).collect();
-        let fans = [fan(&mut r, &mut st), fan(&mut r, &mut st)];
+        let fans = [fan(&mut r), fan(&mut r)];
         let m = CanMasterNode {
-            mac: st.pick(&mut r),
-            device_model: st.pick(&mut r),
-            version: st.pick(&mut r),
+            mac: pick(&mut r),
+            device_model: pick(&mut r),
+            version: pick(&mut r),
             shutdown: r.below(5) == 0,
             hashrate: r.f32(),
             power: r.f32(),
@@ -755,14 +692,12 @@ fn can_swarm() {
             core_voltage: r.below(1400) as c_int,
             flip_screen: r.bool(),
             auto_screen_off: r.bool(),
-            asic_count: temps.len() as c_int,
-            asic_temps: temps.as_ptr(),
+            asic_temps: temps,
             fan_count: r.below(3) as c_int,
             fans,
         };
         // raw bytes: the slaves' model strings may be any bytes
-        // SAFETY: the test's snapshot points at its own live strings and arrays
-        let rust = unsafe { http_json::can_swarm(&m) }.serialize();
+        let rust = http_json::can_swarm(&m).serialize();
         rec.add(text_or_bytes(rust));
     }
     assert!(slaves_seen > 5000, "{slaves_seen}");

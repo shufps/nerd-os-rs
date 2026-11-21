@@ -11,7 +11,8 @@
 //! Difference: `coreVoltageActual` of a NaN or out-of-range output voltage is
 //! 0 or saturated; the C++ `(int)` cast of such a float was undefined.
 
-use core::ffi::{c_char, c_int, CStr};
+use core::ffi::{c_int, CStr};
+use std::ffi::CString;
 
 use crate::ajson::{Json, Num};
 
@@ -42,13 +43,9 @@ impl Obj {
     pub fn bool(&mut self, k: &str, v: bool) -> &mut Self {
         self.set(k, Json::Bool(v))
     }
-    /// A C string; NULL is `null`.
-    ///
-    /// # Safety
-    /// `v` is NULL or NUL-terminated.
-    pub(crate) unsafe fn cstr(&mut self, k: &str, v: *const c_char) -> &mut Self {
-        // SAFETY: caller contract
-        self.set(k, unsafe { cstr(v) })
+    /// A C string; `None` is `null`.
+    pub(crate) fn cstr(&mut self, k: &str, v: Option<&CStr>) -> &mut Self {
+        self.set(k, cstr(v))
     }
     pub fn obj(&mut self, k: &str, v: Obj) -> &mut Self {
         self.set(k, v.into())
@@ -76,22 +73,13 @@ pub fn float(v: f32) -> Json {
     Json::Num(Num::F(v))
 }
 
-/// A C string as ArduinoJson stores it: NULL is `null`.
-///
-/// # Safety
-/// `p` is NULL or NUL-terminated.
-unsafe fn cstr(p: *const c_char) -> Json {
-    if p.is_null() {
-        Json::Null
-    } else {
-        // SAFETY: a NUL-terminated string (caller contract)
-        Json::Str(unsafe { CStr::from_ptr(p) }.to_bytes().to_vec())
-    }
+/// A C string as ArduinoJson stores it: `None` (NULL) is `null`.
+fn cstr(v: Option<&CStr>) -> Json {
+    v.map_or(Json::Null, |v| Json::Str(v.to_bytes().to_vec()))
 }
 
 /// One pool of `manager_info_t`.
-#[repr(C)]
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Debug, Default)]
 pub struct ManagerPool {
     pub connected: bool,
     pub accepted: u64,
@@ -103,15 +91,14 @@ pub struct ManagerPool {
     /// 0 without a ping task
     pub ping_rtt: f64,
     pub ping_loss: f64,
-    /// NULL: not blocked
-    pub verify_blocked: *const c_char,
+    /// `None`: not blocked
+    pub verify_blocked: Option<CString>,
     pub protocol: c_int,
     pub encrypted: bool,
 }
 
 /// `manager_info_t`: what `getManagerInfoJson()` reported.
-#[repr(C)]
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Debug, Default)]
 pub struct ManagerInfo {
     pub config_pool_mode: u16,
     pub pool_mode: c_int,
@@ -132,11 +119,7 @@ pub struct ManagerInfo {
 
 /// The stratum manager object; `verbose`: the v2 dashboard (both pools in
 /// failover mode and the dashboard-only fields).
-///
-/// # Safety
-/// The string pointers in the snapshot are NULL or NUL-terminated, and
-/// its array pointers hold their stated counts, for the call.
-pub unsafe fn manager_info(m: &ManagerInfo, verbose: bool) -> Obj {
+pub fn manager_info(m: &ManagerInfo, verbose: bool) -> Obj {
     let mut o = Obj::new();
     o.uint("poolMode", m.config_pool_mode as u64)
         .int("activePoolMode", m.pool_mode as i64)
@@ -166,13 +149,11 @@ pub unsafe fn manager_info(m: &ManagerInfo, verbose: bool) -> Obj {
             pool.uint("bestDiff", p.best_session);
         }
         if verbose {
-            let reason = if p.verify_blocked.is_null() {
-                c"".as_ptr()
-            } else {
-                p.verify_blocked
-            };
             pool.bool("active", active)
-                .cstr("verifyBlocked", reason)
+                .cstr(
+                    "verifyBlocked",
+                    Some(p.verify_blocked.as_deref().unwrap_or(c"")),
+                )
                 .int("activeProtocol", p.protocol as i64)
                 .bool("encrypted", p.encrypted);
         }
@@ -220,26 +201,10 @@ pub fn history(start: u64, end: u64, current: u64, limit: u32, now_ms: u64) -> O
     o
 }
 
-/// All-zero snapshots: the handlers fill in the fields they have.
-macro_rules! zeroed {
-    ($($t:ty),*) => {$(
-        impl $t {
-            /// All fields zero (NULL, false).
-            pub fn zeroed() -> Self {
-                // SAFETY: a plain C struct of numbers, bools, arrays and raw
-                // pointers: all zero (NULL, false) is a valid value
-                unsafe { core::mem::zeroed() }
-            }
-        }
-    )*};
-}
-zeroed!(FanInfo, SystemInfo, Dashboard, V2Settings);
-
 /// `fan_info_t`: one fan channel.
-#[repr(C)]
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Debug, Default)]
 pub struct FanInfo {
-    pub label: *const c_char,
+    pub label: Option<CString>,
     pub mode: c_int,
     pub manual_speed: u16,
     pub overheat_temp: u16,
@@ -252,14 +217,13 @@ pub struct FanInfo {
 }
 
 /// `system_info_t`: the values of `GET /api/system/info`.
-#[repr(C)]
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Debug, Default)]
 pub struct SystemInfo {
     pub asic_count: c_int,
     pub small_core_count: c_int,
-    pub device_model: *const c_char,
-    pub hostip: *const c_char,
-    pub mac_addr: *const c_char,
+    pub device_model: Option<CString>,
+    pub hostip: Option<CString>,
+    pub mac_addr: Option<CString>,
     pub wifi_rssi: c_int,
     pub power: f32,
     pub max_power: f32,
@@ -299,7 +263,7 @@ pub struct SystemInfo {
     pub best_session_diff: u64,
     pub manager: ManagerInfo,
     /// `asic_count` entries
-    pub asic_temps: *const f32,
+    pub asic_temps: Vec<f32>,
     pub history_requested: bool,
     pub history_start: u64,
     pub history_span_ms: u64,
@@ -312,22 +276,22 @@ pub struct SystemInfo {
     pub pid_p: u16,
     pub pid_i: u16,
     pub pid_d: u16,
-    pub hostname: *const c_char,
-    pub ssid: *const c_char,
-    pub stratum_url: *const c_char,
+    pub hostname: Option<CString>,
+    pub ssid: Option<CString>,
+    pub stratum_url: Option<CString>,
     pub stratum_port: u16,
-    pub stratum_user: *const c_char,
+    pub stratum_user: Option<CString>,
     pub stratum_enonce_subscribe: bool,
     pub stratum_tls: bool,
-    pub fallback_stratum_url: *const c_char,
+    pub fallback_stratum_url: Option<CString>,
     pub fallback_stratum_port: u16,
-    pub fallback_stratum_user: *const c_char,
+    pub fallback_stratum_user: Option<CString>,
     pub fallback_stratum_enonce_subscribe: bool,
     pub fallback_stratum_tls: bool,
     pub stratum_protocol: u16,
     pub fallback_stratum_protocol: u16,
-    pub sv2_authority_pubkey: *const c_char,
-    pub fallback_sv2_authority_pubkey: *const c_char,
+    pub sv2_authority_pubkey: Option<CString>,
+    pub fallback_sv2_authority_pubkey: Option<CString>,
     pub sv2_channel_type: u16,
     pub fallback_sv2_channel_type: u16,
     /// mV
@@ -345,15 +309,15 @@ pub struct SystemInfo {
     pub vr_frequency: u32,
     pub default_vr_frequency: u32,
     pub otp: bool,
-    pub asic_model: *const c_char,
+    pub asic_model: Option<CString>,
     pub uptime_seconds: i64,
-    pub last_reset_reason: *const c_char,
-    pub wifi_status: *const c_char,
+    pub last_reset_reason: Option<CString>,
+    pub wifi_status: Option<CString>,
     pub free_heap: u64,
     pub free_heap_int: u64,
-    pub version: *const c_char,
-    pub running_partition: *const c_char,
-    pub default_theme: *const c_char,
+    pub version: Option<CString>,
+    pub running_partition: Option<CString>,
+    pub default_theme: Option<CString>,
 }
 
 fn pid_obj(target: i64, p: u16, i: u16, d: u16) -> Obj {
@@ -366,11 +330,7 @@ fn pid_obj(target: i64, p: u16, i: u16, d: u16) -> Obj {
 }
 
 /// `GET /api/system/info`
-///
-/// # Safety
-/// The string pointers in the snapshot are NULL or NUL-terminated, and
-/// its array pointers hold their stated counts, for the call.
-pub unsafe fn system_info(s: &SystemInfo) -> Json {
+pub fn system_info(s: &SystemInfo) -> Json {
     let on = |v: f64| if s.shutdown { 0.0 } else { v };
     let fans = s.fan_count.clamp(0, 2) as usize;
     let fan = |ch: usize, f: fn(&FanInfo) -> u16| {
@@ -383,9 +343,9 @@ pub unsafe fn system_info(s: &SystemInfo) -> Json {
     let mut d = Obj::new();
     d.int("asicCount", s.asic_count as i64)
         .int("smallCoreCount", s.small_core_count as i64)
-        .cstr("deviceModel", s.device_model)
-        .cstr("hostip", s.hostip)
-        .cstr("macAddr", s.mac_addr)
+        .cstr("deviceModel", s.device_model.as_deref())
+        .cstr("hostip", s.hostip.as_deref())
+        .cstr("macAddr", s.mac_addr.as_deref())
         .int("wifiRSSI", s.wifi_rssi as i64)
         .float("power", s.power)
         .float("maxPower", s.max_power)
@@ -427,10 +387,7 @@ pub unsafe fn system_info(s: &SystemInfo) -> Json {
         .uint("sharesRejected", s.shares_rejected)
         .uint("bestDiff", s.best_diff)
         .uint("bestSessionDiff", s.best_session_diff);
-    let temps = (0..s.asic_count.max(0) as usize)
-        // SAFETY: `asic_count` entries (caller contract)
-        .map(|i| float(unsafe { *s.asic_temps.add(i) }))
-        .collect();
+    let temps = floats(&s.asic_temps, s.asic_count).map(float).collect();
     d.arr("asicTemps", temps);
     if !s.shutdown && s.history_requested {
         let end = s.history_start.wrapping_add(s.history_span_ms);
@@ -454,7 +411,7 @@ pub unsafe fn system_info(s: &SystemInfo) -> Json {
         .iter()
         .map(|f| {
             let mut o = Obj::new();
-            o.cstr("label", f.label)
+            o.cstr("label", f.label.as_deref())
                 .int("mode", f.mode as i64)
                 .uint("manualSpeed", f.manual_speed as u64)
                 .uint("overheatTemp", f.overheat_temp as u64)
@@ -465,16 +422,16 @@ pub unsafe fn system_info(s: &SystemInfo) -> Json {
         })
         .collect();
     d.arr("fans", fan_list)
-        .cstr("hostname", s.hostname)
-        .cstr("ssid", s.ssid)
-        .cstr("stratumURL", s.stratum_url)
+        .cstr("hostname", s.hostname.as_deref())
+        .cstr("ssid", s.ssid.as_deref())
+        .cstr("stratumURL", s.stratum_url.as_deref())
         .uint("stratumPort", s.stratum_port as u64)
-        .cstr("stratumUser", s.stratum_user)
+        .cstr("stratumUser", s.stratum_user.as_deref())
         .bool("stratumEnonceSubscribe", s.stratum_enonce_subscribe)
         .bool("stratumTLS", s.stratum_tls)
-        .cstr("fallbackStratumURL", s.fallback_stratum_url)
+        .cstr("fallbackStratumURL", s.fallback_stratum_url.as_deref())
         .uint("fallbackStratumPort", s.fallback_stratum_port as u64)
-        .cstr("fallbackStratumUser", s.fallback_stratum_user)
+        .cstr("fallbackStratumUser", s.fallback_stratum_user.as_deref())
         .bool(
             "fallbackStratumEnonceSubscribe",
             s.fallback_stratum_enonce_subscribe,
@@ -485,10 +442,10 @@ pub unsafe fn system_info(s: &SystemInfo) -> Json {
             "fallbackStratumProtocol",
             s.fallback_stratum_protocol as u64,
         )
-        .cstr("sv2AuthorityPubkey", s.sv2_authority_pubkey)
+        .cstr("sv2AuthorityPubkey", s.sv2_authority_pubkey.as_deref())
         .cstr(
             "fallbackSv2AuthorityPubkey",
-            s.fallback_sv2_authority_pubkey,
+            s.fallback_sv2_authority_pubkey.as_deref(),
         )
         .uint("sv2ChannelType", s.sv2_channel_type as u64)
         .uint("fallbackSv2ChannelType", s.fallback_sv2_channel_type as u64)
@@ -507,24 +464,23 @@ pub unsafe fn system_info(s: &SystemInfo) -> Json {
         .uint("vrFrequency", s.vr_frequency as u64)
         .uint("defaultVrFrequency", s.default_vr_frequency as u64)
         .bool("otp", s.otp)
-        .cstr("ASICModel", s.asic_model)
+        .cstr("ASICModel", s.asic_model.as_deref())
         .int("uptimeSeconds", s.uptime_seconds)
-        .cstr("lastResetReason", s.last_reset_reason)
-        .cstr("wifiStatus", s.wifi_status)
+        .cstr("lastResetReason", s.last_reset_reason.as_deref())
+        .cstr("wifiStatus", s.wifi_status.as_deref())
         .uint("freeHeap", s.free_heap)
         .uint("freeHeapInt", s.free_heap_int)
-        .cstr("version", s.version)
-        .cstr("runningPartition", s.running_partition)
-        .cstr("defaultTheme", s.default_theme);
+        .cstr("version", s.version.as_deref())
+        .cstr("runningPartition", s.running_partition.as_deref())
+        .cstr("defaultTheme", s.default_theme.as_deref());
     d.into()
 }
 
 /// `asic_info_t`: the values of `GET /api/system/asic`.
-#[repr(C)]
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Debug, Default)]
 pub struct AsicInfo {
-    pub asic_model: *const c_char,
-    pub device_model: *const c_char,
+    pub asic_model: Option<CString>,
+    pub device_model: Option<CString>,
     pub asic_count: c_int,
     pub default_frequency: c_int,
     pub default_voltage: c_int,
@@ -533,32 +489,20 @@ pub struct AsicInfo {
     pub abs_max_voltage: c_int,
     pub eco_frequency: c_int,
     pub eco_voltage: c_int,
-    pub swarm_color: *const c_char,
-    pub frequency_options: *const u32,
-    pub frequency_count: usize,
-    pub voltage_options: *const u32,
-    pub voltage_count: usize,
+    pub swarm_color: Option<CString>,
+    pub frequency_options: Vec<u32>,
+    pub voltage_options: Vec<u32>,
 }
 
-unsafe fn u32_list(p: *const u32, n: usize) -> Vec<Json> {
-    if n == 0 {
-        return Vec::new();
-    }
-    core::slice::from_raw_parts(p, n)
-        .iter()
-        .map(|&v| Json::Num(Num::U(v as u64)))
-        .collect()
+fn u32_list(v: &[u32]) -> Vec<Json> {
+    v.iter().map(|&v| Json::Num(Num::U(v as u64))).collect()
 }
 
 /// `GET /api/system/asic`
-///
-/// # Safety
-/// The string pointers in the snapshot are NULL or NUL-terminated, and
-/// its array pointers hold their stated counts, for the call.
-pub unsafe fn asic_info(a: &AsicInfo) -> Json {
+pub fn asic_info(a: &AsicInfo) -> Json {
     let mut d = Obj::new();
-    d.cstr("ASICModel", a.asic_model)
-        .cstr("deviceModel", a.device_model)
+    d.cstr("ASICModel", a.asic_model.as_deref())
+        .cstr("deviceModel", a.device_model.as_deref())
         .int("asicCount", a.asic_count as i64)
         .int("defaultFrequency", a.default_frequency as i64)
         .int("defaultVoltage", a.default_voltage as i64)
@@ -567,25 +511,18 @@ pub unsafe fn asic_info(a: &AsicInfo) -> Json {
         .int("absMaxVoltage", a.abs_max_voltage as i64)
         .int("ecoFrequency", a.eco_frequency as i64)
         .int("ecoVoltage", a.eco_voltage as i64)
-        .cstr("swarmColor", a.swarm_color);
-    // SAFETY: the counts are the lengths (caller contract)
-    d.arr("frequencyOptions", unsafe {
-        u32_list(a.frequency_options, a.frequency_count)
-    })
-    // SAFETY: as above
-    .arr("voltageOptions", unsafe {
-        u32_list(a.voltage_options, a.voltage_count)
-    });
+        .cstr("swarmColor", a.swarm_color.as_deref());
+    d.arr("frequencyOptions", u32_list(&a.frequency_options))
+        .arr("voltageOptions", u32_list(&a.voltage_options));
     d.into()
 }
 
 /// One pool's coinbase data of the dashboard.
-#[repr(C)]
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Debug, Default)]
 pub struct DashCoinbase {
     pub block_height: u32,
     pub network_difficulty: f64,
-    pub scriptsig: *const c_char,
+    pub scriptsig: CString,
     pub total_value_satoshis: u64,
     pub user_value_satoshis: u64,
     pub verification_ok: bool,
@@ -598,8 +535,7 @@ pub struct DashCoinbase {
 }
 
 /// `dashboard_t`: the values of `GET /api/v2/dashboard`.
-#[repr(C)]
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Debug, Default)]
 pub struct Dashboard {
     pub uptime_seconds: i64,
     pub shutdown: bool,
@@ -621,9 +557,9 @@ pub struct Dashboard {
     pub asic_count: c_int,
     pub small_core_count: c_int,
     /// `asic_count` entries each
-    pub chip_hashrate: *const f32,
-    pub chip_error_rate: *const f32,
-    pub asic_temps: *const f32,
+    pub chip_hashrate: Vec<f32>,
+    pub chip_error_rate: Vec<f32>,
+    pub asic_temps: Vec<f32>,
     pub watts: f32,
     pub min_power: f32,
     pub max_power: f32,
@@ -643,9 +579,9 @@ pub struct Dashboard {
     pub fan_speed: [u16; 2],
     pub fan_rpm: [u16; 2],
     pub manager: ManagerInfo,
-    pub pool_host: [*const c_char; 2],
+    pub pool_host: [Option<CString>; 2],
     pub pool_port: [c_int; 2],
-    pub pool_user: [*const c_char; 2],
+    pub pool_user: [Option<CString>; 2],
     pub has_can_extension: bool,
     pub can_enabled: bool,
     pub coinbase: [DashCoinbase; 2],
@@ -657,18 +593,13 @@ pub struct Dashboard {
     pub now_ms: u64,
 }
 
-/// `n` floats from `p` (`n` <= 0: none).
-unsafe fn floats(p: *const f32, n: c_int) -> impl Iterator<Item = f32> {
-    let n = n.max(0) as usize;
-    (0..n).map(move |i| *p.add(i))
+/// The first `n` floats of `v` (`n` <= 0: none).
+fn floats(v: &[f32], n: c_int) -> impl Iterator<Item = f32> + '_ {
+    v.iter().copied().take(n.max(0) as usize)
 }
 
 /// `GET /api/v2/dashboard`
-///
-/// # Safety
-/// The string pointers in the snapshot are NULL or NUL-terminated, and
-/// its array pointers hold their stated counts, for the call.
-pub unsafe fn dashboard(s: &Dashboard) -> Json {
+pub fn dashboard(s: &Dashboard) -> Json {
     let on = |v: f64| if s.shutdown { 0.0 } else { v };
     let mut d = Obj::new();
 
@@ -702,18 +633,15 @@ pub unsafe fn dashboard(s: &Dashboard) -> Json {
         .int("frequency", s.frequency as i64)
         .int("asicCount", s.asic_count as i64)
         .int("smallCoreCount", s.small_core_count as i64);
-    // SAFETY: `asic_count` entries (caller contract)
-    let chips = unsafe {
-        floats(s.chip_hashrate, s.asic_count)
-            .zip(floats(s.chip_error_rate, s.asic_count))
-            .map(|(h, e)| {
-                let mut c = Obj::new();
-                c.double("hashRate", on(h as f64))
-                    .double("errorHashRate", on(e as f64));
-                c.into()
-            })
-            .collect()
-    };
+    let chips = floats(&s.chip_hashrate, s.asic_count)
+        .zip(floats(&s.chip_error_rate, s.asic_count))
+        .map(|(h, e)| {
+            let mut c = Obj::new();
+            c.double("hashRate", on(h as f64))
+                .double("errorHashRate", on(e as f64));
+            c.into()
+        })
+        .collect();
     perf.arr("chips", chips);
     d.obj("performance", perf);
 
@@ -737,10 +665,7 @@ pub unsafe fn dashboard(s: &Dashboard) -> Json {
         .float("vrTempInt", s.vr_temp_int);
     therm.arr(
         "asicTemps",
-        // SAFETY: `asic_count` entries (caller contract)
-        unsafe { floats(s.asic_temps, s.asic_count) }
-            .map(float)
-            .collect(),
+        floats(&s.asic_temps, s.asic_count).map(float).collect(),
     );
     let fans = (0..s.fan_count.clamp(0, 2) as usize)
         .map(|ch| {
@@ -757,9 +682,9 @@ pub unsafe fn dashboard(s: &Dashboard) -> Json {
     if let Some((_, Json::Arr(pools))) = stratum.0.iter_mut().find(|(k, _)| k == b"pools") {
         for (i, pool) in pools.iter_mut().take(2).enumerate() {
             if let Json::Obj(members) = pool {
-                members.push((b"host".to_vec(), cstr(s.pool_host[i])));
+                members.push((b"host".to_vec(), cstr(s.pool_host[i].as_deref())));
                 members.push((b"port".to_vec(), int(s.pool_port[i] as i64)));
-                members.push((b"user".to_vec(), cstr(s.pool_user[i])));
+                members.push((b"user".to_vec(), cstr(s.pool_user[i].as_deref())));
             }
         }
     }
@@ -779,7 +704,7 @@ pub unsafe fn dashboard(s: &Dashboard) -> Json {
         bh.int("pool", p as i64)
             .uint("blockHeight", cb.block_height as u64)
             .double("networkDifficulty", cb.network_difficulty)
-            .cstr("scriptSig", cb.scriptsig);
+            .cstr("scriptSig", Some(&cb.scriptsig));
         if cb.verify_mode > 0 {
             bh.uint("coinbaseValueTotalSatoshis", cb.total_value_satoshis)
                 .uint("coinbaseValueUserSatoshis", cb.user_value_satoshis)
@@ -821,42 +746,37 @@ pub unsafe fn dashboard(s: &Dashboard) -> Json {
 }
 
 /// `v2_system_t`: the values of `GET /api/v2/system`.
-#[repr(C)]
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Debug, Default)]
 pub struct V2System {
-    pub device_model: *const c_char,
-    pub asic_model: *const c_char,
-    pub version: *const c_char,
+    pub device_model: Option<CString>,
+    pub asic_model: Option<CString>,
+    pub version: Option<CString>,
     pub uptime_seconds: i64,
-    pub last_reset_reason: *const c_char,
-    pub hostname: *const c_char,
-    pub ssid: *const c_char,
-    pub mac_addr: *const c_char,
-    pub ip_addr: *const c_char,
-    pub wifi_status: *const c_char,
+    pub last_reset_reason: Option<CString>,
+    pub hostname: Option<CString>,
+    pub ssid: Option<CString>,
+    pub mac_addr: Option<CString>,
+    pub ip_addr: Option<CString>,
+    pub wifi_status: Option<CString>,
     pub wifi_rssi: c_int,
     pub free_heap: u64,
     pub free_heap_int: u64,
 }
 
 /// `GET /api/v2/system`
-///
-/// # Safety
-/// The string pointers in the snapshot are NULL or NUL-terminated, and
-/// its array pointers hold their stated counts, for the call.
-pub unsafe fn v2_system(s: &V2System) -> Json {
+pub fn v2_system(s: &V2System) -> Json {
     let mut d = Obj::new();
-    d.cstr("deviceModel", s.device_model)
-        .cstr("asicModel", s.asic_model)
-        .cstr("version", s.version)
+    d.cstr("deviceModel", s.device_model.as_deref())
+        .cstr("asicModel", s.asic_model.as_deref())
+        .cstr("version", s.version.as_deref())
         .int("uptimeSeconds", s.uptime_seconds)
-        .cstr("lastResetReason", s.last_reset_reason);
+        .cstr("lastResetReason", s.last_reset_reason.as_deref());
     let mut net = Obj::new();
-    net.cstr("hostname", s.hostname)
-        .cstr("ssid", s.ssid)
-        .cstr("macAddr", s.mac_addr)
-        .cstr("ipAddr", s.ip_addr)
-        .cstr("wifiStatus", s.wifi_status)
+    net.cstr("hostname", s.hostname.as_deref())
+        .cstr("ssid", s.ssid.as_deref())
+        .cstr("macAddr", s.mac_addr.as_deref())
+        .cstr("ipAddr", s.ip_addr.as_deref())
+        .cstr("wifiStatus", s.wifi_status.as_deref())
         .int("wifiRSSI", s.wifi_rssi as i64);
     d.obj("network", net);
     let mut mem = Obj::new();
@@ -867,11 +787,10 @@ pub unsafe fn v2_system(s: &V2System) -> Json {
 }
 
 /// `v2_identify_t`: the values of `GET /api/v2/identify`.
-#[repr(C)]
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Debug, Default)]
 pub struct V2Identify {
-    pub device_model: *const c_char,
-    pub default_theme: *const c_char,
+    pub device_model: Option<CString>,
+    pub default_theme: Option<CString>,
     pub otp: bool,
     pub ap_active: bool,
     pub core_dump_download: bool,
@@ -879,14 +798,10 @@ pub struct V2Identify {
 }
 
 /// `GET /api/v2/identify`
-///
-/// # Safety
-/// The string pointers in the snapshot are NULL or NUL-terminated, and
-/// its array pointers hold their stated counts, for the call.
-pub unsafe fn v2_identify(s: &V2Identify) -> Json {
+pub fn v2_identify(s: &V2Identify) -> Json {
     let mut d = Obj::new();
-    d.cstr("deviceModel", s.device_model)
-        .cstr("defaultTheme", s.default_theme)
+    d.cstr("deviceModel", s.device_model.as_deref())
+        .cstr("defaultTheme", s.default_theme.as_deref())
         .bool("otp", s.otp)
         .bool("apActive", s.ap_active)
         .bool("coreDumpDownload", s.core_dump_download);
@@ -897,8 +812,7 @@ pub unsafe fn v2_identify(s: &V2Identify) -> Json {
 }
 
 /// `alert_info_t`: `GET /api/alert/info`.
-#[repr(C)]
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Debug, Default)]
 pub struct AlertInfo {
     pub has_webhook: bool,
     pub watchdog: bool,
@@ -920,27 +834,23 @@ pub fn alert_info(a: &AlertInfo) -> Json {
 }
 
 /// `influx_info_t`: `GET /api/influx/info`.
-#[repr(C)]
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Debug, Default)]
 pub struct InfluxInfo {
-    pub url: *const c_char,
+    pub url: Option<CString>,
     pub port: u16,
-    pub bucket: *const c_char,
-    pub org: *const c_char,
-    pub prefix: *const c_char,
+    pub bucket: Option<CString>,
+    pub org: Option<CString>,
+    pub prefix: Option<CString>,
     pub enabled: bool,
 }
 
-/// # Safety
-/// The string pointers in the snapshot are NULL or NUL-terminated, and
-/// its array pointers hold their stated counts, for the call.
-pub unsafe fn influx_info(i: &InfluxInfo) -> Json {
+pub fn influx_info(i: &InfluxInfo) -> Json {
     let mut d = Obj::new();
-    d.cstr("url", i.url)
+    d.cstr("url", i.url.as_deref())
         .uint("port", i.port as u64)
-        .cstr("bucket", i.bucket)
-        .cstr("org", i.org)
-        .cstr("prefix", i.prefix)
+        .cstr("bucket", i.bucket.as_deref())
+        .cstr("org", i.org.as_deref())
+        .cstr("prefix", i.prefix.as_deref())
         .int("enabled", i.enabled as i64);
     d.into()
 }
@@ -962,25 +872,20 @@ pub fn otp_session(token: &[u8], ttl_seconds: u32, expires_ms: u64) -> Json {
 }
 
 /// `wifi_network_t`: one scanned access point.
-#[repr(C)]
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Debug, Default)]
 pub struct WifiNetwork {
-    pub ssid: *const c_char,
+    pub ssid: CString,
     pub rssi: i8,
     pub authmode: c_int,
 }
 
 /// `GET /api/wifi/scan`
-///
-/// # Safety
-/// The string pointers in the snapshot are NULL or NUL-terminated, and
-/// its array pointers hold their stated counts, for the call.
-pub unsafe fn wifi_scan(nets: &[WifiNetwork]) -> Json {
+pub fn wifi_scan(nets: &[WifiNetwork]) -> Json {
     let list = nets
         .iter()
         .map(|n| {
             let mut o = Obj::new();
-            o.cstr("ssid", n.ssid)
+            o.cstr("ssid", Some(&n.ssid))
                 .int("rssi", n.rssi as i64)
                 .int("authmode", n.authmode as i64);
             o.into()
@@ -992,16 +897,15 @@ pub unsafe fn wifi_scan(nets: &[WifiNetwork]) -> Json {
 }
 
 /// One pool of `GET /api/v2/settings`.
-#[repr(C)]
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Debug, Default)]
 pub struct SettingsPool {
-    pub url: *const c_char,
+    pub url: Option<CString>,
     pub port: u16,
-    pub user: *const c_char,
+    pub user: Option<CString>,
     pub enonce_subscribe: bool,
     pub tls: bool,
     pub protocol: u16,
-    pub sv2_authority_pubkey: *const c_char,
+    pub sv2_authority_pubkey: Option<CString>,
     pub sv2_channel_type: u16,
     pub sv2_require_auth: bool,
     pub coinbase_verify_mode: u16,
@@ -1011,12 +915,11 @@ pub struct SettingsPool {
 }
 
 /// `v2_settings_t`: the values of `GET /api/v2/settings`.
-#[repr(C)]
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Debug, Default)]
 pub struct V2Settings {
-    pub asic_model: *const c_char,
-    pub device_model: *const c_char,
-    pub version: *const c_char,
+    pub asic_model: Option<CString>,
+    pub device_model: Option<CString>,
+    pub version: Option<CString>,
     pub otp: bool,
     pub ap_active: bool,
     pub has_can_extension: bool,
@@ -1031,10 +934,8 @@ pub struct V2Settings {
     pub eco_core_voltage: c_int,
     pub abs_min_core_voltage: c_int,
     pub abs_max_core_voltage: c_int,
-    pub frequency_options: *const u32,
-    pub frequency_count: usize,
-    pub voltage_options: *const u32,
-    pub voltage_count: usize,
+    pub frequency_options: Vec<u32>,
+    pub voltage_options: Vec<u32>,
     pub pool_mode: u16,
     pub pool_balance: u16,
     pub stratum_keep: bool,
@@ -1048,25 +949,21 @@ pub struct V2Settings {
     /// NerdAxe/NerdAxeGamma builds report `pidUseMax`
     pub has_pid_use_max: bool,
     pub pid_use_max: bool,
-    pub hostname: *const c_char,
-    pub ssid: *const c_char,
+    pub hostname: Option<CString>,
+    pub ssid: Option<CString>,
     pub mempool_custom: bool,
-    pub mempool_url: *const c_char,
+    pub mempool_url: Option<CString>,
     pub flip_screen: bool,
     pub invert_screen: bool,
     pub auto_screen_off: bool,
 }
 
 /// `GET /api/v2/settings`
-///
-/// # Safety
-/// The string pointers in the snapshot are NULL or NUL-terminated, and
-/// its array pointers hold their stated counts, for the call.
-pub unsafe fn v2_settings(s: &V2Settings) -> Json {
+pub fn v2_settings(s: &V2Settings) -> Json {
     let mut d = Obj::new();
-    d.cstr("asicModel", s.asic_model)
-        .cstr("deviceModel", s.device_model)
-        .cstr("version", s.version)
+    d.cstr("asicModel", s.asic_model.as_deref())
+        .cstr("deviceModel", s.device_model.as_deref())
+        .cstr("version", s.version.as_deref())
         .bool("otp", s.otp)
         .bool("apActive", s.ap_active);
     let mut can = Obj::new();
@@ -1083,31 +980,25 @@ pub unsafe fn v2_settings(s: &V2Settings) -> Json {
         .int("ecoCoreVoltage", s.eco_core_voltage as i64)
         .int("absMinCoreVoltage", s.abs_min_core_voltage as i64)
         .int("absMaxCoreVoltage", s.abs_max_core_voltage as i64);
-    // SAFETY: the counts are the lengths (caller contract)
-    d.arr("frequencyOptions", unsafe {
-        u32_list(s.frequency_options, s.frequency_count)
-    })
-    // SAFETY: as above
-    .arr("voltageOptions", unsafe {
-        u32_list(s.voltage_options, s.voltage_count)
-    })
-    .uint("poolMode", s.pool_mode as u64)
-    .uint("poolBalance", s.pool_balance as u64)
-    .int("stratumKeep", s.stratum_keep as i64)
-    .int("jobInterval", s.job_interval as i64)
-    .uint("stratumDifficulty", s.stratum_difficulty as u64);
+    d.arr("frequencyOptions", u32_list(&s.frequency_options))
+        .arr("voltageOptions", u32_list(&s.voltage_options))
+        .uint("poolMode", s.pool_mode as u64)
+        .uint("poolBalance", s.pool_balance as u64)
+        .int("stratumKeep", s.stratum_keep as i64)
+        .int("jobInterval", s.job_interval as i64)
+        .uint("stratumDifficulty", s.stratum_difficulty as u64);
     let pools = s
         .pools
         .iter()
         .map(|p| {
             let mut o = Obj::new();
-            o.cstr("url", p.url)
+            o.cstr("url", p.url.as_deref())
                 .uint("port", p.port as u64)
-                .cstr("user", p.user)
+                .cstr("user", p.user.as_deref())
                 .bool("enonceSubscribe", p.enonce_subscribe)
                 .bool("tls", p.tls)
                 .uint("protocol", p.protocol as u64)
-                .cstr("sv2AuthorityPubkey", p.sv2_authority_pubkey)
+                .cstr("sv2AuthorityPubkey", p.sv2_authority_pubkey.as_deref())
                 .uint("sv2ChannelType", p.sv2_channel_type as u64)
                 .bool("sv2RequireAuth", p.sv2_require_auth)
                 .uint("coinbaseVerifyMode", p.coinbase_verify_mode as u64)
@@ -1122,7 +1013,7 @@ pub unsafe fn v2_settings(s: &V2Settings) -> Json {
         .iter()
         .map(|f| {
             let mut o = Obj::new();
-            o.cstr("label", f.label)
+            o.cstr("label", f.label.as_deref())
                 .int("mode", f.mode as i64)
                 .uint("manualSpeed", f.manual_speed as u64)
                 .uint("overheatTemp", f.overheat_temp as u64)
@@ -1135,10 +1026,10 @@ pub unsafe fn v2_settings(s: &V2Settings) -> Json {
     if s.has_pid_use_max {
         d.bool("pidUseMax", s.pid_use_max);
     }
-    d.cstr("hostname", s.hostname)
-        .cstr("ssid", s.ssid)
+    d.cstr("hostname", s.hostname.as_deref())
+        .cstr("ssid", s.ssid.as_deref())
         .bool("mempoolCustom", s.mempool_custom)
-        .cstr("mempoolUrl", s.mempool_url)
+        .cstr("mempoolUrl", s.mempool_url.as_deref())
         .int("flipScreen", s.flip_screen as i64)
         .int("invertScreen", s.invert_screen as i64)
         .int("autoScreenOff", s.auto_screen_off as i64);
@@ -1146,12 +1037,11 @@ pub unsafe fn v2_settings(s: &V2Settings) -> Json {
 }
 
 /// `can_master_node_t`: the master board's node of `GET /api/v2/can/swarm`.
-#[repr(C)]
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Debug, Default)]
 pub struct CanMasterNode {
-    pub mac: *const c_char,
-    pub device_model: *const c_char,
-    pub version: *const c_char,
+    pub mac: Option<CString>,
+    pub device_model: Option<CString>,
+    pub version: Option<CString>,
     pub shutdown: bool,
     /// `getCurrentHashrate()` (0 in a shutdown)
     pub hashrate: f32,
@@ -1167,8 +1057,7 @@ pub struct CanMasterNode {
     pub core_voltage: c_int,
     pub flip_screen: bool,
     pub auto_screen_off: bool,
-    pub asic_count: c_int,
-    pub asic_temps: *const f32,
+    pub asic_temps: Vec<f32>,
     pub fan_count: c_int,
     /// label/p/i/d unused
     pub fans: [FanInfo; 2],
@@ -1176,12 +1065,9 @@ pub struct CanMasterNode {
 
 /// `GET /api/v2/can/swarm`: the fleet totals, the master and the CAN slaves
 /// (from the CAN master's registry).
-///
-/// # Safety
-/// The string pointers in the snapshot are NULL or NUL-terminated, and
-/// its array pointers hold their stated counts, for the call.
-pub unsafe fn can_swarm(m: &CanMasterNode) -> Json {
+pub fn can_swarm(m: &CanMasterNode) -> Json {
     use crate::can_master::api as can;
+    use crate::can_master::{slave_config, slave_mac, slave_telemetry};
     use crate::can_master::{CONFIG_LEN, SLAVE_MAX, TELEMETRY_LEN};
 
     let f32_at = |b: &[u8], at: usize| f32::from_le_bytes(b[at..at + 4].try_into().unwrap());
@@ -1194,7 +1080,7 @@ pub unsafe fn can_swarm(m: &CanMasterNode) -> Json {
         if !can::can_master_is_slave_known(i) {
             continue;
         }
-        if let Some(t) = crate::can_master::slave_telemetry(i).filter(|t| t[43] == 0) {
+        if let Some(t) = slave_telemetry(i).filter(|t| t[43] == 0) {
             slave_hashrate += f32_at(&t, 39);
         }
     }
@@ -1208,12 +1094,12 @@ pub unsafe fn can_swarm(m: &CanMasterNode) -> Json {
     let mut master = Obj::new();
     master
         .int("id", 0)
-        .cstr("mac", m.mac)
+        .cstr("mac", m.mac.as_deref())
         .bool("active", true)
         .bool("foreign", false)
         .bool("isMaster", true)
-        .cstr("deviceModel", m.device_model)
-        .cstr("version", m.version)
+        .cstr("deviceModel", m.device_model.as_deref())
+        .cstr("version", m.version.as_deref())
         .float("hashRate", master_hashrate)
         .float("temp", m.temp)
         .float("vrTemp", m.vr_temp)
@@ -1243,10 +1129,7 @@ pub unsafe fn can_swarm(m: &CanMasterNode) -> Json {
         .bool("autoScreenOff", m.auto_screen_off);
     master.arr(
         "asicTemps",
-        // SAFETY: `asic_count` entries (caller contract)
-        unsafe { floats(m.asic_temps, m.asic_count) }
-            .map(float)
-            .collect(),
+        m.asic_temps.iter().copied().map(float).collect(),
     );
     let fans = m.fans[..fan_count]
         .iter()
@@ -1268,12 +1151,11 @@ pub unsafe fn can_swarm(m: &CanMasterNode) -> Json {
         if !can::can_master_is_slave_known(i) {
             continue;
         }
-        let mac = crate::can_master::slave_mac(i).unwrap_or_default();
-        let telem = crate::can_master::slave_telemetry(i);
-        let config = crate::can_master::slave_config(i);
-        let (has_telem, has_config) = (telem.is_some(), config.is_some());
-        let t = telem.unwrap_or([0; TELEMETRY_LEN]);
-        let c = config.unwrap_or([0; CONFIG_LEN]);
+        let mac = slave_mac(i).unwrap_or_default();
+        let (t, c) = (slave_telemetry(i), slave_config(i));
+        let (has_telem, has_config) = (t.is_some(), c.is_some());
+        let t = t.unwrap_or([0; TELEMETRY_LEN]);
+        let c = c.unwrap_or([0; CONFIG_LEN]);
         let text = |b: &[u8]| {
             let b = if has_config { b } else { &[][..] };
             Json::Str(b[..b.iter().position(|&x| x == 0).unwrap_or(b.len())].to_vec())

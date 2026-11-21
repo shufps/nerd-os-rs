@@ -10,7 +10,6 @@
 #include "http_auth.h"
 #include "http_settings.h"
 #include "http_query.h"
-#include "http_ota.h"
 #include "apis.h"
 #include "pool_stats.h"
 #include "pool_coinbase.h"

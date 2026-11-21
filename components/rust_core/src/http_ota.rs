@@ -1,8 +1,7 @@
 //! Firmware and web UI updates over HTTP (port of the input handling of
 //! `handler_ota.cpp` and `handler_ota_factory.cpp`): receiving an upload
 //! into flash, the body of `POST /api/system/OTA/github` and the check of the
-//! factory image URL. Flash, OTA and HTTP client calls stay in C++. C API:
-//! `http_ota.h`.
+//! factory image URL. Used by `ota_upload.rs` and `ota_factory_task.rs`.
 //!
 //! Behaviour notes:
 //! * an upload gives up after [`MAX_STALLS`] receive timeouts in a row,
@@ -156,29 +155,6 @@ pub fn factory_body(body: &[u8]) -> FactoryBody {
     FactoryBody::Ok {
         url: url.to_vec(),
         keep_config,
-    }
-}
-
-mod ffi {
-    use super::*;
-    use core::ffi::c_void;
-
-    /// `ota_upload_io_t`
-    #[repr(C)]
-    pub struct CIo {
-        pub ctx: *mut c_void,
-        pub recv: unsafe extern "C" fn(*mut c_void, *mut u8, usize) -> i32,
-        pub write: unsafe extern "C" fn(*mut c_void, u32, *const u8, usize) -> bool,
-    }
-
-    impl UploadIo for &CIo {
-        // SAFETY (both): valid callbacks for ctx; buf is writable.
-        fn recv(&mut self, buf: &mut [u8]) -> i32 {
-            unsafe { (self.recv)(self.ctx, buf.as_mut_ptr(), buf.len()) }
-        }
-        fn write(&mut self, offset: u32, data: &[u8]) -> bool {
-            unsafe { (self.write)(self.ctx, offset, data.as_ptr(), data.len()) }
-        }
     }
 }
 

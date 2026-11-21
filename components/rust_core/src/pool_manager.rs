@@ -1821,6 +1821,8 @@ mod tests {
 
     #[test]
     fn actions_drive_the_tasks() {
+        // invalidates pool 0's work: the job state is shared with other tests
+        let _j = crate::jobs::test_support::fresh();
         let m = manager(false);
         let (p, s) = (m.task(0).unwrap(), m.task(1).unwrap());
         p.valid_notify.store(true, Release);
@@ -1845,6 +1847,8 @@ mod tests {
 
     #[test]
     fn failover_events() {
+        // invalidates pool 0's work: the job state is shared with other tests
+        let _j = crate::jobs::test_support::fresh();
         let m = manager(false);
         let (p, s) = (m.task(0).unwrap(), m.task(1).unwrap());
         p.stop.store(false, Release);

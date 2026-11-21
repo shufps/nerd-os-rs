@@ -85,6 +85,7 @@ fn mac_str(mac: &[u8]) -> String {
 
 fn sta_mac() -> [u8; 6] {
     let mut mac = [0u8; 6];
+    // SAFETY: mac is a 6-byte buffer, the size esp_read_mac writes for a station MAC
     unsafe { sys::esp_read_mac(mac.as_mut_ptr(), MAC_WIFI_STA) };
     mac
 }
@@ -335,6 +336,7 @@ fn load_registry() {
     // into the registry buffer)
     if let Ok(blob) = nvs.get_blob(REGISTRY_KEY) {
         if blob.len() <= can_master::REGISTRY_LEN {
+            // SAFETY: blob holds blob.len() bytes for the call
             unsafe { master::can_master_load_registry(blob.as_ptr(), blob.len()) };
         }
     }
@@ -346,6 +348,7 @@ fn save_registry() {
         return;
     };
     let mut blob = [0u8; can_master::REGISTRY_LEN];
+    // SAFETY: blob is a REGISTRY_LEN-byte array, as the function requires
     unsafe { master::can_master_registry(&mut blob) };
     nvs.set_blob(REGISTRY_KEY, &blob);
     nvs.commit();
@@ -434,6 +437,7 @@ fn master_loop() -> ! {
         }
 
         let mut ev = can_master::Event::default();
+        // SAFETY: msg.data is the frame's 8 data bytes and ev a writable local
         unsafe {
             master::can_master_frame(
                 msg.identifier,
@@ -510,6 +514,8 @@ fn slave_config() -> [u8; can_master::CONFIG_LEN] {
     let model = if b.device_model.is_null() {
         Vec::new()
     } else {
+        // SAFETY: device_model is non-null (checked) and a static C string literal of the board
+        // profile
         text(unsafe { CStr::from_ptr(b.device_model) }.to_bytes())
     };
     c[..model.len()].copy_from_slice(&model);
@@ -538,6 +544,8 @@ fn slave_config() -> [u8; can_master::CONFIG_LEN] {
 
 fn board_info() -> crate::board::ffi::Info {
     let mut i = core::mem::MaybeUninit::uninit();
+    // SAFETY: board_info() writes a complete Info through the pointer, so it is initialised
+    // afterwards
     unsafe {
         crate::board::ffi::board_info(i.as_mut_ptr());
         i.assume_init()
@@ -612,6 +620,7 @@ fn handle_settings_cmd(p: &[u8]) {
         CMD_IDENTIFY => {
             log!(Info, TAG_SLAVE, "CMD IDENTIFY → blink display 60s");
             // 0: the default 60 s
+            // SAFETY: a C++ entry point (ui_ipc.cpp) taking a plain duration
             unsafe { sys::ui_send_identify(0) };
         }
         CMD_RESTART => {
@@ -637,6 +646,7 @@ fn now_ms() -> u64 {
 fn slave_loop() -> ! {
     let mac = sta_mac();
     // negotiation, job reassembly and store: can_slave.rs
+    // SAFETY: mac is a 6-byte array, as the function requires
     unsafe { slave::can_slave_init(&mac) };
     loop {
         // HELLO every second while unassigned
@@ -656,6 +666,7 @@ fn slave_loop() -> ! {
         }
 
         let mut ev = can_slave::Event::NONE;
+        // SAFETY: msg.data is the frame's 8 data bytes and ev a writable local
         unsafe {
             slave::can_slave_frame(
                 msg.identifier,

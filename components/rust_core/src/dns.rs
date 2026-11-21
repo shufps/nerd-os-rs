@@ -125,7 +125,9 @@ mod sys {
 #[cfg(target_os = "espidf")]
 fn ap_ip() -> Option<[u8; 4]> {
     let mut info = crate::idf::raw::esp_netif_ip_info_t::default();
+    // SAFETY: the if-key is a static NUL-terminated literal; returns null if not found
     let netif = unsafe { sys::esp_netif_get_handle_from_ifkey(c"WIFI_AP_DEF".as_ptr()) };
+    // SAFETY: `info` is a live local; esp_netif_get_ip_info rejects a null `netif`
     let ok = unsafe { sys::esp_netif_get_ip_info(netif, &mut info) } == 0;
     // IPADDR_ANY: no answer
     (ok && info.ip.addr != 0).then(|| info.ip.addr.to_ne_bytes())

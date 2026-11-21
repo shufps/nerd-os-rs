@@ -272,6 +272,7 @@ pub fn error() -> (c_int, u32) {
 
 /// Reads and logs the reset reason (once at boot); the `esp_reset_reason_t`.
 pub fn read_reset_reason() -> c_int {
+    // SAFETY: esp_reset_reason takes no arguments and only reads the stored reason
     let reason = unsafe { sys::esp_reset_reason() } as c_int;
     let text = reset_reason_text(reason);
     state().reset_reason = text;
@@ -341,6 +342,7 @@ impl Overlay {
         if self.shown && self.code != 0 {
             return;
         }
+        // SAFETY: text is a valid NUL-terminated C string; the display copies it into its overlay
         unsafe { sys::disp_show_error(text.as_ptr(), code) };
         self.shown = true;
         self.code = code;
@@ -353,6 +355,7 @@ impl Overlay {
         if !self.shown {
             return;
         }
+        // SAFETY: a C++ display entry point (display_api.cpp) without arguments
         unsafe { sys::disp_hide_error() };
         self.shown = false;
         self.code = 0;
@@ -367,6 +370,7 @@ pub fn run() -> ! {
     let mut next = start + PERIOD_US;
     log!(Info, TAG, "SYSTEM_task started");
 
+    // SAFETY: a C++ display entry point (display_api.cpp) without arguments
     unsafe { sys::disp_wait_for_splashs() };
     let can_slave = sys::bapi_is_can_slave();
 
@@ -379,14 +383,19 @@ pub fn run() -> ! {
             }
             // not connected yet: show the access point
             let ssid = CString::new(crate::network::ap_ssid()).unwrap_or_default();
+            // SAFETY: ssid is a live CString for the call; portalScreen copies it (strlcpy)
             unsafe { sys::disp_portal_screen(ssid.as_ptr()) };
             std::thread::sleep(Duration::from_secs(5));
         }
+        // SAFETY: the temporary CString lives until the end of the statement; lv_label_set_text
+        // copies it
         unsafe { sys::disp_update_ip(ip().as_ptr()) };
     }
 
+    // SAFETY: a C++ display entry point (display_api.cpp) without arguments
     unsafe { sys::disp_mining_screen() };
     if can_slave {
+        // SAFETY: a C++ display entry point (display_api.cpp) without arguments
         unsafe { sys::disp_set_can_icon() };
     }
 
@@ -418,6 +427,7 @@ pub fn run() -> ! {
                 CString::new(format!("CAN ID: {id}")).unwrap_or_default()
             };
             if label != last_label {
+                // SAFETY: label is a live CString for the call; lv_label_set_text copies it
                 unsafe { sys::disp_update_ip(label.as_ptr()) };
                 last_label = label;
             }
@@ -427,6 +437,8 @@ pub fn run() -> ! {
             if has_ip {
                 if ip != last_label {
                     log!(Info, TAG, "ip address: {}", ip.to_string_lossy());
+                    // SAFETY: ip is a live CString for the call (copied by lv_label_set_text); the
+                    // icon call takes a bool
                     unsafe {
                         sys::disp_update_ip(ip.as_ptr());
                         sys::disp_set_network_icon(eth);
@@ -437,6 +449,7 @@ pub fn run() -> ! {
 
             let found = crate::pool_manager::get().map_or(0, |m| m.found_blocks());
             if found > last_found {
+                // SAFETY: a C++ display entry point (display_api.cpp) without arguments
                 unsafe { sys::disp_show_found_block() };
             }
             last_found = found;
@@ -450,6 +463,7 @@ pub fn run() -> ! {
         }
 
         toggle = 1 - toggle;
+        // SAFETY: a C++ display entry point (display_api.cpp) taking an int
         unsafe { sys::disp_update(toggle) };
 
         // a history sample with the filtered temperatures

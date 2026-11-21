@@ -505,20 +505,24 @@ pub(crate) mod ffi {
     // SAFETY: thread-safe callbacks (serial.rs locks its sends); the
     // driver is shared between tasks as before.
     unsafe impl Send for CUart {}
+    // SAFETY: as for Send; the callbacks are safe to call from several tasks
     unsafe impl Sync for CUart {}
 
     impl Uart for CUart {
-        // SAFETY (all): valid callbacks for ctx.
         fn send(&mut self, data: &[u8]) {
+            // SAFETY: a valid callback for ctx (asic_driver_new); data readable for its length
             unsafe { (self.send)(self.ctx, data.as_ptr(), data.len()) }
         }
         fn rx(&mut self, buf: &mut [u8], timeout_ms: u16) -> i32 {
+            // SAFETY: a valid callback for ctx (asic_driver_new); buf writable for its length
             unsafe { (self.rx)(self.ctx, buf.as_mut_ptr(), buf.len(), timeout_ms) }
         }
         fn clear(&mut self) {
+            // SAFETY: a valid callback for ctx (asic_driver_new)
             unsafe { (self.clear)(self.ctx) }
         }
         fn delay_ms(&mut self, ms: u32) {
+            // SAFETY: a valid callback for ctx (asic_driver_new)
             unsafe { (self.delay_ms)(self.ctx, ms) }
         }
     }

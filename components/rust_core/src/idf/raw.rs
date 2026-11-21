@@ -6,7 +6,8 @@
     non_snake_case,
     dead_code,
     improper_ctypes,
-    clippy::all
+    clippy::all,
+    clippy::undocumented_unsafe_blocks
 )]
 
 include!(concat!(env!("OUT_DIR"), "/idf.rs"));

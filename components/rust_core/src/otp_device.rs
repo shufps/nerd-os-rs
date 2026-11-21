@@ -101,6 +101,8 @@ fn encode_qr(uri: &str) -> Option<(Vec<u8>, c_int)> {
     let Ok(text) = std::ffi::CString::new(uri) else {
         return None;
     };
+    // SAFETY: `text` is NUL-terminated; `tmp` and `qr` both hold
+    // qr_buffer_len(QR_MAX_VERSION) bytes, the most a version-10 code needs
     let size = unsafe {
         if !sys::qrcodegen_encodeText(
             text.as_ptr(),
@@ -163,6 +165,8 @@ pub fn start_enrollment() -> c_int {
 }
 
 fn opt(p: *const c_char) -> Option<&'static [u8]> {
+    // SAFETY: only called from otp_dev_init(), whose contract is NUL-terminated
+    // strings (or NULL, checked); the bytes are copied before it returns
     (!p.is_null()).then(|| unsafe { CStr::from_ptr(p) }.to_bytes())
 }
 

@@ -66,6 +66,7 @@ mod sys {
 /// Milliseconds since the epoch.
 pub fn now_ms() -> u64 {
     let mut tv = Timeval::default();
+    // SAFETY: `tv` is a live local; the timezone argument may be null
     unsafe { sys::gettimeofday(&mut tv, core::ptr::null_mut()) };
     tv.tv_sec as u64 * 1000 + tv.tv_usec as u64 / 1000
 }
@@ -89,6 +90,8 @@ unsafe extern "C" fn on_sync(_: *mut Timeval) {
 pub fn start() {
     crate::idf::idf_const!(OPMODE_POLL: u32 = esp_sntp_operatingmode_t_ESP_SNTP_OPMODE_POLL, 0);
     crate::idf::idf_const!(SYNC_MODE_IMMED: u32 = sntp_sync_mode_t_SNTP_SYNC_MODE_IMMED, 0);
+    // SAFETY: the server names and TZ strings are static NUL-terminated literals
+    // (SNTP keeps the name pointers) and `on_sync` is a valid extern "C" fn
     unsafe {
         sys::esp_sntp_setoperatingmode(OPMODE_POLL);
         // the server names are kept as pointers: static strings

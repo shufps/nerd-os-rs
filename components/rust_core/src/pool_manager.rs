@@ -297,6 +297,7 @@ impl Task {
 
     /// Logs the free stack when it reaches a new low.
     fn log_stack_low(&self) {
+        // SAFETY: a null handle means the calling task, which is alive
         let free = unsafe { sys::uxTaskGetStackHighWaterMark(core::ptr::null_mut()) };
         let low = self.stack_low.load(Relaxed);
         if low == 0 || free < low {
@@ -1389,6 +1390,7 @@ impl Manager {
     fn run(&'static self) -> ! {
         const T: &CStr = c"StratumManager";
         log!(Info, T, "Subscribing to task watchdog.");
+        // SAFETY: a null handle subscribes the calling (manager) task
         if unsafe { sys::esp_task_wdt_add(core::ptr::null_mut()) } != 0 {
             log!(Error, T, "Failed to add task to watchdog!");
         }
@@ -1427,6 +1429,7 @@ impl Manager {
         let mut seconds = 0u32;
         loop {
             if crate::power_mgmt::is_shutdown() {
+                // SAFETY: a null handle unsubscribes the calling task
                 if unsafe { sys::esp_task_wdt_delete(core::ptr::null_mut()) } != 0 {
                     log!(Error, TAG, "Couldn't remove watchdog");
                 }
@@ -1445,6 +1448,7 @@ impl Manager {
                 // fed only while the pool answers submits (within an hour)
                 let last = self.stats.summary().last_response_us;
                 if last != 0 && now_us().saturating_sub(last) < WATCHDOG_RESPONSE_US {
+                    // SAFETY: no arguments; feeds the calling task's subscription
                     unsafe { sys::esp_task_wdt_reset() };
                 }
             }
@@ -1817,6 +1821,8 @@ mod tests {
 
     #[test]
     fn actions_drive_the_tasks() {
+        // invalidates pool 0's work: the job state is shared with other tests
+        let _j = crate::jobs::test_support::fresh();
         let m = manager(false);
         let (p, s) = (m.task(0).unwrap(), m.task(1).unwrap());
         p.valid_notify.store(true, Release);
@@ -1841,6 +1847,8 @@ mod tests {
 
     #[test]
     fn failover_events() {
+        // invalidates pool 0's work: the job state is shared with other tests
+        let _j = crate::jobs::test_support::fresh();
         let m = manager(false);
         let (p, s) = (m.task(0).unwrap(), m.task(1).unwrap());
         p.stop.store(false, Release);

@@ -108,8 +108,9 @@ const RECURSIVE_MUTEX: u8 = 4;
 const MAX_DELAY: u32 = u32::MAX;
 
 struct Lock(*mut c_void);
-// the FreeRTOS mutex handle is used from every task
+// SAFETY: a FreeRTOS mutex handle may be used from any task
 unsafe impl Send for Lock {}
+// SAFETY: the FreeRTOS mutex calls are thread-safe; the handle is never freed
 unsafe impl Sync for Lock {}
 
 static LOCK: OnceLock<Lock> = OnceLock::new();
@@ -120,16 +121,19 @@ static FANS: OnceLock<FanController> = OnceLock::new();
 static TASK: OnceLock<PowerTask> = OnceLock::new();
 
 fn mutex() -> *mut c_void {
+    // SAFETY: xQueueCreateMutex takes only the queue type; run once by OnceLock
     LOCK.get_or_init(|| Lock(unsafe { sys::xQueueCreateMutex(RECURSIVE_MUTEX) }.cast()))
         .0
 }
 
 /// Takes the hardware lock (recursive).
 pub fn lock() {
+    // SAFETY: the handle comes from xQueueCreateMutex (mutex()) and is never deleted
     unsafe { sys::xQueueTakeMutexRecursive(mutex().cast(), MAX_DELAY) };
 }
 
 pub fn unlock() {
+    // SAFETY: the handle comes from xQueueCreateMutex (mutex()) and is never deleted
     unsafe { sys::xQueueGiveMutexRecursive(mutex().cast()) };
 }
 

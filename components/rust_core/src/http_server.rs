@@ -401,6 +401,8 @@ pub fn start() -> EspErr {
         return ESP_FAIL;
     }
     // the base path is ""
+    // SAFETY: `ctx` is a non-null allocation of size_of::<ServerCtx>() bytes;
+    // all-zero is a valid ServerCtx (char arrays)
     unsafe { core::ptr::write_bytes(ctx, 0, 1) };
 
     let mut config = httpd::default_config();
@@ -417,13 +419,17 @@ pub fn start() -> EspErr {
 
     log!(Info, TAG, "Starting HTTP Server");
     let mut handle: httpd::Handle = core::ptr::null_mut();
+    // SAFETY: `handle` and `config` are live locals; httpd copies the config
     if unsafe { httpd::httpd_start(&mut handle, &config) } != ESP_OK {
         log!(Error, TAG, "Start server failed");
+        // SAFETY: `ctx` came from c_malloc() above and was not handed out yet
         unsafe { crate::cutil::c_free(ctx as *mut c_void) };
         return ESP_FAIL;
     }
     http_server.store(handle, Ordering::Release);
 
+    // SAFETY: the server is running; `ctx` is initialized and never freed (it
+    // stays the routes' user context); the handler matches the err callback type
     unsafe {
         register_routes(ctx);
         httpd::httpd_register_err_handler(handle, err::E404_NOT_FOUND, Some(not_found_handler));

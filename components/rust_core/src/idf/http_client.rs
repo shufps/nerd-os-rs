@@ -65,7 +65,8 @@ pub struct Config {
 #[cfg(not(target_os = "espidf"))]
 impl Default for Config {
     fn default() -> Self {
-        // all zero, as `esp_http_client_config_t config = {};`
+        // SAFETY: all fields are raw pointers, integers, bools or `Option<fn>`, for which
+        // all zero is valid (null / 0 / false / None), as `esp_http_client_config_t config = {};`
         unsafe { core::mem::zeroed() }
     }
 }
@@ -192,23 +193,27 @@ impl Client {
             crt_bundle_attach: Some(crate::crt_bundle::attach),
             ..Config::default()
         };
+        // SAFETY: `config` is a valid local and `url` a NUL-terminated string; init copies the strings it keeps.
         let h = unsafe { sys::esp_http_client_init(&config) };
         (!h.is_null()).then_some(Client(h))
     }
 
     /// A client for `config`; None if the initialization failed.
     pub fn from_config(config: &Config) -> Option<Client> {
+        // SAFETY: `config` is a valid reference for the call; init copies the strings it keeps.
         let h = unsafe { sys::esp_http_client_init(config) };
         (!h.is_null()).then_some(Client(h))
     }
 
     pub fn set_url(&self, url: &CStr) -> EspErr {
+        // SAFETY: the handle comes from a successful `esp_http_client_init` and is only freed in `drop`; `url` is NUL-terminated and copied.
         unsafe { sys::esp_http_client_set_url(self.0, url.as_ptr()) }
     }
 
     /// Reads body bytes into `buf` (`esp_http_client_read()`): the bytes
     /// read, 0 at the end, < 0 on an error.
     pub fn read(&self, buf: &mut [u8]) -> c_int {
+        // SAFETY: the handle comes from a successful `esp_http_client_init` and is only freed in `drop`; at most `buf.len()` bytes are written to `buf`.
         unsafe {
             sys::esp_http_client_read(self.0, buf.as_mut_ptr() as *mut c_char, buf.len() as c_int)
         }
@@ -227,25 +232,32 @@ impl Client {
             crt_bundle_attach: Some(crate::crt_bundle::attach),
             ..Config::default()
         };
+        // SAFETY: `config` is a valid local and `url` NUL-terminated (copied); the caller keeps
+        // `user_data` valid for what `handler` does with it.
         let h = unsafe { sys::esp_http_client_init(&config) };
         (!h.is_null()).then_some(Client(h))
     }
 
     /// The whole request (redirects followed); the body goes to the handler.
     pub fn perform(&self) -> EspErr {
+        // SAFETY: the handle comes from a successful `esp_http_client_init` and is only freed in `drop`.
         unsafe { sys::esp_http_client_perform(self.0) }
     }
 
     pub fn set_method(&self, method: Method) -> EspErr {
+        // SAFETY: the handle comes from a successful `esp_http_client_init` and is only freed in `drop`.
         unsafe { sys::esp_http_client_set_method(self.0, method) }
     }
 
     pub fn set_header(&self, key: &CStr, value: &CStr) -> EspErr {
+        // SAFETY: the handle comes from a successful `esp_http_client_init` and is only freed in `drop`; key and value are NUL-terminated and copied.
         unsafe { sys::esp_http_client_set_header(self.0, key.as_ptr(), value.as_ptr()) }
     }
 
     /// Sends the request with `body` (kept by the client until `perform`).
     pub fn perform_with_body(&self, body: &[u8]) -> EspErr {
+        // SAFETY: the handle comes from a successful `esp_http_client_init` and is only freed in `drop`; the client keeps the `body`
+        // pointer (not a copy), which stays borrowed until `perform` below returns.
         unsafe {
             let e = sys::esp_http_client_set_post_field(
                 self.0,
@@ -260,17 +272,20 @@ impl Client {
     }
 
     pub fn status(&self) -> c_int {
+        // SAFETY: the handle comes from a successful `esp_http_client_init` and is only freed in `drop`.
         unsafe { sys::esp_http_client_get_status_code(self.0) }
     }
 
     /// Connects and sends the request line and headers; `write_len` bytes
     /// of body follow with `write()`.
     pub fn open(&self, write_len: usize) -> EspErr {
+        // SAFETY: the handle comes from a successful `esp_http_client_init` and is only freed in `drop`.
         unsafe { sys::esp_http_client_open(self.0, write_len as c_int) }
     }
 
     /// The bytes written, < 0 on an error.
     pub fn write(&self, data: &[u8]) -> c_int {
+        // SAFETY: the handle comes from a successful `esp_http_client_init` and is only freed in `drop`; `data.len()` bytes are read from `data`.
         unsafe {
             sys::esp_http_client_write(self.0, data.as_ptr() as *const c_char, data.len() as c_int)
         }
@@ -278,11 +293,13 @@ impl Client {
 
     /// The content length (-1 if chunked or unknown, < 0 on an error).
     pub fn fetch_headers(&self) -> i64 {
+        // SAFETY: the handle comes from a successful `esp_http_client_init` and is only freed in `drop`.
         unsafe { sys::esp_http_client_fetch_headers(self.0) }
     }
 
     /// Reads the response body (also chunked) into `buf`; the bytes read.
     pub fn read_response(&self, buf: &mut [u8]) -> c_int {
+        // SAFETY: the handle comes from a successful `esp_http_client_init` and is only freed in `drop`; at most `buf.len()` bytes are written to `buf`.
         unsafe {
             sys::esp_http_client_read_response(
                 self.0,
@@ -293,6 +310,7 @@ impl Client {
     }
 
     pub fn content_length(&self) -> i64 {
+        // SAFETY: the handle comes from a successful `esp_http_client_init` and is only freed in `drop`.
         unsafe { sys::esp_http_client_get_content_length(self.0) }
     }
 
@@ -301,30 +319,36 @@ impl Client {
     /// # Safety
     /// `h` a live client handle.
     pub unsafe fn errno_of(h: Handle) -> c_int {
+        // SAFETY: the caller guarantees `h` is a live client handle.
         unsafe { sys::esp_http_client_get_errno(h) }
     }
 
     /// # Safety
     /// `h` a live client handle.
     pub unsafe fn is_ssl_of(h: Handle) -> bool {
+        // SAFETY: the caller guarantees `h` is a live client handle.
         unsafe { sys::esp_http_client_get_transport_type(h) == TRANSPORT_OVER_SSL }
     }
 
     pub fn errno(&self) -> c_int {
+        // SAFETY: the handle comes from a successful `esp_http_client_init` and is only freed in `drop`.
         unsafe { sys::esp_http_client_get_errno(self.0) }
     }
 
     pub fn is_ssl(&self) -> bool {
+        // SAFETY: the handle comes from a successful `esp_http_client_init` and is only freed in `drop`.
         unsafe { sys::esp_http_client_get_transport_type(self.0) == TRANSPORT_OVER_SSL }
     }
 
     pub fn close(&self) -> EspErr {
+        // SAFETY: the handle comes from a successful `esp_http_client_init` and is only freed in `drop`.
         unsafe { sys::esp_http_client_close(self.0) }
     }
 }
 
 impl Drop for Client {
     fn drop(&mut self) {
+        // SAFETY: the handle is live and owned by this `Client`; it is not used after drop.
         unsafe { sys::esp_http_client_cleanup(self.0) };
     }
 }

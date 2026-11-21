@@ -554,6 +554,7 @@ pub fn asic_info(a: &AsicInfo) -> Json {
     d.arr("frequencyOptions", unsafe {
         u32_list(a.frequency_options, a.frequency_count)
     })
+    // SAFETY: as above
     .arr("voltageOptions", unsafe {
         u32_list(a.voltage_options, a.voltage_count)
     });
@@ -712,9 +713,9 @@ pub fn dashboard(s: &Dashboard) -> Json {
         .float("asicTemp", s.asic_temp)
         .float("vrTemp", s.vr_temp)
         .float("vrTempInt", s.vr_temp_int);
-    // SAFETY: as above
     therm.arr(
         "asicTemps",
+        // SAFETY: `asic_count` entries (caller contract)
         unsafe { floats(s.asic_temps, s.asic_count) }
             .map(float)
             .collect(),
@@ -1045,6 +1046,7 @@ pub fn v2_settings(s: &V2Settings) -> Json {
     d.arr("frequencyOptions", unsafe {
         u32_list(s.frequency_options, s.frequency_count)
     })
+    // SAFETY: as above
     .arr("voltageOptions", unsafe {
         u32_list(s.voltage_options, s.voltage_count)
     })
@@ -1196,9 +1198,9 @@ pub fn can_swarm(m: &CanMasterNode) -> Json {
         .int("coreVoltage", m.core_voltage as i64)
         .bool("flipScreen", m.flip_screen)
         .bool("autoScreenOff", m.auto_screen_off);
-    // SAFETY: `asic_count` entries (caller contract)
     master.arr(
         "asicTemps",
+        // SAFETY: `asic_count` entries (caller contract)
         unsafe { floats(m.asic_temps, m.asic_count) }
             .map(float)
             .collect(),

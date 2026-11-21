@@ -19,6 +19,10 @@ const MIN_ALIGN: usize = 4;
 
 pub struct PsramFirst;
 
+// SAFETY: the ESP-IDF heap returns blocks of at least the requested size
+// with 4-byte alignment (larger alignments through heap_caps_aligned_alloc),
+// or NULL; heap_caps_free/realloc accept every block it returned, aligned
+// ones included (IDF >= 4.4)
 unsafe impl GlobalAlloc for PsramFirst {
     unsafe fn alloc(&self, layout: Layout) -> *mut u8 {
         if layout.align() <= MIN_ALIGN {

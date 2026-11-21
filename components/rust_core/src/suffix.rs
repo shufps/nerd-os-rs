@@ -34,6 +34,8 @@ pub fn suffix_string(mut val: u64, sig_digits: i32) -> String {
     let p = buf.as_mut_ptr() as *mut c_char;
     let n = buf.len();
     let sfx = std::ffi::CString::new(suffix).unwrap_or_default();
+    // SAFETY: `p`/`n` describe `buf` (snprintf truncates and terminates); the
+    // formats are static C strings whose conversions match the passed arguments
     unsafe {
         if sig_digits == 0 {
             if decimal {

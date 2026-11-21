@@ -52,9 +52,12 @@ mod sys {
         bus.sclk_io_num = sclk;
         bus.__bindgen_anon_3.quadwp_io_num = -1;
         bus.__bindgen_anon_4.quadhd_io_num = -1;
+        // SAFETY: `bus` is a live local that spi_bus_initialize only reads
         unsafe { raw::spi_bus_initialize(SPI_HOST, &bus, raw::spi_common_dma_t_SPI_DMA_CH_AUTO) }
     }
     pub fn spi_bus_free() {
+        // SAFETY: the bus is freed only by its owner (we_init_bus) or after an init failure;
+        // an error code is returned if devices are still attached
         unsafe { raw::spi_bus_free(SPI_HOST) };
     }
     /// The W5500 frame format at 2 MHz (mode 0).
@@ -74,6 +77,7 @@ mod sys {
     pub fn reg_access(cs: c_int, reg: u16, ctrl: u8, data: &mut u8) -> EspErr {
         let cfg = device_config(cs, 1);
         let mut dev = core::ptr::null_mut();
+        // SAFETY: `cfg` and `dev` are live locals; the driver copies the config
         let e = unsafe { raw::spi_bus_add_device(SPI_HOST, &cfg, &mut dev) };
         if e != ESP_OK {
             return e;
@@ -87,15 +91,20 @@ mod sys {
         };
         if write {
             t.flags = raw::SPI_TRANS_USE_TXDATA;
+            // SAFETY: SPI_TRANS_USE_TXDATA is set, so `tx_data` is the active union field
             unsafe { t.__bindgen_anon_1.tx_data[0] = *data };
         } else {
             t.rxlength = 8;
             t.flags = raw::SPI_TRANS_USE_RXDATA;
         }
+        // SAFETY: `dev` comes from the successful spi_bus_add_device above and `t` is a live
+        // local transaction (TX/RX in its inline data per the flags)
         let e = unsafe { raw::spi_device_polling_transmit(dev, &mut t) };
         if e == ESP_OK && !write {
+            // SAFETY: SPI_TRANS_USE_RXDATA was set, so the driver filled `rx_data`
             *data = unsafe { t.__bindgen_anon_2.rx_data[0] };
         }
+        // SAFETY: `dev` comes from spi_bus_add_device above and is removed only here
         unsafe { raw::spi_bus_remove_device(dev) };
         e
     }
@@ -105,17 +114,22 @@ mod sys {
             mode: raw::gpio_mode_t_GPIO_MODE_OUTPUT,
             ..Default::default()
         };
+        // SAFETY: `io` is a live local that gpio_config only reads
         unsafe { raw::gpio_config(&io) }
     }
     pub fn gpio_set_level(pin: c_int, level: u32) {
+        // SAFETY: plain value arguments; an invalid pin returns an error code
         unsafe { raw::gpio_set_level(pin, level) };
     }
     pub fn efuse_mac() -> Option<[u8; 6]> {
         let mut mac = [0u8; 6];
+        // SAFETY: `mac` is a 6-byte local, the size esp_efuse_mac_get_default writes
         (unsafe { raw::esp_efuse_mac_get_default(mac.as_mut_ptr()) } == ESP_OK).then_some(mac)
     }
     /// `esp_netif_new(ESP_NETIF_DEFAULT_ETH())`
     pub fn netif_new_eth() -> *mut c_void {
+        // SAFETY: only takes the address of / copies the ETH netif default config statics,
+        // as ESP_NETIF_DEFAULT_ETH() does; `cfg` is a live local that is only read
         unsafe {
             let cfg = raw::esp_netif_config_t {
                 base: core::ptr::addr_of!(raw::_g_esp_netif_inherent_eth_config),
@@ -126,9 +140,12 @@ mod sys {
         }
     }
     pub fn netif_destroy(netif: *mut c_void) {
+        // SAFETY: `netif` is the netif from netif_new_eth; the caller (release) destroys it
+        // once and clears the pointer
         unsafe { raw::esp_netif_destroy(netif.cast()) };
     }
     pub fn netif_attach(netif: *mut c_void, glue: *mut c_void) -> EspErr {
+        // SAFETY: `netif` and `glue` come from netif_new_eth/glue_new and are non-null
         unsafe { raw::esp_netif_attach(netif.cast(), glue) }
     }
     /// The MAC driver: `ETH_MAC_DEFAULT_CONFIG()` and
@@ -149,6 +166,8 @@ mod sys {
             rx_task_prio: 15,
             flags: 0,
         };
+        // SAFETY: `w5500`, `mac` and `dev` are live locals; the driver adds its SPI device
+        // from `spi_devcfg` during this call and keeps no pointer to them
         unsafe { raw::esp_eth_mac_new_w5500(&w5500, &mac).cast() }
     }
     /// The PHY driver: `ETH_PHY_DEFAULT_CONFIG()` without its reset GPIO.
@@ -162,10 +181,12 @@ mod sys {
             autonego_timeout_ms: 4000,
             reset_gpio_num: -1,
         };
+        // SAFETY: `phy` is a live local the driver copies
         unsafe { raw::esp_eth_phy_new_w5500(&phy).cast() }
     }
     pub fn mac_del(mac: *mut c_void) {
         let mac = mac as *mut raw::esp_eth_mac_t;
+        // SAFETY: `mac` is the non-null object from mac_new, deleted only here by release
         unsafe {
             if let Some(del) = (*mac).del {
                 del(mac);
@@ -174,6 +195,7 @@ mod sys {
     }
     pub fn phy_del(phy: *mut c_void) {
         let phy = phy as *mut raw::esp_eth_phy_t;
+        // SAFETY: `phy` is the non-null object from phy_new, deleted only here by release
         unsafe {
             if let Some(del) = (*phy).del {
                 del(phy);
@@ -189,13 +211,17 @@ mod sys {
             ..Default::default()
         };
         let mut h = core::ptr::null_mut();
+        // SAFETY: `cfg` and `h` are live locals; `mac`/`phy` are the non-null driver objects
         let e = unsafe { raw::esp_eth_driver_install(&cfg, &mut h) };
         (e, h)
     }
     pub fn driver_uninstall(h: *mut c_void) {
+        // SAFETY: `h` is the handle from driver_install; release clears it afterwards
         unsafe { raw::esp_eth_driver_uninstall(h) };
     }
     pub fn set_mac(h: *mut c_void, mac: &mut [u8; 6]) -> EspErr {
+        // SAFETY: `h` is the installed driver handle and `mac` a 6-byte buffer, the size
+        // ETH_CMD_S_MAC_ADDR reads
         unsafe {
             raw::esp_eth_ioctl(
                 h,
@@ -205,16 +231,21 @@ mod sys {
         }
     }
     pub fn glue_new(h: *mut c_void) -> *mut c_void {
+        // SAFETY: `h` is the installed, non-null driver handle
         unsafe { raw::esp_eth_new_netif_glue(h).cast() }
     }
     pub fn glue_del(g: *mut c_void) {
+        // SAFETY: `g` is the non-null glue from glue_new; release clears it afterwards
         unsafe { raw::esp_eth_del_netif_glue(g.cast()) };
     }
     pub fn eth_start(h: *mut c_void) -> EspErr {
+        // SAFETY: `h` is the installed, non-null driver handle
         unsafe { raw::esp_eth_start(h) }
     }
     /// A handler for an ETH (`eth`) or IP event.
     pub fn register_handler(eth: bool, id: i32, handler: EventHandler) -> EspErr {
+        // SAFETY: ETH_EVENT/IP_EVENT are immutable link-time event bases and `handler`
+        // is a valid extern "C" fn; no handler argument
         unsafe {
             let base = if eth { raw::ETH_EVENT } else { raw::IP_EVENT };
             raw::esp_event_handler_register(base, id, Some(handler), core::ptr::null_mut())

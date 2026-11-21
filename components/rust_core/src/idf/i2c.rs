@@ -121,6 +121,8 @@ mod sys {
 /// One command link: `build` queues the transaction, then it runs on the
 /// bus (the former `i2c_cmd_link_create()` .. `i2c_cmd_link_delete()`).
 fn transaction(build: impl FnOnce(Cmd)) -> EspErr {
+    // SAFETY: the link is created, filled by `build`, run on the installed port and deleted
+    // exactly once here; it does not escape.
     unsafe {
         let cmd = sys::i2c_cmd_link_create();
         build(cmd);
@@ -131,6 +133,7 @@ fn transaction(build: impl FnOnce(Cmd)) -> EspErr {
 }
 
 fn write_addr(cmd: Cmd, addr: u8, rw: u8) {
+    // SAFETY: only called from `transaction` builders with their live command link.
     unsafe {
         sys::i2c_master_write_byte(cmd, (addr << 1) | rw, ACK_CHECK);
     }
@@ -138,6 +141,8 @@ fn write_addr(cmd: Cmd, addr: u8, rw: u8) {
 
 /// SMBus read byte
 pub fn smbus_read_byte(addr: u8, command: u8, out: &mut u8) -> EspErr {
+    // SAFETY: `cmd` is the live command link of `transaction`; the queued `out` pointer
+    // outlives the `i2c_master_cmd_begin` run inside `transaction`.
     transaction(|cmd| unsafe {
         sys::i2c_master_start(cmd);
         write_addr(cmd, addr, WRITE_BIT);
@@ -151,6 +156,7 @@ pub fn smbus_read_byte(addr: u8, command: u8, out: &mut u8) -> EspErr {
 
 /// SMBus write byte
 pub fn smbus_write_byte(addr: u8, command: u8, data: u8) -> EspErr {
+    // SAFETY: `cmd` is the live command link of `transaction`; only bytes are queued.
     transaction(|cmd| unsafe {
         sys::i2c_master_start(cmd);
         write_addr(cmd, addr, WRITE_BIT);
@@ -162,6 +168,7 @@ pub fn smbus_write_byte(addr: u8, command: u8, data: u8) -> EspErr {
 
 /// SMBus send byte (command only)
 pub fn smbus_write_command(addr: u8, command: u8) -> EspErr {
+    // SAFETY: `cmd` is the live command link of `transaction`; only bytes are queued.
     transaction(|cmd| unsafe {
         sys::i2c_master_start(cmd);
         write_addr(cmd, addr, WRITE_BIT);
@@ -173,6 +180,8 @@ pub fn smbus_write_command(addr: u8, command: u8) -> EspErr {
 /// SMBus read word (little endian; the result only on success)
 pub fn smbus_read_word(addr: u8, command: u8, out: &mut u16) -> EspErr {
     let mut data = [0u8; 2];
+    // SAFETY: `cmd` is the live command link of `transaction`; the queued pointers (into
+    // `data`, 2 bytes, so `add(1)` is in bounds) outlive the `i2c_master_cmd_begin` run.
     let err = transaction(|cmd| unsafe {
         sys::i2c_master_start(cmd);
         write_addr(cmd, addr, WRITE_BIT);
@@ -191,6 +200,7 @@ pub fn smbus_read_word(addr: u8, command: u8, out: &mut u16) -> EspErr {
 
 /// SMBus write word (little endian)
 pub fn smbus_write_word(addr: u8, command: u8, data: u16) -> EspErr {
+    // SAFETY: `cmd` is the live command link of `transaction`; only bytes are queued.
     transaction(|cmd| unsafe {
         sys::i2c_master_start(cmd);
         write_addr(cmd, addr, WRITE_BIT);
@@ -205,6 +215,8 @@ pub fn smbus_write_word(addr: u8, command: u8, data: u16) -> EspErr {
 /// former `TMP1075.cpp`; the result only on success)
 pub fn read_word_be_acked(addr: u8, reg: u8, out: &mut u16) -> EspErr {
     let mut data = [0u8; 2];
+    // SAFETY: `cmd` is the live command link of `transaction`; the queued pointer to the
+    // 2-byte `data` (read of 2) outlives the `i2c_master_cmd_begin` run.
     let err = transaction(|cmd| unsafe {
         sys::i2c_master_start(cmd);
         write_addr(cmd, addr, WRITE_BIT);
@@ -222,6 +234,7 @@ pub fn read_word_be_acked(addr: u8, reg: u8, out: &mut u16) -> EspErr {
 
 /// Register read: the register address, then `len` bytes.
 pub fn register_read(addr: u8, reg: u8, data: &mut [u8]) -> EspErr {
+    // SAFETY: `reg` is one readable byte and `data` is writable for `data.len()` bytes.
     unsafe {
         sys::i2c_master_write_read_device(
             PORT,
@@ -236,6 +249,7 @@ pub fn register_read(addr: u8, reg: u8, data: &mut [u8]) -> EspErr {
 }
 
 pub fn write_to_device(addr: u8, data: &[u8]) -> EspErr {
+    // SAFETY: `data` is readable for `data.len()` bytes.
     unsafe { sys::i2c_master_write_to_device(PORT, addr, data.as_ptr(), data.len(), TIMEOUT) }
 }
 
@@ -267,6 +281,7 @@ pub fn smbus_write_block(addr: u8, command: u8, data: &[u8]) -> EspErr {
 
 /// Removes the driver.
 pub fn delete() -> EspErr {
+    // SAFETY: plain call with the port number; the driver checks whether it is installed.
     unsafe { sys::i2c_driver_delete(PORT) }
 }
 
@@ -296,6 +311,7 @@ pub fn init() -> EspErr {
     {
         conf.clk_speed = FREQ_HZ;
     }
+    // SAFETY: `conf` is a valid local read only during the call; no ISR or queues requested.
     let err = unsafe {
         sys::i2c_param_config(PORT, &conf);
         sys::i2c_driver_install(PORT, conf.mode, 0, 0, 0)

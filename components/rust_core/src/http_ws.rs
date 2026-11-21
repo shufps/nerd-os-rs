@@ -67,6 +67,8 @@ static FD: AtomicI32 = AtomicI32::new(-1);
 
 /// A `malloc()`ed log line.
 struct Line(*mut c_char);
+// SAFETY: the line is owned exclusively by whoever holds the `Line` (handed
+// from the logging task to the log task, freed there)
 unsafe impl Send for Line {}
 
 static TX: OnceLock<SyncSender<Line>> = OnceLock::new();
@@ -80,6 +82,7 @@ fn reset_fd(fd: c_int) {
             .is_ok()
     {
         // the normal log output again
+        // SAFETY: restores the previous C vprintf hook; no arguments
         unsafe { sys::ws_log_uninstall() };
     }
 }

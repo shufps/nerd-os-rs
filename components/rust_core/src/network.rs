@@ -54,19 +54,25 @@ mod sys {
     use crate::idf::raw;
 
     pub fn wifi_event() -> *const c_char {
+        // SAFETY: WIFI_EVENT is an immutable `const char *` set at link time by esp_wifi
         unsafe { raw::WIFI_EVENT }
     }
     pub fn ip_event() -> *const c_char {
+        // SAFETY: IP_EVENT is an immutable `const char *` set at link time by esp_netif
         unsafe { raw::IP_EVENT }
     }
     pub fn netif_init() -> EspErr {
+        // SAFETY: no arguments; esp_netif_init only sets up the TCP/IP stack once
         unsafe { raw::esp_netif_init() }
     }
     pub fn event_loop_create_default() -> EspErr {
+        // SAFETY: no arguments; returns ESP_ERR_INVALID_STATE if the default loop exists
         unsafe { raw::esp_event_loop_create_default() }
     }
     pub fn register_handler(base: *const c_char, id: i32, handler: EventHandler) -> EspErr {
         let mut instance = core::ptr::null_mut();
+        // SAFETY: `base` is a static event base, `handler` a valid extern "C" fn and
+        // `instance` a live local the call writes the instance handle to
         unsafe {
             raw::esp_event_handler_instance_register(
                 base,
@@ -90,16 +96,21 @@ mod sys {
             skip_unhandled_events: true,
         };
         let mut t = core::ptr::null_mut();
+        // SAFETY: `args` (with the static `name`) and `t` are live locals; esp_timer copies
+        // the args, `cb` is a valid extern "C" fn and the arg pointer is unused
         match unsafe { raw::esp_timer_create(&args, &mut t) } {
             ESP_OK => Ok(t.cast()),
             e => Err(e),
         }
     }
     pub fn timer_start_once(t: *mut c_void, us: u64) -> EspErr {
+        // SAFETY: `t` is the handle from `timer_create` (BACKOFF_TIMER), never deleted
         unsafe { raw::esp_timer_start_once(t.cast(), us) }
     }
     /// `esp_wifi_init(WIFI_INIT_CONFIG_DEFAULT())`
     pub fn wifi_init_default() -> EspErr {
+        // SAFETY: only reads extern statics/takes the address of `g_wifi_osi_funcs`, as
+        // WIFI_INIT_CONFIG_DEFAULT() does; nothing is dereferenced here
         let cfg = unsafe {
             raw::wifi_init_config_t {
                 osi_funcs: core::ptr::addr_of_mut!(raw::g_wifi_osi_funcs),
@@ -130,14 +141,18 @@ mod sys {
                 magic: raw::WIFI_INIT_CONFIG_MAGIC as c_int,
             }
         };
+        // SAFETY: `cfg` is a fully initialised local; esp_wifi_init only reads it
         unsafe { raw::esp_wifi_init(&cfg) }
     }
     pub fn set_mode(mode: u32) -> EspErr {
+        // SAFETY: plain value argument
         unsafe { raw::esp_wifi_set_mode(mode) }
     }
     /// The access point: open, channel 1, up to 30 stations.
     pub fn set_ap_config(ssid: &[u8]) -> EspErr {
         let mut c = raw::wifi_config_t::default();
+        // SAFETY: the `ap` union field is the one written and read by IF_AP;
+        // `c` is a live local that esp_wifi_set_config copies
         unsafe {
             let ap = &mut c.ap;
             let n = ssid.len().min(ap.ssid.len());
@@ -153,6 +168,8 @@ mod sys {
     /// open networks only without a password.
     pub fn set_sta_config(ssid: &[u8], pass: &[u8]) -> EspErr {
         let mut c = raw::wifi_config_t::default();
+        // SAFETY: the `sta` union field is the one written and read by IF_STA; ssid and
+        // password keep their last byte 0; `c` is a live local that is copied
         unsafe {
             let sta = &mut c.sta;
             sta.scan_method = raw::wifi_scan_method_t_WIFI_ALL_CHANNEL_SCAN;
@@ -175,34 +192,43 @@ mod sys {
         }
     }
     pub fn wifi_start() -> EspErr {
+        // SAFETY: no arguments; called after esp_wifi_init
         unsafe { raw::esp_wifi_start() }
     }
     pub fn wifi_stop() -> EspErr {
+        // SAFETY: no arguments; fails with an error code if WiFi is not initialised
         unsafe { raw::esp_wifi_stop() }
     }
     pub fn wifi_connect() -> EspErr {
+        // SAFETY: no arguments; fails with an error code if WiFi is not started
         unsafe { raw::esp_wifi_connect() }
     }
     pub fn wifi_disconnect() -> EspErr {
+        // SAFETY: no arguments; fails with an error code if WiFi is not started
         unsafe { raw::esp_wifi_disconnect() }
     }
     pub fn set_ps_none() -> EspErr {
+        // SAFETY: plain value argument
         unsafe { raw::esp_wifi_set_ps(raw::wifi_ps_type_t_WIFI_PS_NONE) }
     }
     pub fn mac(iface: u32) -> (EspErr, [u8; 6]) {
         let mut mac = [0u8; 6];
+        // SAFETY: `mac` is a 6-byte local, the size esp_wifi_get_mac writes
         let e = unsafe { raw::esp_wifi_get_mac(iface, mac.as_mut_ptr()) };
         (e, mac)
     }
     /// All channels, no hidden networks (`wifi_scan_config_t` zeroed).
     pub fn scan_start() -> EspErr {
         let cfg = raw::wifi_scan_config_t::default();
+        // SAFETY: `cfg` is a zeroed local that esp_wifi_scan_start only reads (blocking: false)
         unsafe { raw::esp_wifi_scan_start(&cfg, false) }
     }
     /// The records of the finished scan (up to `SCAN_MAX_APS`).
     pub fn scan_records() -> Option<Vec<ScanResult>> {
         let mut records = vec![raw::wifi_ap_record_t::default(); SCAN_MAX_APS];
         let mut n = SCAN_MAX_APS as u16;
+        // SAFETY: `records` holds `n` = SCAN_MAX_APS entries; the call writes at most `n`
+        // records and stores the count it wrote in `n`
         if unsafe { raw::esp_wifi_scan_get_ap_records(&mut n, records.as_mut_ptr()) } != ESP_OK {
             return None;
         }
@@ -221,18 +247,24 @@ mod sys {
     /// The access point's RSSI (dBm) while connected.
     pub fn sta_rssi() -> Option<i8> {
         let mut r = raw::wifi_ap_record_t::default();
+        // SAFETY: `r` is a live local the call fills
         (unsafe { raw::esp_wifi_sta_get_ap_info(&mut r) } == ESP_OK).then_some(r.rssi)
     }
     pub fn netif_create_ap() -> *mut c_void {
+        // SAFETY: no arguments; requires esp_netif_init/esp_wifi_init (done in wifi_init)
         unsafe { raw::esp_netif_create_default_wifi_ap().cast() }
     }
     pub fn netif_create_sta() -> *mut c_void {
+        // SAFETY: no arguments; requires esp_netif_init/esp_wifi_init (done in wifi_init)
         unsafe { raw::esp_netif_create_default_wifi_sta().cast() }
     }
     pub fn set_hostname(netif: *mut c_void, name: &CStr) -> EspErr {
+        // SAFETY: `netif` is the STA netif from `netif_create_sta` (never destroyed) and
+        // `name` a NUL-terminated string that esp_netif copies
         unsafe { raw::esp_netif_set_hostname(netif.cast(), name.as_ptr()) }
     }
     pub fn set_default_netif(netif: *mut c_void) -> EspErr {
+        // SAFETY: `netif` is a live netif (ETH from w5500 or the STA one), checked non-null
         unsafe { raw::esp_netif_set_default_netif(netif.cast()) }
     }
     /// Makes the DNS servers of `netif` (from its DHCP lease) the global
@@ -254,6 +286,7 @@ mod sys {
                     && info.ip.u_addr.ip4.addr != 0
             };
             if current {
+                // SAFETY: the condition above checked that `info.ip` is of type IPv4
                 let a = unsafe { info.ip.u_addr.ip4.addr }.to_ne_bytes();
                 log!(
                     Info,
@@ -283,6 +316,7 @@ mod sys {
             }
             // without CONFIG_ESP_NETIF_SET_DNS_PER_DEFAULT_NETIF this sets
             // the global lwIP DNS server of the slot
+            // SAFETY: `netif` is the live, non-null preferred netif and `info` a local that is only read
             let e = unsafe { raw::esp_netif_set_dns_info(netif.cast(), ty, &mut info) };
             if e != ESP_OK {
                 log!(
@@ -743,6 +777,7 @@ fn on_event(ev: Event) {
     let eth = crate::w5500::netif();
     let sta = NETIF_STA.load(Ordering::Acquire);
     let mut preferred = 0;
+    // SAFETY: `preferred` is a live local the call writes to
     let a = unsafe {
         netmgr::netmgr_event(ev as c_int, !eth.is_null(), !sta.is_null(), &mut preferred)
     };
@@ -808,6 +843,8 @@ fn on_event(ev: Event) {
     if a & nact::HOOK_PREFERRED != 0 {
         let hook = *HOOK_PREFERRED.lock().unwrap_or_else(|e| e.into_inner());
         if let Some(h) = hook {
+            // SAFETY: `h` was registered through network_set_hook_preferred_changed, whose
+            // caller passes a valid function taking no arguments
             unsafe { h() };
         }
     }
@@ -821,7 +858,10 @@ pub fn preferred_ip() -> Option<(String, bool)> {
     }
     if netmgr::netmgr_wifi_has_ip() {
         let mut buf = [0 as c_char; 20];
+        // SAFETY: `buf` is a live local of `buf.len()` bytes; the call writes at most that
+        // many including the NUL
         let ok = unsafe { wifi_state::wifi_state_ip(buf.as_mut_ptr(), buf.len()) };
+        // SAFETY: wifi_state_ip always NUL-terminates `buf` (len > 0) and it was zeroed
         let ip = unsafe { CStr::from_ptr(buf.as_ptr()) }
             .to_string_lossy()
             .into_owned();

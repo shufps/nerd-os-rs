@@ -222,6 +222,7 @@ pub fn perform(pool: usize, ip: &str, host: &str) -> Round {
     let Ok(cip) = CString::new(ip) else {
         return result;
     };
+    // SAFETY: `cip` is a live NUL-terminated CString and `target` a live local
     if unsafe { sys::ipaddr_aton(cip.as_ptr(), &mut target) } == 0 {
         log!(
             Error,
@@ -257,6 +258,8 @@ pub fn perform(pool: usize, ip: &str, host: &str) -> Round {
     };
 
     let mut hdl: *mut c_void = core::ptr::null_mut();
+    // SAFETY: `config`/`cbs` are live locals that esp_ping_new_session copies; `hdl`
+    // comes from a successful esp_ping_new_session and is deleted once at the end
     unsafe {
         if sys::esp_ping_new_session(&config, &cbs, &mut hdl) != ESP_OK {
             log!(Error, tag, "Error creating ping session");

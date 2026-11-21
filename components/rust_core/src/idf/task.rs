@@ -165,6 +165,7 @@ pub unsafe fn create_psram(
 /// A task with its stack in internal RAM (`xTaskCreate()`), for code that
 /// writes flash (the cache, and with it PSRAM, is off meanwhile).
 pub fn create_internal(code: TaskFn, name: &'static CStr, stack_bytes: u32, prio: u32) -> bool {
+    // SAFETY: `name` is static and NUL-terminated; null parameter and null handle are allowed.
     unsafe {
         sys::xTaskCreatePinnedToCore(
             code,

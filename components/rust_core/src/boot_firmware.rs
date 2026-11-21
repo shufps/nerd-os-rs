@@ -121,12 +121,16 @@ unsafe extern "C" fn psram_free(p: *mut c_void) {
 /// A step of the C++ side (all are set by main.cpp).
 fn call(hook: Option<unsafe extern "C" fn()>) {
     if let Some(f) = hook {
+        // SAFETY: the hooks are C++ functions set by main.cpp (boot_cpp_hooks()), callable from the
+        // main task
         unsafe { f() }
     }
 }
 
 fn board_info() -> crate::board::ffi::Info {
     let mut i = core::mem::MaybeUninit::uninit();
+    // SAFETY: board_info() writes a complete Info through the pointer, so it is initialised
+    // afterwards
     unsafe {
         crate::board::ffi::board_info(i.as_mut_ptr());
         i.assume_init()
@@ -177,13 +181,18 @@ impl Hooks for Firmware {
             idle_core_mask: 0,
             trigger_panic: true,
         };
+        // SAFETY: wdt is a valid config on the stack; esp_task_wdt_init only reads it during the
+        // call
         let e = unsafe { sys::esp_task_wdt_init(&wdt) };
         if e != ESP_OK {
             log!(Error, TAG, "Failed to initialize watchdog: {e}");
         }
+        // SAFETY: both are plain functions with the calloc/free signatures mbedTLS expects, set
+        // once before any TLS use
         unsafe { sys::mbedtls_platform_set_calloc_free(Some(psram_calloc), Some(psram_free)) };
 
         log!(Info, TAG, "Welcome to the Nerd*Axe - hack the planet!");
+        // SAFETY: called once at boot from the main task, before any NVS access
         check(unsafe { sys::nvs_flash_init() }, "nvs_flash_init");
         // shows and saves the last reset reason
         let reason = crate::system::read_reset_reason();
@@ -191,6 +200,8 @@ impl Hooks for Firmware {
         let single_fan = matches!(crate::sdkconfig::BOARD, "NERDAXE" | "NERDAXEGAMMA");
         crate::config_nvs::init(single_fan, crate::sdkconfig::OVERHEAT_TEMP as u16);
 
+        // SAFETY: plain ESP-IDF call with no pointer arguments; an already installed service is
+        // tolerated below
         let e = unsafe { sys::gpio_install_isr_service(0) };
         if e != ESP_OK && e != ESP_ERR_INVALID_STATE {
             log!(
@@ -200,7 +211,10 @@ impl Hooks for Firmware {
                 err_name(e)
             );
         }
+        // SAFETY: called once at boot from the main task
         check(unsafe { sys::esp_netif_init() }, "esp_netif_init");
+        // SAFETY: called once at boot from the main task; an existing default loop is tolerated
+        // below
         let e = unsafe { sys::esp_event_loop_create_default() };
         if e != ESP_ERR_INVALID_STATE {
             check(e, "esp_event_loop_create_default");
@@ -303,6 +317,8 @@ impl Hooks for Firmware {
             let model = if model.is_null() {
                 "".into()
             } else {
+                // SAFETY: board_info() strings are non-null here (checked) static C string literals
+                // of the profile
                 unsafe { CStr::from_ptr(model) }.to_string_lossy()
             };
             log!(Error, TAG, "error initializing board {model}");
@@ -335,6 +351,8 @@ impl Hooks for Firmware {
 
     fn create_stratum_manager(&mut self, mode: PoolMode) {
         if let Some(f) = self.cpp.create_stratum_manager {
+            // SAFETY: the hook is a C++ function set by main.cpp (boot_cpp_hooks()), called from
+            // the main task
             unsafe { f(mode == PoolMode::Dual) }
         }
     }
@@ -376,6 +394,8 @@ impl Hooks for Firmware {
                     if p.is_null() {
                         String::new()
                     } else {
+                        // SAFETY: p is non-null (checked) and a static C string literal of the
+                        // board profile
                         unsafe { CStr::from_ptr(p) }.to_string_lossy().into_owned()
                     }
                 };
@@ -412,6 +432,8 @@ impl Hooks for Firmware {
     fn otp_init(&mut self) {
         let model = board_info().device_model;
         let hostname = CString::new(crate::system::hostname().to_bytes()).unwrap_or_default();
+        // SAFETY: hostname is a live CString, the MAC string is NUL-terminated (network_mac_addr)
+        // and model a static profile string
         unsafe {
             crate::otp_device::ffi::otp_dev_init(
                 hostname.as_ptr(),
@@ -494,6 +516,7 @@ impl Hooks for Firmware {
 #[cfg(target_os = "espidf")]
 #[no_mangle]
 pub extern "C" fn app_main() {
+    // SAFETY: boot_cpp_hooks() returns a pointer to a static const table in main.cpp, valid forever
     let mut f = unsafe { Firmware::new(sys::boot_cpp_hooks()) };
     crate::boot::start(&mut f);
     while crate::boot::idle(&mut f) {}

@@ -210,6 +210,21 @@ pub fn history(start: u64, end: u64, current: u64, limit: u32, now_ms: u64) -> O
     o
 }
 
+/// All-zero snapshots: the handlers fill in the fields they have.
+macro_rules! zeroed {
+    ($($t:ty),*) => {$(
+        impl $t {
+            /// All fields zero (NULL, false).
+            pub fn zeroed() -> Self {
+                // SAFETY: a plain C struct of numbers, bools, arrays and raw
+                // pointers: all zero (NULL, false) is a valid value
+                unsafe { core::mem::zeroed() }
+            }
+        }
+    )*};
+}
+zeroed!(FanInfo, SystemInfo, Dashboard, V2Settings);
+
 /// `fan_info_t`: one fan channel.
 #[repr(C)]
 #[derive(Clone, Copy, Debug)]

@@ -5,11 +5,11 @@
 //! is a 404.
 
 use crate::idf::idf_const;
-use core::ffi::{c_char, CStr};
+use core::ffi::CStr;
+use std::ffi::CString;
 use std::io::Read;
 
-use crate::http_server::{ServerCtx, SCRATCH_SIZE};
-use crate::idf::httpd::{self, err, Req};
+use crate::idf::httpd::{err, Request};
 use crate::idf::{EspErr, ESP_FAIL, ESP_OK};
 use crate::log::log;
 
@@ -26,8 +26,8 @@ pub use crate::idf::raw::esp_vfs_spiffs_conf_t as SpiffsConf;
 /// `esp_vfs_spiffs_conf_t` (host model)
 #[repr(C)]
 pub struct SpiffsConf {
-    pub base_path: *const c_char,
-    pub partition_label: *const c_char,
+    pub base_path: *const core::ffi::c_char,
+    pub partition_label: *const core::ffi::c_char,
     pub max_files: usize,
     pub format_if_mount_failed: bool,
 }
@@ -43,7 +43,11 @@ mod sys {
     pub unsafe fn esp_vfs_spiffs_register(_: *const SpiffsConf) -> EspErr {
         ESP_FAIL
     }
-    pub unsafe fn esp_spiffs_info(_: *const c_char, _: *mut usize, _: *mut usize) -> EspErr {
+    pub unsafe fn esp_spiffs_info(
+        _: *const core::ffi::c_char,
+        _: *mut usize,
+        _: *mut usize,
+    ) -> EspErr {
         ESP_FAIL
     }
 }
@@ -85,16 +89,12 @@ pub fn init_fs() -> EspErr {
     ESP_OK
 }
 
-unsafe fn redirect_portal(req: *mut Req) -> EspErr {
+fn redirect_portal(req: &mut Request) -> EspErr {
     log!(Info, TAG, "Redirecting to portal");
-    httpd::httpd_resp_set_status(req, c"302 Found".as_ptr());
-    httpd::httpd_resp_set_type(req, c"text/plain".as_ptr());
-    httpd::httpd_resp_set_hdr(req, c"Location".as_ptr(), c"/".as_ptr());
-    httpd::httpd_resp_send(
-        req,
-        c"Redirect to the captive portal".as_ptr(),
-        httpd::RESP_USE_STRLEN,
-    );
+    req.set_status(c"302 Found");
+    req.set_type(c"text/plain");
+    req.set_hdr(c"Location", c"/");
+    req.send(b"Redirect to the captive portal");
     ESP_OK
 }
 
@@ -104,26 +104,18 @@ fn open(path: &[u8]) -> std::io::Result<std::fs::File> {
 }
 
 /// `rest_common_get_handler()`: the file of the request.
-///
-/// # Safety
-/// `req` a request of a route with the server context.
-pub unsafe extern "C" fn file_handler(req: *mut Req) -> EspErr {
-    let ctx = (*req).user_ctx as *mut ServerCtx;
-    let base = CStr::from_ptr((*ctx).base_path.as_ptr()).to_bytes();
-    let uri = CStr::from_ptr((*req).uri.as_ptr());
+pub fn file_handler(req: &mut Request) -> EspErr {
+    // the base path of the server context is "" (it stays zeroed)
+    let uri: CString = req.uri().into();
     let Some(f) =
-        crate::http_file::resolve(base, uri.to_bytes()).filter(|f| f.path.len() < FILE_PATH_MAX)
+        crate::http_file::resolve(b"", uri.to_bytes()).filter(|f| f.path.len() < FILE_PATH_MAX)
     else {
-        return httpd::httpd_resp_send_err(
-            req,
-            err::E500_INTERNAL_SERVER_ERROR,
-            c"File path too long".as_ptr(),
-        );
+        return req.send_err(err::E500_INTERNAL_SERVER_ERROR, Some(c"File path too long"));
     };
     let path = String::from_utf8_lossy(&f.path).into_owned();
 
     // do not MIME-sniff
-    httpd::httpd_resp_set_hdr(req, c"X-Content-Type-Options".as_ptr(), c"nosniff".as_ptr());
+    req.set_hdr(c"X-Content-Type-Options", c"nosniff");
 
     let mut file = match open(&f.path) {
         Ok(file) => file,
@@ -132,17 +124,16 @@ pub unsafe extern "C" fn file_handler(req: *mut Req) -> EspErr {
                 // a missing asset: 404, no portal redirect
                 let errno = e.raw_os_error().unwrap_or(0);
                 log!(Error, TAG, "Failed to open file: {path}, errno: {errno}");
-                httpd::httpd_resp_send_err(req, err::E404_NOT_FOUND, c"Not found".as_ptr());
+                req.send_err(err::E404_NOT_FOUND, Some(c"Not found"));
                 return ESP_OK;
             }
             log!(Error, TAG, "page not found: {}", uri.to_string_lossy());
             return redirect_portal(req);
         }
         Err(_) => {
-            return httpd::httpd_resp_send_err(
-                req,
+            return req.send_err(
                 err::E500_INTERNAL_SERVER_ERROR,
-                c"Failed to open file".as_ptr(),
+                Some(c"Failed to open file"),
             )
         }
     };
@@ -151,14 +142,27 @@ pub unsafe extern "C" fn file_handler(req: *mut Req) -> EspErr {
 
     // the file's headers (type, cache policy, gzip) only go with the file,
     // not with an error response
-    let mut started = false;
-    let start = |req: *mut Req| {
-        httpd::httpd_resp_set_type(req, f.content_type.as_ptr());
-        httpd::httpd_resp_set_hdr(req, c"Cache-Control".as_ptr(), f.cache_control.as_ptr());
-        httpd::httpd_resp_set_hdr(req, c"Content-Encoding".as_ptr(), c"gzip".as_ptr());
+    let start = |req: &mut Request| {
+        req.set_type(f.content_type);
+        req.set_hdr(c"Cache-Control", f.cache_control);
+        req.set_hdr(c"Content-Encoding", c"gzip");
     };
-    let chunk =
-        core::slice::from_raw_parts_mut((*ctx).scratch.as_mut_ptr() as *mut u8, SCRATCH_SIZE);
+    crate::http_server::with_scratch(req, |req, chunk| {
+        send_file(req, &mut file, chunk, &path, start)
+    })
+    .unwrap_or(ESP_FAIL)
+}
+
+/// Sends the file in chunks through `chunk`; `start` sets the file's
+/// headers before the first chunk.
+fn send_file(
+    req: &mut Request,
+    file: &mut std::fs::File,
+    chunk: &mut [u8],
+    path: &str,
+    start: impl Fn(&mut Request),
+) -> EspErr {
+    let mut started = false;
     loop {
         let n = match file.read(chunk) {
             Ok(0) => break,
@@ -166,11 +170,7 @@ pub unsafe extern "C" fn file_handler(req: *mut Req) -> EspErr {
             Err(_) => {
                 log!(Error, TAG, "Read error while sending {path}");
                 if !started {
-                    return httpd::httpd_resp_send_err(
-                        req,
-                        err::E500_INTERNAL_SERVER_ERROR,
-                        c"Read error".as_ptr(),
-                    );
+                    return req.send_err(err::E500_INTERNAL_SERVER_ERROR, Some(c"Read error"));
                 }
                 // headers and part of the body are out: no final chunk, so
                 // the client sees a truncated transfer
@@ -181,8 +181,7 @@ pub unsafe extern "C" fn file_handler(req: *mut Req) -> EspErr {
             start(req);
             started = true;
         }
-        if httpd::httpd_resp_send_chunk(req, chunk.as_ptr() as *const c_char, n as isize) != ESP_OK
-        {
+        if req.send_chunk(&chunk[..n]) != ESP_OK {
             log!(Error, TAG, "Failed to send file chunk");
             return ESP_FAIL;
         }
@@ -192,6 +191,6 @@ pub unsafe extern "C" fn file_handler(req: *mut Req) -> EspErr {
         start(req);
     }
     log!(Info, TAG, "File sending complete");
-    httpd::httpd_resp_send_chunk(req, core::ptr::null(), 0);
+    req.end_chunks();
     ESP_OK
 }

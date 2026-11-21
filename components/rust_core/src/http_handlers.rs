@@ -2,20 +2,20 @@
 //! `handler_shutdown.cpp`, `handler_influx.cpp`, `handler_alert.cpp`,
 //! `handler_otp.cpp`, `v2/handler_v2_identify.cpp` and
 //! `v2/handler_v2_system.cpp`) and the settings bodies of the C++ ones
-//! (`http_apply_settings()`, formerly `settings_apply.cpp` behind
+//! (`apply_pool_settings()`, formerly `settings_apply.cpp` behind
 //! `applySettingsBody()`). The routes and their checks are in
 //! `http_server.rs`; the documents are built by `http_json.rs`.
 
 use crate::idf::idf_const;
-use core::ffi::{c_char, c_int, CStr};
+use core::ffi::{c_int, CStr};
 
 use crate::ajson::Json;
 use crate::config;
 use crate::http_json;
 use crate::http_routes::Handler;
-use crate::http_server::{post_data, ServerCtx};
+use crate::http_server::read_body;
 use crate::http_settings::{self, Write};
-use crate::idf::httpd::{self, err, HandlerFn, Req};
+use crate::idf::httpd::{err, HandlerFn, Request};
 use crate::idf::{EspErr, ESP_FAIL, ESP_OK};
 use crate::log::log;
 use crate::sdkconfig as k;
@@ -75,34 +75,26 @@ pub fn handler(h: Handler) -> Option<HandlerFn> {
 // ---------------------------------------------------------------------------
 // helpers
 
-unsafe fn send_err(req: *mut Req, code: httpd::ErrCode, msg: &CStr) -> EspErr {
-    httpd::httpd_resp_send_err(req, code, msg.as_ptr())
+fn send_err(req: &mut Request, code: crate::idf::httpd::ErrCode, msg: &CStr) -> EspErr {
+    req.send_err(code, Some(msg))
 }
 
-unsafe fn send_str(req: *mut Req, s: &CStr) -> EspErr {
-    httpd::httpd_resp_send(req, s.as_ptr(), httpd::RESP_USE_STRLEN)
+fn send_str(req: &mut Request, s: &CStr) -> EspErr {
+    req.send(s.to_bytes())
 }
 
 /// The end of a chunked (empty) response.
-unsafe fn end_chunks(req: *mut Req) -> EspErr {
-    httpd::httpd_resp_send_chunk(req, core::ptr::null(), 0)
+fn end_chunks(req: &mut Request) -> EspErr {
+    req.end_chunks()
 }
 
-unsafe fn set_json(req: *mut Req) {
-    httpd::httpd_resp_set_type(req, c"application/json".as_ptr());
+fn set_json(req: &mut Request) {
+    req.set_type(c"application/json");
 }
 
 /// A document in 2048 byte chunks (`sendJsonBuffer()`).
-unsafe fn send_doc(req: *mut Req, doc: Json) -> EspErr {
-    let mut len = 0;
-    let p = crate::cutil::malloc_copy(&doc.serialize(), &mut len);
-    crate::http_server::send_json(req, p, len)
-}
-
-/// The body in the server context's scratch buffer (up to a NUL).
-unsafe fn body<'a>(req: *mut Req) -> &'a [u8] {
-    let ctx = (*req).user_ctx as *const ServerCtx;
-    CStr::from_ptr((*ctx).scratch.as_ptr()).to_bytes()
+fn send_doc(req: &mut Request, doc: Json) -> EspErr {
+    crate::http_server::send_json(req, &doc.serialize())
 }
 
 /// A config string with its default (`cfgGetStrAlloc()`), NUL-terminated.
@@ -119,17 +111,17 @@ fn cfg_flag(key: &[u8], def: i64) -> bool {
 
 /// Reads the body and applies its settings; 400 for invalid JSON (logged
 /// with `tag`).
-unsafe fn apply_settings(
-    req: *mut Req,
+pub(crate) fn apply_settings(
+    req: &mut Request,
     tag: &CStr,
     parse: impl Fn(&Json) -> Vec<Write>,
     applied: &mut Applied,
 ) -> EspErr {
-    let e = post_data(req);
-    if e != ESP_OK {
-        return e;
-    }
-    if !settings_apply::apply_body(body(req), parse, applied, &mut settings_apply::Config) {
+    let body = match read_body(req) {
+        Ok(b) => b,
+        Err(e) => return e,
+    };
+    if !settings_apply::apply_body(body, parse, applied, &mut settings_apply::Config) {
         log!(Error, tag, "JSON parsing failed");
         send_err(req, err::E400_BAD_REQUEST, c"Invalid JSON");
         return ESP_FAIL;
@@ -140,7 +132,7 @@ unsafe fn apply_settings(
 // ---------------------------------------------------------------------------
 // restart, shutdown (no OTP on purpose: home automation)
 
-unsafe extern "C" fn restart(req: *mut Req) -> EspErr {
+fn restart(req: &mut Request) -> EspErr {
     log!(
         Info,
         c"http_restart",
@@ -152,7 +144,7 @@ unsafe extern "C" fn restart(req: *mut Req) -> EspErr {
     crate::power_mgmt::restart()
 }
 
-unsafe extern "C" fn shutdown(req: *mut Req) -> EspErr {
+fn shutdown(req: &mut Request) -> EspErr {
     log!(
         Info,
         c"http_shutdown",
@@ -175,7 +167,7 @@ fn board_info() -> crate::board::ffi::Info {
     }
 }
 
-unsafe extern "C" fn v2_identify(req: *mut Req) -> EspErr {
+fn v2_identify(req: &mut Request) -> EspErr {
     set_json(req);
     let b = board_info();
     let v = http_json::V2Identify {
@@ -189,7 +181,7 @@ unsafe extern "C" fn v2_identify(req: *mut Req) -> EspErr {
     send_doc(req, http_json::v2_identify(&v))
 }
 
-unsafe extern "C" fn v2_system(req: *mut Req) -> EspErr {
+fn v2_system(req: &mut Request) -> EspErr {
     set_json(req);
     let b = board_info();
     let hostname = cfg_str(b"hostname", k::LWIP_LOCAL_HOSTNAME);
@@ -218,7 +210,7 @@ unsafe extern "C" fn v2_system(req: *mut Req) -> EspErr {
 // ---------------------------------------------------------------------------
 // influx
 
-unsafe extern "C" fn influx_get(req: *mut Req) -> EspErr {
+fn influx_get(req: &mut Request) -> EspErr {
     set_json(req);
     let url = cfg_str(b"influx_url", k::INFLUX_URL);
     let bucket = cfg_str(b"influx_bucket", k::INFLUX_BUCKET);
@@ -235,7 +227,7 @@ unsafe extern "C" fn influx_get(req: *mut Req) -> EspErr {
     send_doc(req, http_json::influx_info(&i))
 }
 
-unsafe extern "C" fn influx_patch(req: *mut Req) -> EspErr {
+fn influx_patch(req: &mut Request) -> EspErr {
     let mut a = Applied::default();
     if apply_settings(req, c"http_utils", http_settings::settings_influx, &mut a) != ESP_OK {
         return ESP_FAIL;
@@ -248,7 +240,7 @@ unsafe extern "C" fn influx_patch(req: *mut Req) -> EspErr {
 // ---------------------------------------------------------------------------
 // alerts
 
-unsafe extern "C" fn alert_get(req: *mut Req) -> EspErr {
+fn alert_get(req: &mut Request) -> EspErr {
     set_json(req);
     let webhook = cfg_str(b"alrt_disc_url", k::ALERT_DISCORD_URL);
     let a = http_json::AlertInfo {
@@ -265,7 +257,7 @@ unsafe extern "C" fn alert_get(req: *mut Req) -> EspErr {
     send_doc(req, http_json::alert_info(&a))
 }
 
-unsafe extern "C" fn alert_patch(req: *mut Req) -> EspErr {
+fn alert_patch(req: &mut Request) -> EspErr {
     let mut a = Applied::default();
     if apply_settings(req, c"http_utils", http_settings::settings_alert, &mut a) != ESP_OK {
         return ESP_FAIL;
@@ -274,11 +266,12 @@ unsafe extern "C" fn alert_patch(req: *mut Req) -> EspErr {
     end_chunks(req);
     // the alerter's and the display's settings
     crate::discord::load_config();
-    sys::disp_load_settings();
+    // SAFETY: the display's C++ entry point
+    unsafe { sys::disp_load_settings() };
     ESP_OK
 }
 
-unsafe extern "C" fn alert_test(req: *mut Req) -> EspErr {
+fn alert_test(req: &mut Request) -> EspErr {
     if crate::discord::ffi::discord_send_test() {
         send_str(req, c"ok");
     } else {
@@ -290,7 +283,7 @@ unsafe extern "C" fn alert_test(req: *mut Req) -> EspErr {
 // ---------------------------------------------------------------------------
 // OTP
 
-unsafe extern "C" fn otp_create(req: *mut Req) -> EspErr {
+fn otp_create(req: &mut Request) -> EspErr {
     use crate::otp::ffi::otp_is_enabled;
     if otp_is_enabled() {
         return send_err(req, err::E405_METHOD_NOT_ALLOWED, c"OTP is enabled");
@@ -311,22 +304,23 @@ unsafe extern "C" fn otp_create(req: *mut Req) -> EspErr {
             );
         }
     }
-    // the QR on the display
-    sys::ui_send_show_qr();
+    // the QR on the display (SAFETY: the display's C++ entry point)
+    unsafe { sys::ui_send_show_qr() };
     end_chunks(req);
     ESP_OK
 }
 
-unsafe extern "C" fn otp_patch(req: *mut Req) -> EspErr {
+fn otp_patch(req: &mut Request) -> EspErr {
     use crate::otp::ffi::{otp_disable_enrollment, otp_save, otp_set_enabled};
     // stops an enrollment (if one runs), hides the QR in any case
     otp_disable_enrollment();
-    sys::ui_send_hide_qr();
-    let e = post_data(req);
-    if e != ESP_OK {
-        return e;
-    }
-    let enabled = match http_settings::otp_body(body(req)) {
+    // SAFETY: the display's C++ entry point
+    unsafe { sys::ui_send_hide_qr() };
+    let body = match read_body(req) {
+        Ok(b) => b,
+        Err(e) => return e,
+    };
+    let enabled = match http_settings::otp_body(body) {
         http_settings::OtpBody::Enabled(b) => b,
         http_settings::OtpBody::Invalid => {
             log!(Error, c"http_otp", "JSON parsing failed");
@@ -350,85 +344,73 @@ unsafe extern "C" fn otp_patch(req: *mut Req) -> EspErr {
     ESP_OK
 }
 
-unsafe extern "C" fn otp_status(req: *mut Req) -> EspErr {
+fn otp_status(req: &mut Request) -> EspErr {
     send_doc(
         req,
         http_json::otp_status(crate::otp::ffi::otp_is_enabled()),
     )
 }
 
-unsafe extern "C" fn otp_session(req: *mut Req) -> EspErr {
+fn otp_session(req: &mut Request) -> EspErr {
     if !crate::otp::ffi::otp_is_enabled() {
         return send_err(req, err::E405_METHOD_NOT_ALLOWED, c"OTP disabled");
     }
-    let mut totp = [0 as c_char; 16];
-    let len = httpd::httpd_req_get_hdr_value_len(req, c"X-TOTP".as_ptr());
-    if len == 0
-        || len + 1 > totp.len()
-        || httpd::httpd_req_get_hdr_value_str(
-            req,
-            c"X-TOTP".as_ptr(),
-            totp.as_mut_ptr(),
-            totp.len(),
-        ) != ESP_OK
-    {
+    const TOTP_CAP: usize = 16;
+    let len = req.header_len(c"X-TOTP");
+    let totp = if len == 0 || len + 1 > TOTP_CAP {
+        None
+    } else {
+        req.header(c"X-TOTP", TOTP_CAP)
+    };
+    let Some(totp) = totp else {
         return send_err(req, err::E400_BAD_REQUEST, c"Missing X-TOTP header");
-    }
+    };
     // behind the rate limit
-    match crate::otp_device::ffi::otp_dev_login_check(totp.as_ptr()) {
-        0 => {}
-        1 => return send_err(req, err::E401_UNAUTHORIZED, c"blocked for 5 minutes"),
-        _ => return send_err(req, err::E401_UNAUTHORIZED, c"Invalid TOTP"),
+    let now = crate::clock::now() as i64;
+    let synced = crate::clock::is_time_synced();
+    match crate::otp::login(totp.to_bytes(), now, synced, crate::clock::now_ms()) {
+        crate::otp::Auth::Ok => {}
+        crate::otp::Auth::Blocked => {
+            return send_err(req, err::E401_UNAUTHORIZED, c"blocked for 5 minutes")
+        }
+        crate::otp::Auth::Failed => return send_err(req, err::E401_UNAUTHORIZED, c"Invalid TOTP"),
     }
-    let mut token = [0 as c_char; 96];
-    if crate::otp_device::ffi::otp_dev_mint_session(SESSION_TTL_S, token.as_mut_ptr(), token.len())
-        == 0
-    {
+    // (the former 96 byte buffer)
+    let Some(token) = crate::otp::mint(SESSION_TTL_S, now).filter(|t| t.len() < 96) else {
         log!(Error, c"http_otp", "createSessionToken failed");
         return send_err(req, err::E500_INTERNAL_SERVER_ERROR, c"Session error");
-    }
+    };
     let expires_ms = crate::clock::now_ms() + SESSION_TTL_S as u64 * 1000;
-    let token = CStr::from_ptr(token.as_ptr()).to_bytes();
-    let doc = http_json::otp_session(token, SESSION_TTL_S, expires_ms).serialize();
+    let doc = http_json::otp_session(token.as_bytes(), SESSION_TTL_S, expires_ms).serialize();
     set_json(req);
-    httpd::httpd_resp_send(req, doc.as_ptr() as *const c_char, doc.len() as isize);
+    req.send(&doc);
     ESP_OK
 }
 
-pub(crate) mod ffi {
-    use super::*;
-
-    /// The settings body of the C++ handlers: `kind` 0 v1 (`dual_pool`), 1
-    /// v2; `verify_changed` (2 values, or NULL) gets the pools whose
-    /// coinbase verification settings changed; 400 for invalid JSON.
-    ///
-    /// # Safety
-    /// `req` a request with the server context, `tag` NUL-terminated,
-    /// `verify_changed` writable for 2 values or NULL.
-    pub unsafe extern "C" fn http_apply_settings(
-        req: *mut Req,
-        kind: c_int,
-        dual_pool: bool,
-        tag: *const c_char,
-        verify_changed: *mut bool,
-    ) -> EspErr {
-        let tag = CStr::from_ptr(tag);
-        let mut a = Applied::default();
-        let r = if kind == 0 {
-            apply_settings(
-                req,
-                tag,
-                |d| http_settings::settings_v1(d, dual_pool),
-                &mut a,
-            )
-        } else {
-            apply_settings(req, tag, http_settings::settings_v2, &mut a)
-        };
-        if !verify_changed.is_null() {
-            *verify_changed = a.verify_changed[0];
-            *verify_changed.add(1) = a.verify_changed[1];
-        }
-        r
+/// The settings body of `PATCH /api/system` (`v1`, with `dual_pool`) and
+/// `PATCH /api/v2/settings`: the pools whose coinbase verification
+/// settings changed, or the error (400 for invalid JSON is sent).
+pub(crate) fn apply_pool_settings(
+    req: &mut Request,
+    v1: bool,
+    dual_pool: bool,
+    tag: &CStr,
+) -> Result<[bool; 2], EspErr> {
+    let mut a = Applied::default();
+    let r = if v1 {
+        apply_settings(
+            req,
+            tag,
+            |d| http_settings::settings_v1(d, dual_pool),
+            &mut a,
+        )
+    } else {
+        apply_settings(req, tag, http_settings::settings_v2, &mut a)
+    };
+    if r == ESP_OK {
+        Ok(a.verify_changed)
+    } else {
+        Err(r)
     }
 }
 
@@ -438,10 +420,7 @@ pub(crate) mod ffi {
 /// `GET /api/v2/wifi/scan`: only while the access point is up (the
 /// station is disconnected for the scan); the CORS headers after that
 /// check.
-///
-/// # Safety
-/// `req` valid.
-pub unsafe extern "C" fn wifi_scan(req: *mut Req) -> EspErr {
+pub fn wifi_scan(req: &mut Request) -> EspErr {
     if !crate::netmgr::ap_active() {
         return send_err(
             req,
@@ -452,7 +431,7 @@ pub unsafe extern "C" fn wifi_scan(req: *mut Req) -> EspErr {
     set_json(req);
     if !crate::http_server::set_cors_headers(req) {
         // httpd_resp_send_500()
-        httpd::httpd_resp_send_err(req, err::E500_INTERNAL_SERVER_ERROR, core::ptr::null());
+        req.send_err(err::E500_INTERNAL_SERVER_ERROR, None);
         return ESP_FAIL;
     }
     let nets = match crate::network::scan() {

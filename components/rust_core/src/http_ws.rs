@@ -10,7 +10,7 @@ use std::sync::atomic::{AtomicI32, Ordering};
 use std::sync::mpsc::{sync_channel, Receiver, SyncSender};
 use std::sync::{Mutex, OnceLock};
 
-use crate::idf::httpd::{self, Req};
+use crate::idf::httpd::{self, Request};
 use crate::idf::{EspErr, ESP_OK};
 use crate::log::log;
 
@@ -48,7 +48,7 @@ mod sys {
 #[cfg(not(target_os = "espidf"))]
 mod sys {
     use super::*;
-    pub unsafe fn httpd_ws_recv_frame(_: *mut Req, _: *mut WsFrame, _: usize) -> EspErr {
+    pub unsafe fn httpd_ws_recv_frame(_: *mut httpd::Req, _: *mut WsFrame, _: usize) -> EspErr {
         crate::idf::ESP_FAIL
     }
     pub unsafe fn httpd_ws_send_frame_async(_: httpd::Handle, _: c_int, _: *mut WsFrame) -> EspErr {
@@ -94,25 +94,25 @@ pub fn on_close(fd: c_int) {
 
 /// The `/api/ws` handler: the handshake starts the forwarding, a CLOSE
 /// frame stops it.
-///
-/// # Safety
-/// `req` valid.
-pub unsafe extern "C" fn handler(req: *mut Req) -> EspErr {
-    if (*req).method as httpd::Method == httpd::method::GET {
+pub fn handler(req: &mut Request) -> EspErr {
+    if req.method() as httpd::Method == httpd::method::GET {
         log!(Info, TAG, "Handshake done, the new connection was opened");
-        sys::ws_log_install();
-        FD.store(httpd::httpd_req_to_sockfd(req), Ordering::Release);
+        // SAFETY: installs the C vprintf hook
+        unsafe { sys::ws_log_install() };
+        FD.store(req.sockfd(), Ordering::Release);
         return ESP_OK;
     }
     // the header only (opcode, length)
-    let mut pkt: WsFrame = core::mem::zeroed();
-    let ret = sys::httpd_ws_recv_frame(req, &mut pkt, 0);
+    // SAFETY: an all-zero frame is valid (no payload)
+    let mut pkt: WsFrame = unsafe { core::mem::zeroed() };
+    // SAFETY: the live request; max_len 0: no payload is written
+    let ret = unsafe { sys::httpd_ws_recv_frame(req.raw(), &mut pkt, 0) };
     if ret != ESP_OK {
         return ret;
     }
     if pkt.type_ == WS_CLOSE {
         log!(Info, TAG, "WebSocket closed, disabling log forwarding");
-        reset_fd(httpd::httpd_req_to_sockfd(req));
+        reset_fd(req.sockfd());
     }
     ESP_OK
 }

@@ -17,7 +17,7 @@ use std::ffi::CString;
 use crate::http_data::Partition;
 use crate::http_ota::{factory_body, factory_url_ok, FactoryBody};
 use crate::idf::http_client::{self, Event};
-use crate::idf::httpd::{self, err, Req};
+use crate::idf::httpd::{self, err, Request};
 use crate::idf::{EspErr, ESP_FAIL, ESP_OK};
 use crate::log::log;
 use crate::ota_factory::{redirect, updater, Redirect, Step, FW_LEN, MAX_REDIRECTS, WWW_LEN};
@@ -505,24 +505,21 @@ pub(crate) mod ffi {
     }
 }
 
-unsafe fn send_err(req: *mut Req, code: httpd::ErrCode, msg: &CStr) -> EspErr {
-    httpd::httpd_resp_send_err(req, code, msg.as_ptr())
+fn send_err(req: &mut Request, code: httpd::ErrCode, msg: &CStr) -> EspErr {
+    req.send_err(code, Some(msg))
 }
 
 /// `POST /api/system/OTA/github`: `{"url": "https://github.com/shufps/...",
 /// "keep_config": bool}`
-///
-/// # Safety
-/// `req` valid.
-pub unsafe extern "C" fn post_handler(req: *mut Req) -> EspErr {
-    let need = (*req).content_len;
+pub fn post_handler(req: &mut Request) -> EspErr {
+    let need = req.content_len();
     if need == 0 || need > MAX_BODY {
         return send_err(req, err::E400_BAD_REQUEST, c"Body too large or empty");
     }
     let mut body = vec![0u8; need];
     let mut off = 0;
     while off < need {
-        let n = httpd::httpd_req_recv(req, body[off..].as_mut_ptr() as *mut c_char, need - off);
+        let n = req.recv(&mut body[off..]);
         if n <= 0 {
             return send_err(req, err::E400_BAD_REQUEST, c"recv failed");
         }
@@ -551,34 +548,19 @@ pub unsafe extern "C" fn post_handler(req: *mut Req) -> EspErr {
         keep_config as c_int
     );
     if !updater().trigger(&url, keep_config) {
-        httpd::httpd_resp_set_status(req, c"409 Conflict".as_ptr());
-        return httpd::httpd_resp_send(
-            req,
-            c"{\"status\":\"busy\"}".as_ptr(),
-            httpd::RESP_USE_STRLEN,
-        );
+        req.set_status(c"409 Conflict");
+        return req.send(b"{\"status\":\"busy\"}");
     }
-    httpd::httpd_resp_set_type(req, c"application/json".as_ptr());
-    httpd::httpd_resp_set_status(req, c"202 Accepted".as_ptr());
-    httpd::httpd_resp_send(
-        req,
-        c"{\"status\":\"started\"}".as_ptr(),
-        httpd::RESP_USE_STRLEN,
-    )
+    req.set_type(c"application/json");
+    req.set_status(c"202 Accepted");
+    req.send(b"{\"status\":\"started\"}")
 }
 
 /// `GET /api/system/OTA/github`: `{"pending", "running", "step",
 /// "progress"}`
-///
-/// # Safety
-/// `req` valid.
-pub unsafe extern "C" fn status_handler(req: *mut Req) -> EspErr {
-    httpd::httpd_resp_set_hdr(
-        req,
-        c"Cache-Control".as_ptr(),
-        c"no-store, no-cache, must-revalidate".as_ptr(),
-    );
+pub fn status_handler(req: &mut Request) -> EspErr {
+    req.set_hdr(c"Cache-Control", c"no-store, no-cache, must-revalidate");
     let json = updater().status_json();
-    httpd::httpd_resp_set_type(req, c"application/json".as_ptr());
-    httpd::httpd_resp_send(req, json.as_ptr() as *const c_char, json.len() as isize)
+    req.set_type(c"application/json");
+    req.send(json.as_bytes())
 }

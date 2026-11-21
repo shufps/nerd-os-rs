@@ -2,9 +2,8 @@
 //! the functions the Rust HTTP code uses. On the host every call fails.
 
 use super::idf_const;
-#[cfg(not(target_os = "espidf"))]
-use core::ffi::c_char;
-use core::ffi::{c_int, c_void};
+use core::ffi::{c_char, c_int, c_void, CStr};
+use std::ffi::CString;
 
 use super::EspErr;
 
@@ -79,7 +78,7 @@ mod types {
     pub struct Uri {
         pub uri: *const c_char,
         pub method: Method,
-        pub handler: Option<HandlerFn>,
+        pub handler: Option<RawHandlerFn>,
         pub user_ctx: *mut c_void,
         pub is_websocket: bool,
         pub handle_ws_control_frames: bool,
@@ -120,7 +119,174 @@ mod types {
 
 pub use types::*;
 
-pub type HandlerFn = unsafe extern "C" fn(*mut Req) -> EspErr;
+/// The C handler `esp_http_server` calls (the server's trampoline).
+pub type RawHandlerFn = unsafe extern "C" fn(*mut Req) -> EspErr;
+
+/// A Rust route handler.
+pub type HandlerFn = fn(&mut Request) -> EspErr;
+
+/// A request inside its handler: what the handlers use instead of the raw
+/// `httpd_req_t`. Header values are kept until the request is dropped
+/// (`httpd_resp_set_hdr()` stores only the pointers until the response is
+/// sent); content type and status must be static for the same reason.
+pub struct Request {
+    req: *mut Req,
+    kept: Vec<CString>,
+}
+
+impl Request {
+    /// # Safety
+    /// `req` is the live request of the running handler, and the value is
+    /// dropped before the handler returns.
+    pub unsafe fn from_raw(req: *mut Req) -> Self {
+        Self {
+            req,
+            kept: Vec::new(),
+        }
+    }
+
+    /// The raw request, for the calls without a wrapper here.
+    pub fn raw(&mut self) -> *mut Req {
+        self.req
+    }
+
+    fn r(&self) -> &Req {
+        // SAFETY: the live request (see from_raw())
+        unsafe { &*self.req }
+    }
+
+    pub fn content_len(&self) -> usize {
+        self.r().content_len
+    }
+
+    pub fn method(&self) -> c_int {
+        self.r().method as c_int
+    }
+
+    /// The request URI.
+    pub fn uri(&self) -> &CStr {
+        // SAFETY: a NUL-terminated array in the request
+        unsafe { CStr::from_ptr(self.r().uri.as_ptr() as *const c_char) }
+    }
+
+    /// The route's context (`user_ctx`).
+    pub fn user_ctx(&self) -> *mut c_void {
+        self.r().user_ctx
+    }
+
+    pub fn set_type(&mut self, content_type: &'static CStr) -> EspErr {
+        // SAFETY: the live request; a static string
+        unsafe { httpd_resp_set_type(self.req, content_type.as_ptr()) }
+    }
+
+    pub fn set_status(&mut self, status: &'static CStr) -> EspErr {
+        // SAFETY: as above
+        unsafe { httpd_resp_set_status(self.req, status.as_ptr()) }
+    }
+
+    /// Adds a response header; the strings are kept until the response is
+    /// sent.
+    pub fn set_hdr(&mut self, field: &CStr, value: &CStr) -> EspErr {
+        let (f, v) = (CString::from(field), CString::from(value));
+        // SAFETY: the live request; both strings stay in `kept` (their heap
+        // buffers do not move) until the request is dropped
+        let e = unsafe { httpd_resp_set_hdr(self.req, f.as_ptr(), v.as_ptr()) };
+        self.kept.push(f);
+        self.kept.push(v);
+        e
+    }
+
+    /// Sends the whole response.
+    pub fn send(&mut self, data: &[u8]) -> EspErr {
+        // SAFETY: the live request; `data` for the call
+        unsafe {
+            httpd_resp_send(
+                self.req,
+                data.as_ptr() as *const c_char,
+                data.len() as isize,
+            )
+        }
+    }
+
+    /// Sends one chunk of a chunked response (not the end: see
+    /// [`Self::end_chunks`]).
+    pub fn send_chunk(&mut self, data: &[u8]) -> EspErr {
+        if data.is_empty() {
+            return super::ESP_OK;
+        }
+        // SAFETY: as above
+        unsafe {
+            httpd_resp_send_chunk(
+                self.req,
+                data.as_ptr() as *const c_char,
+                data.len() as isize,
+            )
+        }
+    }
+
+    /// The end of a chunked response.
+    pub fn end_chunks(&mut self) -> EspErr {
+        // SAFETY: the live request; NULL/0 ends the response
+        unsafe { httpd_resp_send_chunk(self.req, core::ptr::null(), 0) }
+    }
+
+    /// An error response with `msg` (None: the default text).
+    pub fn send_err(&mut self, code: ErrCode, msg: Option<&CStr>) -> EspErr {
+        let m = msg.map_or(core::ptr::null(), CStr::as_ptr);
+        // SAFETY: the live request; `msg` for the call
+        unsafe { httpd_resp_send_err(self.req, code, m) }
+    }
+
+    /// A request header of at most `cap - 1` bytes; None if missing or
+    /// longer.
+    pub fn header(&mut self, name: &CStr, cap: usize) -> Option<CString> {
+        let mut buf = vec![0 as c_char; cap.max(1)];
+        // SAFETY: the live request; `buf` holds `cap` bytes
+        let ok = unsafe {
+            httpd_req_get_hdr_value_str(self.req, name.as_ptr(), buf.as_mut_ptr(), buf.len())
+        } == super::ESP_OK;
+        if !ok {
+            return None;
+        }
+        // SAFETY: NUL-terminated by the call
+        Some(unsafe { CStr::from_ptr(buf.as_ptr()) }.into())
+    }
+
+    /// The URL query of at most `cap - 1` bytes; None without one (or if it
+    /// does not fit).
+    pub fn query(&mut self, cap: usize) -> Option<CString> {
+        let mut buf = vec![0 as c_char; cap.max(1)];
+        // SAFETY: the live request; `buf` holds `cap` bytes
+        let ok = unsafe { httpd_req_get_url_query_str(self.req, buf.as_mut_ptr(), buf.len()) }
+            == super::ESP_OK;
+        // SAFETY: NUL-terminated by the call
+        ok.then(|| unsafe { CStr::from_ptr(buf.as_ptr()) }.into())
+    }
+
+    /// The length of a request header (0 if missing).
+    pub fn header_len(&mut self, name: &CStr) -> usize {
+        // SAFETY: the live request
+        unsafe { httpd_req_get_hdr_value_len(self.req, name.as_ptr()) }
+    }
+
+    /// Receives body bytes into `buf`: their number, `HTTPD_SOCK_ERR_TIMEOUT`
+    /// or another value <= 0 on an error.
+    pub fn recv(&mut self, buf: &mut [u8]) -> c_int {
+        // SAFETY: the live request; at most `buf.len()` bytes
+        unsafe { httpd_req_recv(self.req, buf.as_mut_ptr() as *mut c_char, buf.len()) }
+    }
+
+    /// The socket of the connection.
+    pub fn sockfd(&mut self) -> c_int {
+        // SAFETY: the live request
+        unsafe { httpd_req_to_sockfd(self.req) }
+    }
+
+    /// The server handle.
+    pub fn handle(&self) -> Handle {
+        self.r().handle
+    }
+}
 
 /// `http_method` (http_parser.h)
 pub mod method {
@@ -170,10 +336,10 @@ mod sys {
     use super::*;
     pub use crate::idf::raw::{
         httpd_register_err_handler, httpd_register_uri_handler, httpd_req_get_hdr_value_len,
-        httpd_req_get_hdr_value_str, httpd_req_recv, httpd_req_to_sockfd, httpd_resp_send,
-        httpd_resp_send_chunk, httpd_resp_send_err, httpd_resp_set_hdr, httpd_resp_set_status,
-        httpd_resp_set_type, httpd_sess_trigger_close, httpd_start, httpd_uri_match_wildcard,
-        lwip_close,
+        httpd_req_get_hdr_value_str, httpd_req_get_url_query_str, httpd_req_recv,
+        httpd_req_to_sockfd, httpd_resp_send, httpd_resp_send_chunk, httpd_resp_send_err,
+        httpd_resp_set_hdr, httpd_resp_set_status, httpd_resp_set_type, httpd_sess_trigger_close,
+        httpd_start, httpd_uri_match_wildcard, lwip_close,
     };
 
     /// `struct sockaddr_in6` as the `struct sockaddr` it is passed as
@@ -244,6 +410,9 @@ mod sys {
     }
     pub unsafe fn httpd_req_to_sockfd(_: *mut Req) -> c_int {
         -1
+    }
+    pub unsafe fn httpd_req_get_url_query_str(_: *mut Req, _: *mut c_char, _: usize) -> EspErr {
+        ESP_FAIL
     }
     pub unsafe fn httpd_sess_trigger_close(_: Handle, _: c_int) -> EspErr {
         ESP_FAIL

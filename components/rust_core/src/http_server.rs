@@ -12,7 +12,7 @@ use core::ffi::{c_char, c_int, c_void, CStr};
 use std::sync::atomic::{AtomicBool, AtomicPtr, Ordering};
 
 use crate::http_routes::{self, flag, Handler, Method, Route, ROUTES};
-use crate::idf::httpd::{self, err, Req};
+use crate::idf::httpd::{self, err, Req, Request};
 use crate::idf::{EspErr, ESP_FAIL, ESP_OK};
 use crate::log::log;
 
@@ -63,38 +63,41 @@ struct RouteCtx {
 // ---------------------------------------------------------------------------
 // helpers for the handlers
 
-unsafe fn set_hdr(req: *mut Req, field: &CStr, value: &CStr) -> EspErr {
-    httpd::httpd_resp_set_hdr(req, field.as_ptr(), value.as_ptr())
+fn scratch(req: &mut Request) -> Option<&mut [u8]> {
+    let ctx = req.user_ctx() as *mut ServerCtx;
+    // SAFETY: the context the route was registered with; the server runs
+    // one handler at a time, and the slice is bound to the request borrow
+    unsafe { ctx.as_mut() }.map(|c| {
+        // SAFETY: c_char and u8 have the same layout
+        unsafe { core::slice::from_raw_parts_mut(c.scratch.as_mut_ptr() as *mut u8, SCRATCH_SIZE) }
+    })
 }
 
-unsafe fn send_err(req: *mut Req, code: httpd::ErrCode, msg: &CStr) -> EspErr {
-    httpd::httpd_resp_send_err(req, code, msg.as_ptr())
-}
-
-/// A request header (NUL-terminated into `out`); None if missing or too
-/// long.
-unsafe fn header<'a>(req: *mut Req, name: &CStr, out: &'a mut [c_char]) -> Option<&'a CStr> {
-    let len = httpd::httpd_req_get_hdr_value_len(req, name.as_ptr());
-    if len == 0 || len + 1 > out.len() {
-        return None;
-    }
-    if httpd::httpd_req_get_hdr_value_str(req, name.as_ptr(), out.as_mut_ptr(), out.len()) != ESP_OK
-    {
-        return None;
-    }
-    Some(CStr::from_ptr(out.as_ptr()))
+/// Runs `f` with the request and the server context's scratch buffer (file
+/// and core dump transfers) of a route with the context (`flag::CTX`);
+/// None without the context.
+pub fn with_scratch<T>(
+    req: &mut Request,
+    f: impl FnOnce(&mut Request, &mut [u8]) -> T,
+) -> Option<T> {
+    let buf = scratch(req)?.as_mut_ptr();
+    // SAFETY: the buffer is in the server context, not in the request, so
+    // the two borrows are disjoint; one handler runs at a time
+    let buf = unsafe { core::slice::from_raw_parts_mut(buf, SCRATCH_SIZE) };
+    Some(f(req, buf))
 }
 
 /// `is_network_allowed()`: the decision is `http_auth.rs`.
-unsafe fn network_allowed(req: *mut Req) -> bool {
+fn network_allowed(req: &mut Request) -> bool {
     const T: &CStr = c"http_cors";
     let ap_mode = crate::system::ap_state();
     let mut ip_be = 0u32;
     if !ap_mode {
-        let fd = httpd::httpd_req_to_sockfd(req);
+        let fd = req.sockfd();
         let mut addr = httpd::SockaddrIn6::default();
         let mut len = core::mem::size_of::<httpd::SockaddrIn6>() as u32;
-        if httpd::lwip_getpeername(fd, &mut addr, &mut len) < 0 {
+        // SAFETY: addr/len are writable and len is the size of addr
+        if unsafe { httpd::lwip_getpeername(fd, &mut addr, &mut len) } < 0 {
             log!(Error, T, "Error getting client IP");
             return false;
         }
@@ -102,176 +105,155 @@ unsafe fn network_allowed(req: *mut Req) -> bool {
         ip_be = addr.sin6_addr[3];
     }
     // an Origin header that does not fit counts as none, as before
-    let mut buf = [0 as c_char; 128];
-    let origin =
-        if httpd::httpd_req_get_hdr_value_str(req, c"Origin".as_ptr(), buf.as_mut_ptr(), buf.len())
-            == ESP_OK
-        {
-            Some(CStr::from_ptr(buf.as_ptr()))
-        } else {
-            None
-        };
+    let origin = req.header(c"Origin", 128);
     let hostname = crate::system::hostname();
     if crate::http_auth::network_allowed(
         ap_mode,
         u32::from_be(ip_be),
-        origin.map(CStr::to_bytes),
+        origin.as_deref().map(CStr::to_bytes),
         hostname.to_bytes(),
     ) {
         return true;
     }
     let ip = std::net::Ipv4Addr::from(u32::from_be(ip_be));
-    let origin = origin.map_or("-".into(), CStr::to_string_lossy);
+    let origin = origin.as_deref().map_or("-".into(), CStr::to_string_lossy);
     log!(Error, T, "denied: {ip} (origin {origin})");
     false
 }
 
 /// `set_cors_headers()`
-pub(crate) unsafe fn set_cors_headers(req: *mut Req) -> bool {
-    set_hdr(req, c"Access-Control-Allow-Origin", c"*") == ESP_OK
-        && set_hdr(
-            req,
+pub(crate) fn set_cors_headers(req: &mut Request) -> bool {
+    req.set_hdr(c"Access-Control-Allow-Origin", c"*") == ESP_OK
+        && req.set_hdr(
             c"Access-Control-Allow-Methods",
             c"GET, POST, PUT, PATCH, DELETE, OPTIONS",
         ) == ESP_OK
-        && set_hdr(
-            req,
+        && req.set_hdr(
             c"Access-Control-Allow-Headers",
             c"Content-Type, Authorization, X-TOTP, X-OTP-Session",
         ) == ESP_OK
-        && set_hdr(
-            req,
-            c"Access-Control-Expose-Headers",
-            c"X-ESP-App-ELF-SHA256",
-        ) == ESP_OK
+        && req.set_hdr(c"Access-Control-Expose-Headers", c"X-ESP-App-ELF-SHA256") == ESP_OK
+}
+
+/// A request header of at most `cap - 1` bytes, as before: None if missing
+/// or longer.
+fn header(req: &mut Request, name: &CStr, cap: usize) -> Option<std::ffi::CString> {
+    let len = req.header_len(name);
+    if len == 0 || len + 1 > cap {
+        return None;
+    }
+    req.header(name, cap)
 }
 
 /// `validateOTP()`: the session token or the TOTP header; sends 401 if
 /// neither is valid (`force`: also with OTP disabled, no session token).
-///
-/// # Safety
-/// `req` valid.
-pub unsafe fn validate_otp(req: *mut Req, force: bool) -> EspErr {
+pub fn validate_otp(req: &mut Request, force: bool) -> EspErr {
     // a token is 20 + 1 + 52 characters
-    let mut sess = [0 as c_char; 128];
-    let mut totp = [0 as c_char; 16];
-    let sess = header(req, c"X-OTP-Session", &mut sess).map_or(core::ptr::null(), CStr::as_ptr);
-    let totp = header(req, c"X-TOTP", &mut totp).map_or(core::ptr::null(), CStr::as_ptr);
-    match crate::otp_device::ffi::otp_dev_request_check(sess, totp, force) {
-        0 => ESP_OK,
-        1 => {
-            send_err(req, err::E401_UNAUTHORIZED, c"blocked for 5 minutes");
+    let sess = header(req, c"X-OTP-Session", 128);
+    let totp = header(req, c"X-TOTP", 16);
+    use crate::clock;
+    let auth = crate::otp::request(
+        force,
+        sess.as_deref().map(CStr::to_bytes),
+        totp.as_deref().map(CStr::to_bytes),
+        clock::now() as i64,
+        clock::is_time_synced(),
+        clock::now_ms(),
+    );
+    match auth {
+        crate::otp::Auth::Ok => ESP_OK,
+        crate::otp::Auth::Blocked => {
+            req.send_err(err::E401_UNAUTHORIZED, Some(c"blocked for 5 minutes"));
             ESP_FAIL
         }
-        _ => {
-            send_err(req, err::E401_UNAUTHORIZED, c"OTP/Session required");
+        crate::otp::Auth::Failed => {
+            req.send_err(err::E401_UNAUTHORIZED, Some(c"OTP/Session required"));
             ESP_FAIL
         }
     }
 }
 
-/// `getPostData()`: the body into the server context's scratch buffer
-/// (NUL-terminated); 500 if it does not fit or fails.
-///
-/// # Safety
-/// `req` a request of a route with the server context.
-pub unsafe fn post_data(req: *mut Req) -> EspErr {
+/// `getPostData()`: the body (up to a NUL byte, as before) through the
+/// server context's scratch buffer; sends 500 and returns the error if it
+/// does not fit or fails.
+pub fn read_body(req: &mut Request) -> Result<&[u8], EspErr> {
     const T: &CStr = c"http_utils";
-    let total = (*req).content_len;
-    let ctx = (*req).user_ctx as *mut ServerCtx;
+    let total = req.content_len();
     if total >= SCRATCH_SIZE {
         log!(Error, T, "content too long");
-        send_err(req, err::E500_INTERNAL_SERVER_ERROR, c"content too long");
-        return ESP_FAIL;
+        req.send_err(err::E500_INTERNAL_SERVER_ERROR, Some(c"content too long"));
+        return Err(ESP_FAIL);
     }
-    let buf = (*ctx).scratch.as_mut_ptr();
+    // read into a copy of the pointer: recv() needs the request as well
+    let Some(buf) = scratch(req).map(|b| b.as_mut_ptr()) else {
+        req.send_err(err::E500_INTERNAL_SERVER_ERROR, None);
+        return Err(ESP_FAIL);
+    };
     let mut cur = 0;
     while cur < total {
-        let n = httpd::httpd_req_recv(req, buf.add(cur), total - cur);
+        // SAFETY: the scratch buffer holds SCRATCH_SIZE > total bytes
+        let dst = unsafe { core::slice::from_raw_parts_mut(buf.add(cur), total - cur) };
+        let n = req.recv(dst);
         if n <= 0 {
             log!(Error, T, "error receiving data");
-            send_err(
-                req,
+            req.send_err(
                 err::E500_INTERNAL_SERVER_ERROR,
-                c"error receiving data",
+                Some(c"error receiving data"),
             );
-            return ESP_FAIL;
+            return Err(ESP_FAIL);
         }
         cur += n as usize;
     }
-    *buf.add(total) = 0;
-    ESP_OK
+    let body = &scratch(req).unwrap_or_default()[..total];
+    Ok(crate::cutil::until_nul(body))
 }
 
-/// `sendJsonBuffer()`: sends `json` (`len` bytes, `malloc()`ed) in 2048
-/// byte chunks and frees it; 500 if it is NULL.
-///
-/// # Safety
-/// `req` valid; `json` `malloc()`ed (or NULL), `len` bytes.
-pub unsafe fn send_json(req: *mut Req, json: *mut c_char, len: usize) -> EspErr {
-    if json.is_null() {
-        send_err(req, err::E500_INTERNAL_SERVER_ERROR, c"Out of memory");
-        return ESP_FAIL;
-    }
+/// `sendJsonBuffer()`: sends `json` in 2048 byte chunks.
+pub fn send_json(req: &mut Request, json: &[u8]) -> EspErr {
     const CHUNK: usize = 2048;
-    let data = core::slice::from_raw_parts(json as *const u8, len);
-    let mut ok = true;
-    for chunk in data.chunks(CHUNK) {
-        if httpd::httpd_resp_send_chunk(req, chunk.as_ptr() as *const c_char, chunk.len() as isize)
-            != ESP_OK
-        {
-            ok = false;
-            break;
+    for chunk in json.chunks(CHUNK) {
+        if req.send_chunk(chunk) != ESP_OK {
+            return ESP_FAIL;
         }
     }
-    crate::cutil::c_free(json as *mut c_void);
-    if !ok {
-        return ESP_FAIL;
-    }
-    httpd::httpd_resp_send_chunk(req, core::ptr::null(), 0)
+    req.end_chunks()
 }
 
 // ---------------------------------------------------------------------------
 // the server
 
-unsafe extern "C" fn recovery_handler(req: *mut Req) -> EspErr {
-    httpd::httpd_resp_set_type(req, c"text/html; charset=UTF-8".as_ptr());
-    httpd::httpd_resp_send(
-        req,
-        RECOVERY_PAGE.as_ptr() as *const c_char,
-        RECOVERY_PAGE.len() as isize,
-    );
+fn recovery_handler(req: &mut Request) -> EspErr {
+    req.set_type(c"text/html; charset=UTF-8");
+    req.send(RECOVERY_PAGE);
     ESP_OK
 }
 
 /// CORS preflight: the headers are set by the route's checks.
-unsafe extern "C" fn options_handler(req: *mut Req) -> EspErr {
-    httpd::httpd_resp_send(req, core::ptr::null(), 0);
+fn options_handler(req: &mut Request) -> EspErr {
+    req.send(&[]);
     ESP_OK
 }
 
 /// Closes the connection after the response (`ConGuard`).
-unsafe fn close_after(req: *mut Req) {
-    let fd = httpd::httpd_req_to_sockfd(req);
+fn close_after(req: &mut Request) {
+    let fd = req.sockfd();
     let s = server();
     if fd >= 0 && !s.is_null() {
-        httpd::httpd_sess_trigger_close(s, fd);
+        // SAFETY: the running server and one of its sockets
+        unsafe { httpd::httpd_sess_trigger_close(s, fd) };
     }
 }
 
 /// Unknown URIs: a redirect to `/` (captive portal).
 unsafe extern "C" fn not_found_handler(req: *mut Req, _: httpd::ErrCode) -> EspErr {
-    set_hdr(req, c"Connection", c"close");
-    httpd::httpd_resp_set_status(req, c"302 Temporary Redirect".as_ptr());
-    set_hdr(req, c"Location", c"/");
+    let mut req = Request::from_raw(req);
+    req.set_hdr(c"Connection", c"close");
+    req.set_status(c"302 Temporary Redirect");
+    req.set_hdr(c"Location", c"/");
     // iOS needs content to detect a captive portal
-    httpd::httpd_resp_send(
-        req,
-        c"Redirect to the captive portal".as_ptr(),
-        httpd::RESP_USE_STRLEN,
-    );
+    req.send(b"Redirect to the captive portal");
     log!(Info, TAG, "Redirecting to root");
-    close_after(req);
+    close_after(&mut req);
     ESP_OK
 }
 
@@ -287,13 +269,13 @@ unsafe extern "C" fn open_cb(_: httpd::Handle, _: c_int) -> EspErr {
     ESP_OK
 }
 
-unsafe fn checks_and_handler(req: *mut Req, rc: &RouteCtx) -> EspErr {
+fn checks_and_handler(req: &mut Request, rc: &RouteCtx) -> EspErr {
     let flags = rc.route.flags;
     if flags & flag::NET != 0 && !network_allowed(req) {
-        return send_err(req, err::E401_UNAUTHORIZED, c"Unauthorized");
+        return req.send_err(err::E401_UNAUTHORIZED, Some(c"Unauthorized"));
     }
     if flags & flag::CORS != 0 && !set_cors_headers(req) {
-        httpd::httpd_resp_send_err(req, err::E500_INTERNAL_SERVER_ERROR, core::ptr::null());
+        req.send_err(err::E500_INTERNAL_SERVER_ERROR, None);
         return ESP_FAIL;
     }
     if http_routes::needs_otp(rc.route, recovery()) {
@@ -317,13 +299,14 @@ unsafe fn checks_and_handler(req: *mut Req, rc: &RouteCtx) -> EspErr {
 unsafe extern "C" fn trampoline(req: *mut Req) -> EspErr {
     let rc = &*((*req).user_ctx as *const RouteCtx);
     (*req).user_ctx = rc.ctx;
+    let mut req = Request::from_raw(req);
     if rc.route.flags & flag::CLOSE != 0 {
-        set_hdr(req, c"Connection", c"close");
-        let r = checks_and_handler(req, rc);
-        close_after(req);
+        req.set_hdr(c"Connection", c"close");
+        let r = checks_and_handler(&mut req, rc);
+        close_after(&mut req);
         return r;
     }
-    checks_and_handler(req, rc)
+    checks_and_handler(&mut req, rc)
 }
 
 fn method(m: Method) -> httpd::Method {

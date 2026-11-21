@@ -399,50 +399,38 @@ pub fn apply(id: usize, s: &mut impl crate::settings_apply::Store) -> Option<Vec
 
 pub mod http {
     use super::*;
-    use crate::http_server::ServerCtx;
-    use crate::idf::httpd::{self, err, Req};
-    use crate::idf::{EspErr, ESP_FAIL, ESP_OK};
+    use crate::idf::httpd::{self, err, Request};
+    use crate::idf::{EspErr, ESP_FAIL};
 
-    unsafe fn send_err(req: *mut Req, code: httpd::ErrCode, msg: &CStr) -> EspErr {
-        httpd::httpd_resp_send_err(req, code, msg.as_ptr())
+    fn send_err(req: &mut Request, code: httpd::ErrCode, msg: &CStr) -> EspErr {
+        req.send_err(code, Some(msg))
     }
 
-    unsafe fn send_doc(req: *mut Req, doc: Json) -> EspErr {
-        httpd::httpd_resp_set_type(req, c"application/json".as_ptr());
-        let mut len = 0;
-        let p = crate::cutil::malloc_copy(&doc.serialize(), &mut len);
-        crate::http_server::send_json(req, p, len)
+    fn send_doc(req: &mut Request, doc: Json) -> EspErr {
+        req.set_type(c"application/json");
+        crate::http_server::send_json(req, &doc.serialize())
     }
 
-    /// The request body (read into the server context's scratch buffer).
-    unsafe fn body<'a>(req: *mut Req) -> Option<&'a [u8]> {
-        if crate::http_server::post_data(req) != ESP_OK {
-            return None;
-        }
-        let ctx = (*req).user_ctx as *const ServerCtx;
-        Some(CStr::from_ptr((*ctx).scratch.as_ptr()).to_bytes())
+    /// The request body (read through the server context's scratch buffer),
+    /// copied: the handlers send answers while they still use it.
+    fn body(req: &mut Request) -> Option<Vec<u8>> {
+        crate::http_server::read_body(req).ok().map(<[u8]>::to_vec)
     }
 
     /// `GET /api/v2/profiles`
-    ///
-    /// # Safety
-    /// `req` a request of a route with the server context.
-    pub unsafe extern "C" fn get(req: *mut Req) -> EspErr {
+    pub fn get(req: &mut Request) -> EspErr {
         ensure_default(crate::http_data::v2_settings_doc);
         let (l, a) = list();
         send_doc(req, to_json(&l, a))
     }
 
     /// `PATCH /api/v2/profiles` (OTP): replaces all profiles.
-    ///
-    /// # Safety
-    /// `req` a request of a route with the server context.
-    pub unsafe extern "C" fn patch(req: *mut Req) -> EspErr {
+    pub fn patch(req: &mut Request) -> EspErr {
         ensure_default(crate::http_data::v2_settings_doc);
         let Some(b) = body(req) else {
             return ESP_FAIL;
         };
-        let new = match parse_patch(b) {
+        let new = match parse_patch(&b) {
             Ok(n) => n,
             Err(e) => return send_err(req, err::E400_BAD_REQUEST, e.message()),
         };
@@ -458,16 +446,13 @@ pub mod http {
 
     /// `POST /api/v2/profiles/apply` with `{"id": n}` (no OTP: it only
     /// selects a stored profile).
-    ///
-    /// # Safety
-    /// `req` a request of a route with the server context.
-    pub unsafe extern "C" fn apply(req: *mut Req) -> EspErr {
+    pub fn apply(req: &mut Request) -> EspErr {
         ensure_default(crate::http_data::v2_settings_doc);
         let Some(b) = body(req) else {
             return ESP_FAIL;
         };
         let count = list().0.len();
-        let Some(id) = parse_apply(b, count) else {
+        let Some(id) = parse_apply(&b, count) else {
             return send_err(req, err::E400_BAD_REQUEST, c"Unknown profile id");
         };
         let Some(name) = super::apply(id, &mut crate::settings_apply::Config) else {

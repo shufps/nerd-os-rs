@@ -5,12 +5,10 @@
 //! `ESP_CORE_DUMP_INFO` note) in `X-ESP-App-ELF-SHA256`.
 
 use crate::idf::idf_const;
-use core::ffi::{c_char, c_void, CStr};
+use core::ffi::{c_void, CStr};
 
-#[cfg(not(target_os = "espidf"))]
 use crate::http_data::Partition;
-use crate::http_server::{ServerCtx, SCRATCH_SIZE};
-use crate::idf::httpd::{self, err, Req};
+use crate::idf::httpd::{self, err, Request};
 use crate::idf::nvs::err_name;
 use crate::idf::{EspErr, ESP_FAIL, ESP_OK};
 use crate::log::log;
@@ -52,7 +50,11 @@ mod part {
 #[cfg(not(target_os = "espidf"))]
 mod part {
     use super::*;
-    pub unsafe fn esp_partition_find_first(_: u32, _: u32, _: *const c_char) -> *const Partition {
+    pub unsafe fn esp_partition_find_first(
+        _: u32,
+        _: u32,
+        _: *const core::ffi::c_char,
+    ) -> *const Partition {
         core::ptr::null()
     }
     pub unsafe fn esp_partition_read(
@@ -120,20 +122,14 @@ pub fn elf_sha256(
     Ok(String::from_utf8_lossy(&sha).into_owned())
 }
 
-unsafe fn send_err(req: *mut Req, code: httpd::ErrCode, msg: &CStr) -> EspErr {
-    httpd::httpd_resp_send_err(req, code, msg.as_ptr())
-}
-
-unsafe fn end_chunks(req: *mut Req) -> EspErr {
-    httpd::httpd_resp_send_chunk(req, core::ptr::null(), 0)
+fn send_err(req: &mut Request, code: httpd::ErrCode, msg: &CStr) -> EspErr {
+    req.send_err(code, Some(msg))
 }
 
 /// `GET /api/system/coredump`
-///
-/// # Safety
-/// `req` valid, its context the server context.
-pub unsafe extern "C" fn handler(req: *mut Req) -> EspErr {
-    let e = sys::esp_core_dump_image_check();
+pub fn handler(req: &mut Request) -> EspErr {
+    // SAFETY: reads the core dump partition
+    let e = unsafe { sys::esp_core_dump_image_check() };
     if e == ESP_ERR_NOT_FOUND || e == ESP_ERR_INVALID_SIZE {
         return send_err(req, err::E404_NOT_FOUND, c"No valid core dump stored");
     }
@@ -144,16 +140,13 @@ pub unsafe extern "C" fn handler(req: *mut Req) -> EspErr {
             "Core dump integrity check failed: {}",
             err_name(e)
         );
-        httpd::httpd_resp_set_status(req, c"409 Conflict".as_ptr());
-        return httpd::httpd_resp_send(
-            req,
-            c"Core dump integrity check failed".as_ptr(),
-            httpd::RESP_USE_STRLEN,
-        );
+        req.set_status(c"409 Conflict");
+        return req.send(b"Core dump integrity check failed");
     }
 
     let (mut address, mut size) = (0usize, 0usize);
-    let e = sys::esp_core_dump_image_get(&mut address, &mut size);
+    // SAFETY: both outputs writable
+    let e = unsafe { sys::esp_core_dump_image_get(&mut address, &mut size) };
     if e != ESP_OK {
         log!(Error, TAG, "Failed to locate core dump: {}", err_name(e));
         return send_err(
@@ -162,12 +155,17 @@ pub unsafe extern "C" fn handler(req: *mut Req) -> EspErr {
             c"Failed to locate core dump",
         );
     }
-    let p = part::esp_partition_find_first(
-        PARTITION_TYPE_DATA,
-        PARTITION_SUBTYPE_COREDUMP,
-        core::ptr::null(),
-    );
-    if p.is_null() || address != (*p).address as usize || size > (*p).size as usize {
+    // SAFETY: the partition table lives as long as the firmware (static
+    // entries, or NULL)
+    let p: Option<&'static Partition> = unsafe {
+        part::esp_partition_find_first(
+            PARTITION_TYPE_DATA,
+            PARTITION_SUBTYPE_COREDUMP,
+            core::ptr::null(),
+        )
+        .as_ref()
+    };
+    let Some(p) = p.filter(|p| address == p.address as usize && size <= p.size as usize) else {
         log!(
             Error,
             TAG,
@@ -178,13 +176,19 @@ pub unsafe extern "C" fn handler(req: *mut Req) -> EspErr {
             err::E500_INTERNAL_SERVER_ERROR,
             c"Invalid core dump location",
         );
-    }
+    };
 
-    let ctx = (*req).user_ctx as *mut ServerCtx;
-    let chunk =
-        core::slice::from_raw_parts_mut((*ctx).scratch.as_mut_ptr() as *mut u8, SCRATCH_SIZE);
+    crate::http_server::with_scratch(req, |req, chunk| send_dump(req, chunk, p, size))
+        .unwrap_or(ESP_FAIL)
+}
+
+/// The ELF identity header and the dump in chunks through `chunk`.
+fn send_dump(req: &mut Request, chunk: &mut [u8], p: &'static Partition, size: usize) -> EspErr {
     let read = |offset: usize, buf: &mut [u8]| {
-        let e = part::esp_partition_read(p, offset, buf.as_mut_ptr() as *mut c_void, buf.len());
+        // SAFETY: a partition entry; at most `buf.len()` bytes into `buf`
+        let e = unsafe {
+            part::esp_partition_read(p, offset, buf.as_mut_ptr() as *mut c_void, buf.len())
+        };
         if e == ESP_OK {
             Ok(())
         } else {
@@ -208,12 +212,11 @@ pub unsafe extern "C" fn handler(req: *mut Req) -> EspErr {
         }
     };
 
-    httpd::httpd_resp_set_type(req, c"application/octet-stream".as_ptr());
-    httpd::httpd_resp_set_hdr(req, c"Cache-Control".as_ptr(), c"no-store".as_ptr());
-    httpd::httpd_resp_set_hdr(req, c"X-Content-Type-Options".as_ptr(), c"nosniff".as_ptr());
-    // the header value must live until the response is sent
+    req.set_type(c"application/octet-stream");
+    req.set_hdr(c"Cache-Control", c"no-store");
+    req.set_hdr(c"X-Content-Type-Options", c"nosniff");
     let sha = std::ffi::CString::new(sha).unwrap_or_default();
-    if httpd::httpd_resp_set_hdr(req, c"X-ESP-App-ELF-SHA256".as_ptr(), sha.as_ptr()) != ESP_OK {
+    if req.set_hdr(c"X-ESP-App-ELF-SHA256", &sha) != ESP_OK {
         log!(Error, TAG, "Failed to set core dump ELF identity header");
         return send_err(
             req,
@@ -224,22 +227,21 @@ pub unsafe extern "C" fn handler(req: *mut Req) -> EspErr {
 
     let mut offset = 0;
     while offset < size {
-        let n = (size - offset).min(SCRATCH_SIZE);
+        let n = (size - offset).min(chunk.len());
         if read(offset, &mut chunk[..n]).is_err() {
             log!(Error, TAG, "Failed to read core dump at offset {offset}");
-            end_chunks(req);
+            req.end_chunks();
             return ESP_FAIL;
         }
-        if httpd::httpd_resp_send_chunk(req, chunk.as_ptr() as *const c_char, n as isize) != ESP_OK
-        {
+        if req.send_chunk(&chunk[..n]) != ESP_OK {
             log!(Error, TAG, "Failed to send core dump at offset {offset}");
-            end_chunks(req);
+            req.end_chunks();
             return ESP_FAIL;
         }
         offset += n;
     }
     log!(Info, TAG, "Sent {size}-byte core dump");
-    end_chunks(req)
+    req.end_chunks()
 }
 
 #[cfg(test)]

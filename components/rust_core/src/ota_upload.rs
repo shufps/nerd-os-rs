@@ -7,11 +7,11 @@
 //! PID), and a failed firmware upload restarts the device to mine again.
 
 use crate::idf::idf_const;
-use core::ffi::{c_char, c_int, c_void, CStr};
+use core::ffi::{c_int, c_void, CStr};
 
 use crate::http_data::Partition;
 use crate::http_ota::{receive_upload, UploadError, UploadIo};
-use crate::idf::httpd::{self, err, Req};
+use crate::idf::httpd::{self, err, Request};
 use crate::idf::{EspErr, ESP_FAIL, ESP_OK};
 use crate::log::log;
 use crate::power_mgmt;
@@ -39,7 +39,11 @@ mod sys {
 #[allow(non_snake_case)]
 mod sys {
     use super::*;
-    pub unsafe fn esp_partition_find_first(_: u32, _: u32, _: *const c_char) -> *const Partition {
+    pub unsafe fn esp_partition_find_first(
+        _: u32,
+        _: u32,
+        _: *const core::ffi::c_char,
+    ) -> *const Partition {
         core::ptr::null()
     }
     pub unsafe fn esp_partition_erase_range(_: *const Partition, _: usize, _: usize) -> EspErr {
@@ -114,24 +118,25 @@ impl Drop for PmLock {
 }
 
 /// The request body into the www partition or an OTA handle.
-struct Upload {
-    req: *mut Req,
+struct Upload<'a> {
+    req: &'a mut Request,
     target: Target,
 }
 
 enum Target {
-    Www(*const Partition),
+    Www(&'static Partition),
     Ota(u32),
 }
 
-impl UploadIo for Upload {
+impl UploadIo for Upload<'_> {
     fn recv(&mut self, buf: &mut [u8]) -> i32 {
-        unsafe { httpd::httpd_req_recv(self.req, buf.as_mut_ptr() as *mut c_char, buf.len()) }
+        self.req.recv(buf)
     }
     fn write(&mut self, offset: u32, data: &[u8]) -> bool {
         let ok = match self.target {
             Target::Www(p) => {
                 let _g = PmLock::new();
+                // SAFETY: a partition entry; `data` for the call
                 unsafe {
                     sys::esp_partition_write(
                         p,
@@ -141,21 +146,23 @@ impl UploadIo for Upload {
                     ) == ESP_OK
                 }
             }
+            // SAFETY: an open OTA handle; `data` for the call
             Target::Ota(h) => unsafe {
                 sys::esp_ota_write(h, data.as_ptr() as *const c_void, data.len()) == ESP_OK
             },
         };
         // let the PID and the other tasks run
+        // SAFETY: a plain FreeRTOS call from a task
         unsafe { sys::vPortYield() };
         ok
     }
 }
 
-unsafe fn send_err(req: *mut Req, code: httpd::ErrCode, msg: &CStr) -> EspErr {
-    httpd::httpd_resp_send_err(req, code, msg.as_ptr())
+fn send_err(req: &mut Request, code: httpd::ErrCode, msg: &CStr) -> EspErr {
+    req.send_err(code, Some(msg))
 }
 
-unsafe fn upload_error(req: *mut Req, e: UploadError) -> EspErr {
+fn upload_error(req: &mut Request, e: UploadError) -> EspErr {
     match e {
         UploadError::TooLarge => send_err(
             req,
@@ -175,26 +182,28 @@ fn restart_soon() -> ! {
 }
 
 /// `POST /api/system/OTAWWW`
-///
-/// # Safety
-/// `req` valid.
-pub unsafe extern "C" fn www_update(req: *mut Req) -> EspErr {
-    let p = sys::esp_partition_find_first(
-        PARTITION_TYPE_DATA,
-        PARTITION_SUBTYPE_SPIFFS,
-        c"www".as_ptr(),
-    );
-    if p.is_null() {
+pub fn www_update(req: &mut Request) -> EspErr {
+    // SAFETY: a static entry of the partition table, or NULL
+    let p: Option<&'static Partition> = unsafe {
+        sys::esp_partition_find_first(
+            PARTITION_TYPE_DATA,
+            PARTITION_SUBTYPE_SPIFFS,
+            c"www".as_ptr(),
+        )
+        .as_ref()
+    };
+    let Some(p) = p else {
         send_err(
             req,
             err::E500_INTERNAL_SERVER_ERROR,
             c"WWW partition not found",
         );
         return ESP_FAIL;
-    }
-    let size = (*p).size as usize;
+    };
+    let size = p.size as usize;
     // the whole image must fit (content_len is a size_t)
-    if (*req).content_len > size {
+    let content_len = req.content_len();
+    if content_len > size {
         send_err(
             req,
             err::E400_BAD_REQUEST,
@@ -208,7 +217,8 @@ pub unsafe extern "C" fn www_update(req: *mut Req) -> EspErr {
     {
         let _g = PmLock::new();
         log!(Info, TAG, "erasing www partition ...");
-        if sys::esp_partition_erase_range(p, 0, size) != ESP_OK {
+        // SAFETY: a partition entry and its size
+        if unsafe { sys::esp_partition_erase_range(p, 0, size) } != ESP_OK {
             return send_err(req, err::E500_INTERNAL_SERVER_ERROR, c"Erase Error");
         }
         log!(Info, TAG, "erasing done");
@@ -217,34 +227,30 @@ pub unsafe extern "C" fn www_update(req: *mut Req) -> EspErr {
         req,
         target: Target::Www(p),
     };
-    if let Err(e) = receive_upload(&mut up, (*req).content_len, size, buf.slice()) {
+    if let Err(e) = receive_upload(&mut up, content_len, size, buf.slice()) {
         upload_error(req, e);
         return ESP_FAIL;
     }
-    httpd::httpd_resp_send(
-        req,
-        c"WWW update complete\n".as_ptr(),
-        httpd::RESP_USE_STRLEN,
-    );
+    req.send(b"WWW update complete\n");
     ESP_OK
 }
 
 /// `POST /api/system/OTA`
-///
-/// # Safety
-/// `req` valid.
-pub unsafe extern "C" fn firmware_update(req: *mut Req) -> EspErr {
-    let p = sys::esp_ota_get_next_update_partition(core::ptr::null());
-    if p.is_null() {
+pub fn firmware_update(req: &mut Request) -> EspErr {
+    // SAFETY: a static entry of the partition table, or NULL
+    let p: Option<&'static Partition> =
+        unsafe { sys::esp_ota_get_next_update_partition(core::ptr::null()).as_ref() };
+    let Some(p) = p else {
         return send_err(
             req,
             err::E500_INTERNAL_SERVER_ERROR,
             c"OTA partition not found",
         );
-    }
-    let size = (*p).size as usize;
+    };
+    let size = p.size as usize;
     // before the board is shut down
-    if (*req).content_len > size {
+    let content_len = req.content_len();
+    if content_len > size {
         return send_err(
             req,
             err::E400_BAD_REQUEST,
@@ -262,14 +268,16 @@ pub unsafe extern "C" fn firmware_update(req: *mut Req) -> EspErr {
     power_mgmt::shutdown();
 
     let mut handle = 0u32;
-    let result = if sys::esp_ota_begin(p, OTA_SIZE_UNKNOWN, &mut handle) == ESP_OK {
+    // SAFETY: a partition entry; `handle` writable
+    let result = if unsafe { sys::esp_ota_begin(p, OTA_SIZE_UNKNOWN, &mut handle) } == ESP_OK {
         let mut up = Upload {
             req,
             target: Target::Ota(handle),
         };
-        let r = receive_upload(&mut up, (*req).content_len, size, buf.slice());
+        let r = receive_upload(&mut up, content_len, size, buf.slice());
         if r.is_err() {
-            sys::esp_ota_abort(handle);
+            // SAFETY: the open handle
+            unsafe { sys::esp_ota_abort(handle) };
         }
         r
     } else {
@@ -289,7 +297,9 @@ pub unsafe extern "C" fn firmware_update(req: *mut Req) -> EspErr {
         restart_soon();
     }
     // validate and activate the new image
-    if sys::esp_ota_end(handle) != ESP_OK || sys::esp_ota_set_boot_partition(p) != ESP_OK {
+    // SAFETY: the open handle; the partition it was written to
+    if unsafe { sys::esp_ota_end(handle) != ESP_OK || sys::esp_ota_set_boot_partition(p) != ESP_OK }
+    {
         send_err(
             req,
             err::E500_INTERNAL_SERVER_ERROR,
@@ -297,11 +307,7 @@ pub unsafe extern "C" fn firmware_update(req: *mut Req) -> EspErr {
         );
         restart_soon();
     }
-    httpd::httpd_resp_send(
-        req,
-        c"Firmware update complete, rebooting now!\n".as_ptr(),
-        httpd::RESP_USE_STRLEN,
-    );
+    req.send(b"Firmware update complete, rebooting now!\n");
     log!(
         Info,
         TAG,

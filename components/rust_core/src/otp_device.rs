@@ -7,7 +7,6 @@ use crate::idf::idf_const;
 use core::ffi::{c_char, c_int, CStr};
 use std::sync::Mutex;
 
-use crate::clock;
 use crate::log::log;
 use crate::otp::{self, Enrollment};
 
@@ -205,56 +204,6 @@ pub(crate) mod ffi {
                 *size = 0;
                 core::ptr::null()
             }
-        }
-    }
-
-    /// A protected request (`X-OTP-Session` / `X-TOTP`, NULL if absent):
-    /// 0 ok, 1 blocked, 2 failed.
-    ///
-    /// # Safety
-    /// Strings NUL-terminated or NULL.
-    pub unsafe extern "C" fn otp_dev_request_check(
-        session: *const c_char,
-        totp: *const c_char,
-        force: bool,
-    ) -> c_int {
-        otp::request(
-            force,
-            opt(session),
-            opt(totp),
-            clock::now() as i64,
-            clock::is_time_synced(),
-            clock::now_ms(),
-        ) as c_int
-    }
-
-    /// The TOTP login of `/api/v2/otp/session`, the same outcomes.
-    ///
-    /// # Safety
-    /// `totp` NUL-terminated.
-    pub unsafe extern "C" fn otp_dev_login_check(totp: *const c_char) -> c_int {
-        let t = opt(totp).unwrap_or_default();
-        otp::login(
-            t,
-            clock::now() as i64,
-            clock::is_time_synced(),
-            clock::now_ms(),
-        ) as c_int
-    }
-
-    /// A session token valid `ttl` seconds into `out` (`cap` bytes); its
-    /// length, 0 on an error.
-    ///
-    /// # Safety
-    /// `out` writable for `cap` bytes.
-    pub unsafe extern "C" fn otp_dev_mint_session(ttl: u32, out: *mut c_char, cap: usize) -> usize {
-        match otp::mint(ttl, clock::now() as i64) {
-            Some(t) if t.len() < cap => {
-                core::ptr::copy_nonoverlapping(t.as_ptr(), out as *mut u8, t.len());
-                *out.add(t.len()) = 0;
-                t.len()
-            }
-            _ => 0,
         }
     }
 }

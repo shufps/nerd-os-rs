@@ -8,15 +8,15 @@
 //! C++ (built only with core dumps in flash).
 
 use crate::idf::idf_const;
-use core::ffi::{c_char, c_int, CStr};
+use core::ffi::{c_int, CStr};
 use std::ffi::CString;
 
-use crate::board::ffi::{board_info, Info as BoardInfo};
+use crate::board::ffi::Info as BoardInfo;
 use crate::cfg;
 use crate::history::ffi::{history_current, history_current_timestamp};
 use crate::http_json::{self, AsicInfo, Dashboard, FanInfo, SystemInfo, V2Settings};
 use crate::http_routes::Handler;
-use crate::idf::httpd::{self, HandlerFn, Req};
+use crate::idf::httpd::{HandlerFn, Request};
 use crate::idf::{EspErr, ESP_FAIL, ESP_OK};
 use crate::log::log;
 use crate::power_mgmt;
@@ -39,14 +39,14 @@ pub struct Partition {
     pub address: u32,
     pub size: u32,
     pub erase_size: u32,
-    pub label: [c_char; 17],
+    pub label: [core::ffi::c_char; 17],
     pub encrypted: bool,
     pub readonly: bool,
 }
 
 #[cfg(target_os = "espidf")]
 mod sys {
-    pub use crate::idf::raw::{esp_ota_get_running_partition, httpd_req_get_url_query_str};
+    pub use crate::idf::raw::esp_ota_get_running_partition;
     extern "C" {
         pub fn disp_load_settings();
     }
@@ -59,9 +59,6 @@ mod sys {
     pub unsafe fn disp_load_settings() {}
     pub unsafe fn esp_ota_get_running_partition() -> *const Partition {
         core::ptr::null()
-    }
-    pub unsafe fn httpd_req_get_url_query_str(_: *mut Req, _: *mut c_char, _: usize) -> EspErr {
-        ESP_FAIL
     }
 }
 
@@ -83,11 +80,7 @@ pub fn handler(h: Handler) -> Option<HandlerFn> {
 // sources
 
 fn board() -> BoardInfo {
-    let mut i = core::mem::MaybeUninit::uninit();
-    unsafe {
-        board_info(i.as_mut_ptr());
-        i.assume_init()
-    }
+    crate::board::ffi::info()
 }
 
 fn small_core_count() -> c_int {
@@ -119,11 +112,9 @@ fn now_ms() -> u64 {
 }
 
 /// The history query of the request (`?ts=..&limit=..`).
-unsafe fn history_query(req: *mut Req, v2: bool) -> crate::http_query::HistoryQuery {
-    let mut q = [0 as c_char; 128];
-    let has = sys::httpd_req_get_url_query_str(req, q.as_mut_ptr(), q.len()) == ESP_OK;
-    let query = has.then(|| CStr::from_ptr(q.as_ptr()).to_bytes());
-    crate::http_query::history_query(query, v2)
+fn history_query(req: &mut Request, v2: bool) -> crate::http_query::HistoryQuery {
+    let q = req.query(128);
+    crate::http_query::history_query(q.as_deref().map(CStr::to_bytes), v2)
 }
 
 /// The fan settings of channel `ch` (as shown by the settings pages).
@@ -143,14 +134,12 @@ fn fan_settings(b: &BoardInfo, ch: usize) -> FanInfo {
     }
 }
 
-unsafe fn send_doc(req: *mut Req, doc: crate::ajson::Json) -> EspErr {
-    let mut len = 0;
-    let p = crate::cutil::malloc_copy(&doc.serialize(), &mut len);
-    crate::http_server::send_json(req, p, len)
+fn send_doc(req: &mut Request, doc: crate::ajson::Json) -> EspErr {
+    crate::http_server::send_json(req, &doc.serialize())
 }
 
-unsafe fn set_json(req: *mut Req) {
-    httpd::httpd_resp_set_type(req, c"application/json".as_ptr());
+fn set_json(req: &mut Request) {
+    req.set_type(c"application/json");
 }
 
 fn running_partition() -> CString {
@@ -172,7 +161,7 @@ pub(crate) fn reload_settings() {
 // ---------------------------------------------------------------------------
 // v1
 
-unsafe extern "C" fn system_info(req: *mut Req) -> EspErr {
+fn system_info(req: &mut Request) -> EspErr {
     set_json(req);
     let q = history_query(req, false);
     if q.has_current {
@@ -202,7 +191,7 @@ unsafe extern "C" fn system_info(req: *mut Req) -> EspErr {
         })
         .collect();
 
-    let mut s: SystemInfo = core::mem::zeroed();
+    let mut s = SystemInfo::zeroed();
     s.asic_count = b.asic_count;
     s.small_core_count = small_core_count();
     s.device_model = b.device_model;
@@ -234,7 +223,7 @@ unsafe extern "C" fn system_info(req: *mut Req) -> EspErr {
     s.manual_fan_speed = cfg::fan_speed();
     s.fan_count = b.num_fans;
     for ch in 0..2 {
-        let mut f: FanInfo = core::mem::zeroed();
+        let mut f = FanInfo::zeroed();
         if (ch as c_int) < s.fan_count {
             f = fan_settings(&b, ch);
         }
@@ -320,7 +309,7 @@ unsafe extern "C" fn system_info(req: *mut Req) -> EspErr {
     send_doc(req, http_json::system_info(&s))
 }
 
-unsafe extern "C" fn system_asic(req: *mut Req) -> EspErr {
+fn system_asic(req: &mut Request) -> EspErr {
     set_json(req);
     let b = board();
     let a = AsicInfo {
@@ -345,10 +334,9 @@ unsafe extern "C" fn system_asic(req: *mut Req) -> EspErr {
 
 /// `?allTime=1` also clears the persisted all-time stats; that cannot be
 /// undone, so it needs OTP (when enabled).
-unsafe extern "C" fn reset_stats(req: *mut Req) -> EspErr {
-    let mut q = [0 as c_char; 32];
-    let has = sys::httpd_req_get_url_query_str(req, q.as_mut_ptr(), q.len()) == ESP_OK;
-    let all_time = crate::http_query::all_time(has.then(|| CStr::from_ptr(q.as_ptr()).to_bytes()));
+fn reset_stats(req: &mut Request) -> EspErr {
+    let q = req.query(32);
+    let all_time = crate::http_query::all_time(q.as_deref().map(CStr::to_bytes));
     if all_time && crate::http_server::validate_otp(req, false) != ESP_OK {
         return ESP_FAIL;
     }
@@ -366,24 +354,17 @@ unsafe extern "C" fn reset_stats(req: *mut Req) -> EspErr {
             "Session"
         }
     );
-    httpd::httpd_resp_set_status(req, c"204 No Content".as_ptr());
-    httpd::httpd_resp_send(req, core::ptr::null(), 0)
+    req.set_status(c"204 No Content");
+    req.send(&[])
 }
 
-unsafe extern "C" fn settings_patch(req: *mut Req) -> EspErr {
+fn settings_patch(req: &mut Request) -> EspErr {
     let dual = crate::pool_manager::ffi::pool_mgr_is_dual();
-    if crate::http_handlers::ffi::http_apply_settings(
-        req,
-        0,
-        dual,
-        c"system".as_ptr(),
-        core::ptr::null_mut(),
-    ) != ESP_OK
-    {
+    if crate::http_handlers::apply_pool_settings(req, true, dual, c"system").is_err() {
         return ESP_FAIL;
     }
     crate::config_nvs::request_flush();
-    httpd::httpd_resp_send_chunk(req, core::ptr::null(), 0);
+    req.end_chunks();
     reload_settings();
     ESP_OK
 }
@@ -391,7 +372,7 @@ unsafe extern "C" fn settings_patch(req: *mut Req) -> EspErr {
 // ---------------------------------------------------------------------------
 // v2
 
-unsafe extern "C" fn dashboard(req: *mut Req) -> EspErr {
+fn dashboard(req: &mut Request) -> EspErr {
     set_json(req);
     let q = history_query(req, true);
     let b = board();
@@ -399,7 +380,7 @@ unsafe extern "C" fn dashboard(req: *mut Req) -> EspErr {
     let urls = [cfg::stratum_url(0), cfg::stratum_url(1)];
     let users = [cfg::stratum_user(0), cfg::stratum_user(1)];
 
-    let mut d: Dashboard = core::mem::zeroed();
+    let mut d = Dashboard::zeroed();
     d.uptime_seconds = uptime_seconds();
     d.shutdown = power_mgmt::is_shutdown();
     d.board_error = crate::system::error().0;
@@ -430,8 +411,8 @@ unsafe extern "C" fn dashboard(req: *mut Req) -> EspErr {
         chips[2 * n as usize + u] = crate::board_core::CHIP_TEMPS.get(i);
     }
     d.chip_hashrate = chips.as_ptr();
-    d.chip_error_rate = chips.as_ptr().add(n as usize);
-    d.asic_temps = chips.as_ptr().add(2 * n as usize);
+    d.chip_error_rate = chips[n as usize..].as_ptr();
+    d.asic_temps = chips[2 * n as usize..].as_ptr();
 
     d.watts = power_mgmt::get(0);
     d.min_power = b.min_pin;
@@ -494,7 +475,7 @@ unsafe extern "C" fn dashboard(req: *mut Req) -> EspErr {
     send_doc(req, http_json::dashboard(&d))
 }
 
-unsafe extern "C" fn v2_settings_get(req: *mut Req) -> EspErr {
+fn v2_settings_get(req: &mut Request) -> EspErr {
     set_json(req);
     send_doc(req, v2_settings_doc())
 }
@@ -511,8 +492,7 @@ pub(crate) fn v2_settings_doc() -> crate::ajson::Json {
     let ssid = cfg::wifi_ssid();
     let mempool_url = cfg::mempool_url();
 
-    // SAFETY: a plain C struct, all-zero is a valid value
-    let mut v: V2Settings = unsafe { core::mem::zeroed() };
+    let mut v = V2Settings::zeroed();
     v.asic_model = b.asic_model;
     v.device_model = b.device_model;
     v.version = version.as_ptr();
@@ -584,18 +564,12 @@ pub(crate) fn v2_settings_doc() -> crate::ajson::Json {
 
 /// The same structure as `GET /api/v2/settings`, all fields optional; the
 /// pools as a `pools[]` array.
-unsafe extern "C" fn v2_settings_patch(req: *mut Req) -> EspErr {
-    let mut verify_changed = [false; 2];
-    if crate::http_handlers::ffi::http_apply_settings(
-        req,
-        1,
-        false,
-        c"v2_settings".as_ptr(),
-        verify_changed.as_mut_ptr(),
-    ) != ESP_OK
-    {
+fn v2_settings_patch(req: &mut Request) -> EspErr {
+    let Ok(verify_changed) =
+        crate::http_handlers::apply_pool_settings(req, false, false, c"v2_settings")
+    else {
         return ESP_FAIL;
-    }
+    };
 
     // re-run the verification (unblocked and counted afresh if its settings
     // changed)
@@ -614,7 +588,7 @@ unsafe extern "C" fn v2_settings_patch(req: *mut Req) -> EspErr {
     }
 
     crate::config_nvs::request_flush();
-    httpd::httpd_resp_send_chunk(req, core::ptr::null(), 0);
+    req.end_chunks();
     reload_settings();
     ESP_OK
 }

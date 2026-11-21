@@ -1,7 +1,7 @@
 #ifndef _NERDAXE_UI_HELPERS_H
 #define _NERDAXE_UI_HELPERS_H
 
-#include "ui.h"
+#include "lvgl.h"
 
 #define _UI_TEMPORARY_STRING_BUFFER_SIZE 32
 #define _UI_BAR_PROPERTY_VALUE 0

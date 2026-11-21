@@ -1,4 +1,4 @@
-// The C++ side of the board (board.h): the display theme and the self test;
+// The C++ side of the board (board.h): the self test;
 // everything else is in Rust (board_rs.h).
 #include <stdio.h>
 
@@ -18,31 +18,6 @@ Board::Board(int board)
         ESP_LOGE(TAG, "no board %d", board);
         abort();
     }
-
-#if defined(NERDQAXEPLUS)
-    m_theme = new ThemeNerdqaxeplus();
-#elif defined(NERDQAXEPLUS2)
-    m_theme = new ThemeNerdqaxeplus2();
-#elif defined(NERDOCTAXEPLUS)
-    m_theme = new ThemeNerdoctaxeplus();
-#elif defined(NERDAXE)
-    m_theme = new ThemeNerdaxe();
-#elif defined(NERDOCTAXEGAMMA)
-    m_theme = new ThemeNerdoctaxegamma();
-#elif defined(NERDAXEGAMMA)
-    m_theme = new ThemeNerdaxegamma();
-#elif defined(NERDAXEGAIA)
-    m_theme = new ThemeNerdaxegaia();
-#elif defined(NERDHAXEGAMMA)
-    m_theme = new ThemeNerdhaxegamma();
-#elif defined(NERDEKO)
-    m_theme = new ThemeNerdeko();
-#elif defined(NERDQX)
-    m_theme = new ThemeNerdqx();
-#elif defined(Q1370) || defined(Q1373)
-    m_theme = new ThemeGeneric();
-#endif
-
 }
 
 // Powers the ASICs and shows on the display whether all were found (checks

@@ -6,7 +6,9 @@
 
 #include "../boards/board.h"
 #include "esp_lcd_panel_io.h"
-#include "ui.h"
+#include "ui_rs.h"
+
+#define TDISPLAYS3_LVGL_TICK_PERIOD_MS 30
 #include "ui_helpers.h"
 #include "button.h"
 #include "ui_ipc.h"
@@ -105,8 +107,6 @@ class DisplayDriver {
 
     // cache settings to not hammer the NVS
     bool m_isAutoScreenOffEnabled;
-    uint16_t m_tempControlMode;
-    uint16_t m_fanSpeed;
 
     bool m_showFoundBlockEnabled = true;
 
@@ -114,8 +114,6 @@ class DisplayDriver {
     bool m_countdownActive = false;       // Flag for countdown timer activity
     int64_t m_countdownStartTime = 0;     // Start time for the countdown
 
-    unsigned int m_btcPrice; // Current Bitcoin price
-    uint32_t m_blockHeight; // Current Bitcoin price
 
     // Shutdown countdown state
     bool m_shutdownCountdownActive;
@@ -124,7 +122,6 @@ class DisplayDriver {
     int64_t m_buttonIgnoreUntil_us;
     bool m_screenAnimationRunning = false;
 
-    UI *m_ui;
 
     // Helper methods for LVGL handling
     static bool notifyLvglFlushReady(esp_lcd_panel_io_handle_t panelIo, esp_lcd_panel_io_event_data_t *edata, void *userCtx);
@@ -133,7 +130,6 @@ class DisplayDriver {
     // Enables or disables animations for LVGL
     void enableLvglAnimations(bool enable);
 
-    void updateBTCprice(void);
 
     // Display-related functions
     bool displayTurnOff();         // Turn off the display
@@ -150,7 +146,6 @@ class DisplayDriver {
     // Screen switching logic
     void changeScreen(uint64_t now);   // Change between screens
     void updateBtcPrice();             // Update Bitcoin price on the screen
-    void updateGlobalMiningStats();    // Update Global mining stats
 
     // LVGL task handling
     void mainCreatSysteTasks();                    // Creates system tasks for LVGL
@@ -166,9 +161,6 @@ class DisplayDriver {
     // Display initialization
     lv_obj_t *initTDisplayS3(); // Initialize the TDisplay S3
 
-    void updateHashrate(System *module, StratumManager *manager, float power, int pool);               // Update the hashrate display
-    void updateShares(StratumManager *manager, int pool);                              // Update the shares information on the display
-    void updateTime(System *module);                                // Update the time display
     void lvglAnimations(bool enable);                               // Enable or disable LVGL animations
 
     void hideFoundBlockOverlay();

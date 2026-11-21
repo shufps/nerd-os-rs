@@ -15,7 +15,7 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 
-#include "ui.h"
+#include "ui_rs.h"
 #include "ui_ipc.h"
 #include "ui_helpers.h"
 #include "global_state.h"
@@ -48,27 +48,15 @@ static inline int32_t elapsed_ms(int64_t start_us, int64_t now) {
     return static_cast<int32_t>((now - start_us) / 1000);
 }
 
-static void formatHashrate(char *buf, int len, float hashrate) {
-    if (hashrate >= 10000.0) {
-        snprintf(buf, len, "%d", (int) (hashrate + 0.5f));
-    } else {
-        snprintf(buf, len, "%.1f", hashrate);
-    }
-}
-
 DisplayDriver::DisplayDriver() {
     m_animationsEnabled = false;
     m_lastKeypressTime = 0;
     m_displayIsOn = false;
     m_countdownActive = false;
     m_countdownStartTime = 0;
-    m_btcPrice = 0;
-    m_blockHeight = 0;
     m_isActiveOverlay = false;
     m_lvglMutex = PTHREAD_MUTEX_INITIALIZER;
     m_isAutoScreenOffEnabled = false;
-    m_tempControlMode = 0;
-    m_fanSpeed = 0;
     m_shutdownCountdownActive = false;
     m_shutdownStartTime = 0;
     m_shutdownLabel = nullptr;
@@ -78,8 +66,6 @@ DisplayDriver::DisplayDriver() {
 void DisplayDriver::loadSettings() {
     PThreadGuard lock(m_lvglMutex);
     m_isAutoScreenOffEnabled = Config::isAutoScreenOffEnabled();
-    m_tempControlMode = SYSTEM_MODULE.getBoard()->getFanMode(0);
-    m_fanSpeed = Config::getFanSpeed();
     m_showFoundBlockEnabled = Config::isShowBlockFoundEnabled();
 
     // when setting was changed, turn on the display LED
@@ -246,10 +232,8 @@ void DisplayDriver::refreshScreen(void) {
 void DisplayDriver::showError(const char *error_message, uint32_t error_code) {
     PThreadGuard lock(m_lvglMutex);
     // hide the overlay and free the memory in case it was open
-    m_ui->hideErrorOverlay();
-
-    // now show the (new) error overlay
-    m_ui->showErrorOverlay(error_message, error_code);
+    // the overlay is replaced if it was open
+    ui_show_error(error_message, error_code);
     m_isActiveOverlay = true;
     refreshScreen();
 }
@@ -257,14 +241,14 @@ void DisplayDriver::showError(const char *error_message, uint32_t error_code) {
 void DisplayDriver::hideError() {
     PThreadGuard lock(m_lvglMutex);
     // hide the overlay and free the memory
-    m_ui->hideErrorOverlay();
+    ui_hide_error();
     m_isActiveOverlay = false;
 }
 
 void DisplayDriver::showFoundBlockOverlay() {
     PThreadGuard lock(m_lvglMutex);
     // hide the overlay and free the memory in case it was open
-    m_ui->hideImageOverlay();
+    ui_hide_image_overlay();
 
     // not enabled?
     if (!m_showFoundBlockEnabled) {
@@ -272,7 +256,7 @@ void DisplayDriver::showFoundBlockOverlay() {
     }
 
     // now show the (new) image overlay
-    m_ui->showImageOverlay(&ui_img_found_block_png);
+    ui_show_found_block();
     m_foundBlockOverlay = true;
     refreshScreen();
 }
@@ -282,7 +266,7 @@ void DisplayDriver::hideFoundBlockOverlay() {
     // one for another block
     PThreadGuard lock(m_lvglMutex);
     // hide the overlay and free the memory
-    m_ui->hideImageOverlay();
+    ui_hide_image_overlay();
     m_foundBlockOverlay = false;
 }
 
@@ -321,8 +305,8 @@ bool DisplayDriver::enterState(UiState s, int64_t now)
     case UiState::Splash2:
         ESP_LOGI(TAG, "enter state splash2");
         enableLvglAnimations(true);
-        safe_screen_change(m_ui->ui_Splash2, LV_SCR_LOAD_ANIM_FADE_ON, 500, 0);
-        if (m_ui->ui_Splash1) { lv_obj_clean(m_ui->ui_Splash1); m_ui->ui_Splash1 = NULL; }
+        safe_screen_change(ui_screen(UI_SCREEN_SPLASH2), LV_SCR_LOAD_ANIM_FADE_ON, 500, 0);
+        ui_drop_splash(UI_SCREEN_SPLASH1);
         break;
 
     case UiState::Wait:
@@ -333,53 +317,51 @@ bool DisplayDriver::enterState(UiState s, int64_t now)
 
     case UiState::Portal:
         ESP_LOGI(TAG, "enter state portal");
-        if (m_ui->ui_Splash2) { lv_obj_clean(m_ui->ui_Splash2); m_ui->ui_Splash2 = NULL; }
+        ui_drop_splash(UI_SCREEN_SPLASH2);
         enableLvglAnimations(true);
-        safe_screen_change(m_ui->ui_PortalScreen, LV_SCR_LOAD_ANIM_FADE_ON, 500, 0);
+        safe_screen_change(ui_screen(UI_SCREEN_PORTAL), LV_SCR_LOAD_ANIM_FADE_ON, 500, 0);
         break;
 
     case UiState::Mining:
         ESP_LOGI(TAG, "enter state mining");
-        if (m_ui->ui_Splash2) { lv_obj_clean(m_ui->ui_Splash2); m_ui->ui_Splash2 = NULL; }
+        ui_drop_splash(UI_SCREEN_SPLASH2);
         enableLvglAnimations(true);
         if (previousState == UiState::GlobalStats) {
-            safe_screen_change(m_ui->ui_MiningScreen, LV_SCR_LOAD_ANIM_MOVE_LEFT, 350, 0);
+            safe_screen_change(ui_screen(UI_SCREEN_MINING), LV_SCR_LOAD_ANIM_MOVE_LEFT, 350, 0);
         } else {
-            safe_screen_change(m_ui->ui_MiningScreen, LV_SCR_LOAD_ANIM_FADE_ON, 500, 0);
+            safe_screen_change(ui_screen(UI_SCREEN_MINING), LV_SCR_LOAD_ANIM_FADE_ON, 500, 0);
         }
         break;
 
     case UiState::SettingsScreen:
         ESP_LOGI(TAG, "enter state settings screen");
         enableLvglAnimations(true);
-        safe_screen_change(m_ui->ui_SettingsScreen, LV_SCR_LOAD_ANIM_MOVE_LEFT, 350, 0);
+        safe_screen_change(ui_screen(UI_SCREEN_SETTINGS), LV_SCR_LOAD_ANIM_MOVE_LEFT, 350, 0);
         break;
 
     case UiState::BTCScreen:
         ESP_LOGI(TAG, "enter state btc screen");
         enableLvglAnimations(true);
-        safe_screen_change(m_ui->ui_BTCScreen, LV_SCR_LOAD_ANIM_MOVE_LEFT, 350, 0);
+        safe_screen_change(ui_screen(UI_SCREEN_BTC), LV_SCR_LOAD_ANIM_MOVE_LEFT, 350, 0);
         break;
 
     case UiState::GlobalStats:
         ESP_LOGI(TAG, "enter state global stats");
         enableLvglAnimations(true);
-        safe_screen_change(m_ui->ui_GlobalStats, LV_SCR_LOAD_ANIM_MOVE_LEFT, 350, 0);
+        safe_screen_change(ui_screen(UI_SCREEN_GLOBAL), LV_SCR_LOAD_ANIM_MOVE_LEFT, 350, 0);
         break;
     case UiState::ShowQR:
         ESP_LOGI(TAG, "enter qr state");
         enableLvglAnimations(true);
-        safe_screen_change(m_ui->ui_qrScreen, LV_SCR_LOAD_ANIM_FADE_ON, 500, 0);
+        safe_screen_change(ui_screen(UI_SCREEN_QR), LV_SCR_LOAD_ANIM_FADE_ON, 500, 0);
         break;
     case UiState::Identify:
         ESP_LOGI(TAG, "enter state identify (blink %lums)", m_identifyDuration_ms);
         break;
     case UiState::PowerOff:
-        if (!m_ui->ui_PowerOffScreen) {
-            m_ui->powerOffScreenInit();
-        }
+        ui_power_off_init();
         enableLvglAnimations(false);
-        safe_screen_change(m_ui->ui_PowerOffScreen, LV_SCR_LOAD_ANIM_NONE, 0, 0);
+        safe_screen_change(ui_screen(UI_SCREEN_POWER_OFF), LV_SCR_LOAD_ANIM_NONE, 0, 0);
         POWER_MANAGEMENT_MODULE.shutdown();
         break;
     }
@@ -620,8 +602,7 @@ void DisplayDriver::handleUiQueueMessages(ui_msg_t &msg, int64_t tnow)
             }
             int size = 0;
             uint8_t* qrBuf = (uint8_t*) otp_dev_qr(&size);
-            m_ui->createQRScreen(qrBuf, size);
-            if (m_ui->ui_qrScreen)
+            if (ui_create_qr(qrBuf, size))
                 enterState(UiState::ShowQR, tnow);
             m_isActiveOverlay = true;
             break;
@@ -840,254 +821,42 @@ lv_obj_t *DisplayDriver::initTDisplayS3(void)
     return scr;
 }
 
-void DisplayDriver::updateHashrate(System *module, StratumManager* manager, float power, int pool)
-{
-    char strData[20];
-    char strDataActive[20];
-
-    float hr = SYSTEM_MODULE.getCurrentHashrate() / 1000.0f;
-    float efficiency = (hr > 0) ? power / hr : 10000.0f;
-    float hashrate = SYSTEM_MODULE.getCurrentHashrate();
-    formatHashrate(strData, sizeof(strData), hashrate);
-
-    lv_label_set_text(m_ui->ui_lbHashrate, strData);    // Update hashrate
-
-    // let it toggle on the pool view page
-    if (manager && manager->isDualPool()) {
-        float activeHashrate = hashrate * (float) manager->getActivePoolBalance(pool) / 100.0f;
-        formatHashrate(strDataActive, sizeof(strDataActive), activeHashrate);
-        lv_label_set_text(m_ui->ui_lbHashrateSet, strDataActive); // Update hashrate
-    }
-
-    if (manager && manager->isFallback()) {
-        lv_label_set_text(m_ui->ui_lbHashrateSet, strData); // Update hashrate
-    }
-
-    lv_label_set_text(m_ui->ui_lblHashPrice, strData);  // Update hashrate
-
-    snprintf(strData, sizeof(strData), "%.1f", efficiency);
-    lv_label_set_text(m_ui->ui_lbEficiency, (efficiency < 10000.0f) ? strData : "n/a"); // Update eficiency label
-
-    snprintf(strData, sizeof(strData), "%.3fW", power);
-    lv_label_set_text(m_ui->ui_lbPower, strData); // Actualiza el label
-}
-
-void DisplayDriver::updateShares(StratumManager *manager, int pool)
-{
-    if (!manager) return;
-
-    char strData[20];
-
-    if (manager->isDualPool()) {
-        snprintf(strData, sizeof(strData), "%lld/%lld", manager->getSharesAccepted(pool), manager->getSharesRejected(pool));
-        lv_label_set_text(m_ui->ui_lbShares, strData); // Update shares
-    }
-
-    if (manager->isFallback()) {
-        snprintf(strData, sizeof(strData), "%lld/%lld", manager->getSharesAccepted(), manager->getSharesRejected());
-        lv_label_set_text(m_ui->ui_lbShares, strData); // Update shares
-    }
-
-    char bestDiff[DIFF_STRING_SIZE];
-    manager->getBestDiffString(bestDiff, sizeof(bestDiff));
-    lv_label_set_text(m_ui->ui_lbBestDifficulty, bestDiff);    // Update Bestdifficulty
-    lv_label_set_text(m_ui->ui_lbBestDifficultySet, bestDiff); // Update Bestdifficulty
-}
-void DisplayDriver::updateTime(System *module)
-{
-    char strData[20];
-
-    // Calculate the uptime in seconds
-    // int64_t currentTimeTest = esp_timer_get_time() + (8 * 3600 * 1000000LL) + (1800 * 1000000LL);//(8 * 60 * 60 * 10000);
-    double uptime_in_seconds = (esp_timer_get_time() - module->getStartTime()) / 1000000;
-    int uptime_in_days = uptime_in_seconds / (3600 * 24);
-    int remaining_seconds = (int) uptime_in_seconds % (3600 * 24);
-    int uptime_in_hours = remaining_seconds / 3600;
-    remaining_seconds %= 3600;
-    int uptime_in_minutes = remaining_seconds / 60;
-    int current_seconds = remaining_seconds % 60;
-
-    snprintf(strData, sizeof(strData), "%dd %ih %im %is", uptime_in_days, uptime_in_hours, uptime_in_minutes, current_seconds);
-    lv_label_set_text(m_ui->ui_lbTime, strData); // Update label
-}
-
 void DisplayDriver::updateCurrentSettings(int pool)
 {
     PThreadGuard lock(m_lvglMutex);
-    char strData[20];
-    if (m_ui->ui_SettingsScreen == NULL || !STRATUM_MANAGER)
-        return;
-
-    Board *board = SYSTEM_MODULE.getBoard();
-
-    // the host is copied under the manager lock
-    if (STRATUM_MANAGER->isDualPool()) {
-        STRATUM_MANAGER->getPoolHost(pool, strData, sizeof(strData));
-        lv_label_set_text(m_ui->ui_lbPoolSet, strData); // Update label
-        snprintf(strData, sizeof(strData), "%d", STRATUM_MANAGER->getPoolPort(pool));
-        lv_label_set_text(m_ui->ui_lbPortSet, strData); // Update label
-        snprintf(strData, sizeof(strData), "%d", pool + 1);
-        lv_label_set_text(m_ui->ui_lbPoolNr, strData);
-    }
-
-    if (STRATUM_MANAGER->isFallback()) {
-        int selected = STRATUM_MANAGER->displayPool(pool);
-        char host[128];
-        STRATUM_MANAGER->getPoolHost(selected, host, sizeof(host));
-        lv_label_set_text(m_ui->ui_lbPoolSet, host); // Update label
-        snprintf(strData, sizeof(strData), "%d", STRATUM_MANAGER->getPoolPort(selected));
-        lv_label_set_text(m_ui->ui_lbPortSet, strData); // Update label
-    }
-
-    snprintf(strData, sizeof(strData), "%d", board->getAsicFrequency());
-    lv_label_set_text(m_ui->ui_lbFreqSet, strData); // Update label
-
-    snprintf(strData, sizeof(strData), "%d", board->getAsicVoltageMillis());
-    lv_label_set_text(m_ui->ui_lbVcoreSet, strData); // Update label
-
-    switch (m_tempControlMode) {
-        case 1:
-            lv_label_set_text(m_ui->ui_lbFanSet, "AUTO"); // Update label
-            break;
-        case 2:
-            lv_label_set_text(m_ui->ui_lbFanSet, "PID"); // Update label
-            break;
-        default:
-            snprintf(strData, sizeof(strData), "%d", m_fanSpeed);
-            lv_label_set_text(m_ui->ui_lbFanSet, strData); // Update label
-            break;
-    }
-}
-
-
-void DisplayDriver::updateBTCprice(void)
-{
-    char price_str[32];
-
-    if ((m_state != UiState::BTCScreen) && (m_btcPrice != 0))
-        return;
-
-    m_btcPrice = apis_get_price();
-    snprintf(price_str, sizeof(price_str), "%u$", m_btcPrice);
-    lv_label_set_text(m_ui->ui_lblBTCPrice, price_str); // Update label
-}
-
-void DisplayDriver::updateGlobalMiningStats(void)
-{
-    char strData[32];
-
-    if ((m_state != UiState::GlobalStats) && (m_blockHeight != 0))
-        return;
-
-
-    m_blockHeight = apis_get_block_height();
-    snprintf(strData, sizeof(strData), "%lu", m_blockHeight);
-    lv_label_set_text(m_ui->ui_lblBlock, strData); // Update label
-
-    snprintf(strData, sizeof(strData), "%lu", apis_get_blocks_to_halving());
-    lv_label_set_text(m_ui->ui_lblBlocksToHalving, strData); // Update label
-
-    snprintf(strData, sizeof(strData), "%lu%%", apis_get_halving_percent());
-    lv_label_set_text(m_ui->ui_lblHalvingPercent, strData); // Update label
-
-    snprintf(strData, sizeof(strData), "%llu", apis_get_net_hash());
-    lv_label_set_text(m_ui->ui_lblGlobalHash, strData); // Update label
-
-    snprintf(strData, sizeof(strData), "%lluT", apis_get_net_difficulty());
-    lv_label_set_text(m_ui->ui_lblDifficulty, strData); // Update label
-
-    snprintf(strData, sizeof(strData), "%lu", apis_get_lowest_fee());
-    lv_label_set_text(m_ui->ui_lbllowFee, strData); // Update label
-
-    snprintf(strData, sizeof(strData), "%lu", apis_get_mid_fee());
-    lv_label_set_text(m_ui->ui_lblmedFee, strData); // Update label
-
-    snprintf(strData, sizeof(strData), "%lu", apis_get_fastest_fee());
-    lv_label_set_text(m_ui->ui_lblhighFee, strData); // Update label
+    ui_update_settings(pool);
 }
 
 void DisplayDriver::updateGlobalState(int pool)
 {
     PThreadGuard lock(m_lvglMutex);
-    char strData[20];
-
-    if (m_ui->ui_MiningScreen == NULL)
-        return;
-    if (m_ui->ui_SettingsScreen == NULL)
-        return;
-
-    // snprintf(strData, sizeof(strData), "%.0f", power_management->chip_temp);
-    snprintf(strData, sizeof(strData), "%.0f", POWER_MANAGEMENT_MODULE.getChipTempMax());
-    lv_label_set_text(m_ui->ui_lbTemp, strData);       // Update label
-    lv_label_set_text(m_ui->ui_lblTempPrice, strData); // Update label
-
-    snprintf(strData, sizeof(strData), "%d", POWER_MANAGEMENT_MODULE.getFanRPM(0));
-    lv_label_set_text(m_ui->ui_lbRPM, strData); // Update label
-
-    snprintf(strData, sizeof(strData), "%.3fW", POWER_MANAGEMENT_MODULE.getPower());
-    lv_label_set_text(m_ui->ui_lbPower, strData); // Update label
-
-    snprintf(strData, sizeof(strData), "%imA", (int) POWER_MANAGEMENT_MODULE.getCurrent());
-    lv_label_set_text(m_ui->ui_lbIntensidad, strData); // Update label
-
-    snprintf(strData, sizeof(strData), "%imV", (int) POWER_MANAGEMENT_MODULE.getVoltage());
-    lv_label_set_text(m_ui->ui_lbVinput, strData); // Update label
-
-    updateTime(&SYSTEM_MODULE);
-    updateShares(STRATUM_MANAGER, pool);
-    updateHashrate(&SYSTEM_MODULE, STRATUM_MANAGER, POWER_MANAGEMENT_MODULE.getPower(), pool);
-    updateBTCprice();
-    updateGlobalMiningStats();
-
-    Board *board = SYSTEM_MODULE.getBoard();
-    uint16_t vcore = (int) (board->getVout() * 1000.0f);
-    snprintf(strData, sizeof(strData), "%umV", vcore);
-    lv_label_set_text(m_ui->ui_lbVcore, strData); // Update label
+    ui_update(pool, m_state == UiState::BTCScreen, m_state == UiState::GlobalStats);
 }
 
 void DisplayDriver::updateIpAddress(const char *ip_address_str)
 {
     PThreadGuard lock(m_lvglMutex);
-    if (m_ui->ui_MiningScreen == NULL)
-        return;
-    if (m_ui->ui_SettingsScreen == NULL)
-        return;
-
-    lv_label_set_text(m_ui->ui_lbIP, ip_address_str);    // Update label
-    lv_label_set_text(m_ui->ui_lbIPSet, ip_address_str); // Update label
+    ui_set_ip(ip_address_str);
 }
 
 void DisplayDriver::setNetworkIcon(bool eth_connected)
 {
-    if (m_ui->ui_imgNet == nullptr)
-        return;
-
-    if (eth_connected)
-    {
-        lv_img_set_src(m_ui->ui_imgNet, &ui_img_eth_png);
-    }
-    else
-    {
-        lv_img_set_src(m_ui->ui_imgNet, &ui_img_wifi_png);
-    }
+    PThreadGuard lock(m_lvglMutex);
+    ui_set_net_icon(eth_connected ? 1 : 0);
 }
 
 void DisplayDriver::setCanIcon()
 {
-    if (m_ui->ui_imgNet == nullptr)
-        return;
-
-    lv_img_set_src(m_ui->ui_imgNet, &ui_img_can_png);
+    PThreadGuard lock(m_lvglMutex);
+    ui_set_net_icon(2);
 }
 
 void DisplayDriver::logMessage(const char *message)
 {
     PThreadGuard lock(m_lvglMutex);
-    if (m_ui->ui_LogScreen == NULL)
-        m_ui->logScreenInit();
-    lv_label_set_text(m_ui->ui_LogLabel, message);
+    ui_log(message);
     enableLvglAnimations(true);
-    _ui_screen_change(m_ui->ui_LogScreen, LV_SCR_LOAD_ANIM_NONE, 500, 0);
+    _ui_screen_change(ui_screen(UI_SCREEN_LOG), LV_SCR_LOAD_ANIM_NONE, 500, 0);
 }
 
 void DisplayDriver::miningScreen(void)
@@ -1101,15 +870,14 @@ void DisplayDriver::portalScreen(const char *message)
 {
     PThreadGuard lock(m_lvglMutex);
     strlcpy(m_portalWifiName, message, sizeof(m_portalWifiName));
-    lv_label_set_text(m_ui->ui_lbSSID, m_portalWifiName);
+    ui_set_ssid(m_portalWifiName);
     enterState(UiState::Portal, now_us());
 }
 
 void DisplayDriver::updateWifiStatus(const char *message)
 {
     PThreadGuard lock(m_lvglMutex);
-    if (m_ui->ui_lbConnect != NULL)
-        lv_label_set_text(m_ui->ui_lbConnect, message); // Actualiza el label
+    ui_set_connect(message);
     refreshScreen();
 }
 
@@ -1140,8 +908,7 @@ void DisplayDriver::init(Board* board)
 
     lv_obj_t *scr = initTDisplayS3();
 
-    m_ui = new UI();
-    m_ui->init(board, this);
+    ui_init(this);
     // manual_lvgl_update();
 
     // startUpdateScreenTask(); //Start screen update task

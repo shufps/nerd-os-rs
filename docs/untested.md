@@ -145,3 +145,13 @@ Tested on hardware: a NerdQAxe++ updated over OTA from v2.0.0-alpha.1 got "defau
 Ported from the C firmware: the Gaia-Dark Nebular theme (#765) and the VR temperature gauge of the Gaia home page scaled to the VR shutdown temperature (#766, `vrOverheatTemp` in `GET /api/v2/dashboard`). The new dashboard field is checked by the differential test and on a Q1373 (two fan channels: `vrOverheatTemp` = fan channel 1's shutdown temperature).
 
 Still to test on a NerdAxe Gaia: the Gaia-Dark theme and the VR gauge on the home page.
+
+## Display screens in Rust
+
+The screens of the display (formerly `main/displays/ui.cpp`) are built in Rust (`src/ui.rs` on the LVGL layer `src/lvgl.rs`); the C++ driver keeps the panel, the LVGL task, the buttons and the screen state machine.
+
+Tested on a Q1373 (screenshots compared with the C++ screens): splash with donation QR, mining, settings, BTC, global stats, the screen cycle with button 1, the network icon switching from WiFi to Ethernet.
+
+Still to test:
+- the boards with their own theme (every board except Q1370/Q1373): the backgrounds and the label positions;
+- the portal screen (AP mode with SSID), the error overlay, the "found block" overlay, the power-off screen, the OTP enrollment QR code, the self test screen.

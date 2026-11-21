@@ -37,6 +37,7 @@ pub mod crypto;
 pub mod cutil;
 pub mod discord;
 pub mod display_shot;
+pub mod display_text;
 pub mod dns;
 pub mod ds4432u;
 pub mod emc2101;
@@ -65,6 +66,9 @@ pub mod ina260;
 pub mod influx;
 pub mod jobs;
 mod log;
+/// LVGL (the display): firmware only
+#[cfg(target_os = "espidf")]
+pub mod lvgl;
 pub mod mdns;
 pub mod mining;
 pub mod mining_tasks;
@@ -101,6 +105,8 @@ pub mod tmp1075;
 pub mod tmp451;
 pub mod tps536x7;
 pub mod tps546;
+#[cfg(target_os = "espidf")]
+pub mod ui;
 pub mod w5500;
 pub mod wifi;
 pub mod wifi_health;

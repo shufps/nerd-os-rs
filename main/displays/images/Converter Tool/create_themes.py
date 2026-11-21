@@ -54,9 +54,7 @@ def main():
         'screens': screens
     }
 
-    # Generate themes.h using Jinja2
-    generate_file('themes.h.j2', '../themes/themes.h', context)
-
+    # (the theme selection is in components/rust_core/src/ui.rs)
     # Generate themes.c using Jinja2
     generate_file('themes.c.j2', '../themes/themes.c', context)
 

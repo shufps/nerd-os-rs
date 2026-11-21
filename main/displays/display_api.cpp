@@ -6,6 +6,8 @@
 static DisplayDriver *display() { return SYSTEM_MODULE.getDisplay(); }
 
 extern "C" {
+// a screen load animation of the Rust UI ended (ui_rs.h)
+void disp_screen_loaded(void *driver) { static_cast<DisplayDriver *>(driver)->setScreenAnimationRunning(false); }
 void disp_load_settings(void) { SYSTEM_MODULE.loadSettings(); }
 void disp_wait_for_splashs(void) { display()->waitForSplashs(); }
 void disp_portal_screen(const char *ssid) { display()->portalScreen(ssid); }

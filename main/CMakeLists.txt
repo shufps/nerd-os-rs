@@ -5,7 +5,6 @@ SRCS
     "boards/board.cpp"
     "./self_test/self_test.cpp"
     "./displays/displayDriver.cpp"
-    "./displays/ui.cpp"
     "./displays/ui_ipc.cpp"
     "./displays/button.cpp"
     "./displays/ui_helpers.cpp"

@@ -108,6 +108,12 @@ fn sdkconfig() {
         let _ = writeln!(out, "#[allow(dead_code)]\npub const {name}: {rust};");
     }
     let board = std::env::var("BOARD").unwrap_or_default();
+    // cfg(board = "..."): code for one board only (the display theme links
+    // only that board's images)
+    println!("cargo:rustc-check-cfg=cfg(board, values(any()))");
+    if !board.is_empty() {
+        println!("cargo:rustc-cfg=board=\"{board}\"");
+    }
     let _ = writeln!(
         out,
         "/// the board the firmware is built for (`BOARD`)\npub const BOARD: &str = \"{board}\";"

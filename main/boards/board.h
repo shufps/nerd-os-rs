@@ -1,7 +1,6 @@
 #pragma once
 
 #include <vector>
-#include "../displays/images/themes/themes.h"
 #include "nvs_config.h"
 #include "../pid/pid_settings.h"
 #include "board_core.h"
@@ -45,7 +44,6 @@ public:
     }
 
   protected:
-    Theme *m_theme = nullptr;
     // copies for the callers that take pointers
     PidSettings m_pidSettings[2] = {};
     EthPins m_ethPins;
@@ -111,7 +109,6 @@ public:
 
     bool selfTest();
 
-    Theme *getTheme() { return m_theme; }
 
     uint32_t getAsicMaxDifficulty() { return info().max_difficulty; }
     uint32_t getAsicMinDifficulty() { return info().min_difficulty; }

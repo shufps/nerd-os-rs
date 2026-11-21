@@ -1331,6 +1331,16 @@ impl Manager {
         }
     }
 
+    /// The statistics of one pool.
+    pub fn pool_stats(&self, pool: c_int) -> stats::PoolSummary {
+        self.stats.pool(pool)
+    }
+
+    /// The pool a view of `pool` shows (failover: the selected one).
+    pub fn display_pool(&self, pool: c_int) -> c_int {
+        self.policy.display_pool(pool)
+    }
+
     pub fn pool_port(&self, pool: c_int) -> c_int {
         self.lock()[(pool & 1) as usize].port
     }

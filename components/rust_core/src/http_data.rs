@@ -11,7 +11,7 @@ use crate::idf::idf_const;
 use core::ffi::{c_int, CStr};
 use std::ffi::CString;
 
-use crate::board::ffi::Info as BoardInfo;
+use crate::board::api::Info as BoardInfo;
 use crate::cfg;
 use crate::history::ffi::{history_current, history_current_timestamp};
 use crate::http_json::{self, AsicInfo, Dashboard, FanInfo, SystemInfo, V2Settings};
@@ -76,7 +76,7 @@ pub fn handler(h: Handler) -> Option<HandlerFn> {
 // sources
 
 fn board() -> BoardInfo {
-    crate::board::ffi::info()
+    crate::board::api::info()
 }
 
 fn small_core_count() -> c_int {
@@ -119,7 +119,7 @@ fn history_query(req: &mut Request, v2: bool) -> crate::http_query::HistoryQuery
 fn fan_settings(b: &BoardInfo, ch: usize) -> FanInfo {
     let pid = b.pid[ch];
     FanInfo {
-        label: b.fan_labels[ch],
+        label: b.fan_labels[ch].as_ptr(),
         mode: b.fan_mode[ch],
         manual_speed: cfg::fan_manual_speed(ch),
         overheat_temp: cfg::fan_overheat_temp(ch),
@@ -152,7 +152,7 @@ fn running_partition() -> CString {
 
 /// Reloads what a settings change touches: board, fans, display, pools.
 pub(crate) fn reload_settings() {
-    crate::board::ffi::board_load_settings();
+    crate::board::api::board_load_settings();
     crate::power_mgmt::fan_load_settings();
     crate::display::load_settings();
     crate::pool_manager::ffi::pool_mgr_load_settings();
@@ -194,7 +194,7 @@ fn system_info(req: &mut Request) -> EspErr {
     let mut s = SystemInfo::zeroed();
     s.asic_count = b.asic_count;
     s.small_core_count = small_core_count();
-    s.device_model = b.device_model;
+    s.device_model = b.device_model.as_ptr();
     s.hostip = hostip.as_ptr();
     s.mac_addr = crate::network::mac_addr().as_ptr();
     s.wifi_rssi = crate::network::wifi_rssi();
@@ -219,7 +219,7 @@ fn system_info(req: &mut Request) -> EspErr {
     s.hashrate_1d = history_current(3);
     s.core_voltage = b.asic_voltage_mv;
     s.default_core_voltage = b.default_voltage_mv;
-    s.vout = crate::board::ffi::board_power_value(3);
+    s.vout = crate::board::api::board_power_value(3);
     s.manual_fan_speed = cfg::fan_speed();
     s.fan_count = b.num_fans;
     for ch in 0..2 {
@@ -296,7 +296,7 @@ fn system_info(req: &mut Request) -> EspErr {
     s.default_vr_frequency = b.default_vr_frequency;
     s.otp = cfg::otp_enabled();
 
-    s.asic_model = b.asic_model;
+    s.asic_model = b.asic_model.as_ptr();
     s.uptime_seconds = uptime_seconds();
     s.last_reset_reason = crate::system::reset_reason().as_ptr();
     s.wifi_status = wifi_status.as_ptr();
@@ -304,7 +304,7 @@ fn system_info(req: &mut Request) -> EspErr {
     s.free_heap_int = crate::idf::task::free_heap(CAP_INTERNAL) as u64;
     s.version = version.as_ptr();
     s.running_partition = partition.as_ptr();
-    s.default_theme = b.default_theme;
+    s.default_theme = b.default_theme.as_ptr();
 
     // SAFETY: the strings are this function's live CStrings and static profile
     // literals
@@ -315,8 +315,8 @@ fn system_asic(req: &mut Request) -> EspErr {
     set_json(req);
     let b = board();
     let a = AsicInfo {
-        asic_model: b.asic_model,
-        device_model: b.device_model,
+        asic_model: b.asic_model.as_ptr(),
+        device_model: b.device_model.as_ptr(),
         asic_count: b.asic_count,
         default_frequency: b.default_frequency,
         default_voltage: b.default_voltage_mv,
@@ -325,11 +325,11 @@ fn system_asic(req: &mut Request) -> EspErr {
         abs_max_voltage: b.abs_max_voltage_mv,
         eco_frequency: b.eco_frequency,
         eco_voltage: b.eco_voltage_mv,
-        swarm_color: b.swarm_color,
-        frequency_options: b.frequencies,
-        frequency_count: b.frequency_count,
-        voltage_options: b.voltages,
-        voltage_count: b.voltage_count,
+        swarm_color: b.swarm_color.as_ptr(),
+        frequency_options: b.frequencies.as_ptr(),
+        frequency_count: b.frequencies.len(),
+        voltage_options: b.voltages.as_ptr(),
+        voltage_count: b.voltages.len(),
     };
     // SAFETY: static profile strings and option lists with their counts
     send_doc(req, unsafe { http_json::asic_info(&a) })
@@ -426,7 +426,7 @@ fn dashboard(req: &mut Request) -> EspErr {
     d.current = power_mgmt::get(2);
     d.min_current_a = b.min_current_a;
     d.max_current_a = b.max_current_a;
-    d.vout = crate::board::ffi::board_power_value(3);
+    d.vout = crate::board::api::board_power_value(3);
 
     d.asic_temp = power_mgmt::get(3);
     d.vr_temp = power_mgmt::get(4);
@@ -444,7 +444,7 @@ fn dashboard(req: &mut Request) -> EspErr {
         d.pool_port[i] = cfg::stratum_port(i) as c_int;
     }
 
-    d.has_can_extension = crate::board::ffi::board_has_can_extension();
+    d.has_can_extension = crate::board::api::board_has_can_extension();
     d.can_enabled = cfg::can_enabled();
 
     let cbs = [coinbase_info(0), coinbase_info(1)];
@@ -498,13 +498,13 @@ pub(crate) fn v2_settings_doc() -> crate::ajson::Json {
     let mempool_url = cfg::mempool_url();
 
     let mut v = V2Settings::zeroed();
-    v.asic_model = b.asic_model;
-    v.device_model = b.device_model;
+    v.asic_model = b.asic_model.as_ptr();
+    v.device_model = b.device_model.as_ptr();
     v.version = version.as_ptr();
     v.otp = cfg::otp_enabled();
     v.ap_active = crate::netmgr::ap_active();
 
-    v.has_can_extension = crate::board::ffi::board_has_can_extension();
+    v.has_can_extension = crate::board::api::board_has_can_extension();
     v.can_enabled = cfg::can_enabled();
 
     v.frequency = b.asic_frequency;
@@ -517,10 +517,10 @@ pub(crate) fn v2_settings_doc() -> crate::ajson::Json {
     v.eco_core_voltage = b.eco_voltage_mv;
     v.abs_min_core_voltage = b.abs_min_voltage_mv;
     v.abs_max_core_voltage = b.abs_max_voltage_mv;
-    v.frequency_options = b.frequencies;
-    v.frequency_count = b.frequency_count;
-    v.voltage_options = b.voltages;
-    v.voltage_count = b.voltage_count;
+    v.frequency_options = b.frequencies.as_ptr();
+    v.frequency_count = b.frequencies.len();
+    v.voltage_options = b.voltages.as_ptr();
+    v.voltage_count = b.voltages.len();
 
     v.pool_mode = cfg::pool_mode();
     v.pool_balance = cfg::pool_balance();

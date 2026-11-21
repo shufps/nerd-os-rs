@@ -33,7 +33,7 @@ fn asics() -> Option<&'static asic::Handle> {
     crate::board::get()?.asic_handle()
 }
 
-use crate::board::ffi::info as board_info;
+use crate::board::api::info as board_info;
 
 // ---------------------------------------------------------------------------
 // jobs

@@ -480,7 +480,7 @@ fn telemetry() -> [u8; can_master::TELEMETRY_LEN] {
     put(29, &[fan_get(0, 1) as u8, fan_get(1, 1) as u8]);
     put(31, &pm(0).to_le_bytes());
     put(35, &(pm(2) as u16).to_le_bytes());
-    let vout = crate::board::ffi::board_power_value(3);
+    let vout = crate::board::api::board_power_value(3);
     put(37, &((vout * 1000.0) as u16).to_le_bytes());
     put(
         39,
@@ -505,13 +505,7 @@ fn slave_config() -> [u8; can_master::CONFIG_LEN] {
     let mut c = [0u8; can_master::CONFIG_LEN];
     // NUL-terminated within 16 bytes
     let text = |s: &[u8]| s[..s.len().min(15)].to_vec();
-    let model = if b.device_model.is_null() {
-        Vec::new()
-    } else {
-        // SAFETY: device_model is non-null (checked) and a static C string literal of the board
-        // profile
-        text(unsafe { CStr::from_ptr(b.device_model) }.to_bytes())
-    };
+    let model = text(b.device_model.to_bytes());
     c[..model.len()].copy_from_slice(&model);
     let fw = text(crate::mdns::fw_version().as_bytes());
     c[16..16 + fw.len()].copy_from_slice(&fw);
@@ -536,14 +530,8 @@ fn slave_config() -> [u8; can_master::CONFIG_LEN] {
     c
 }
 
-fn board_info() -> crate::board::ffi::Info {
-    let mut i = core::mem::MaybeUninit::uninit();
-    // SAFETY: board_info() writes a complete Info through the pointer, so it is initialised
-    // afterwards
-    unsafe {
-        crate::board::ffi::board_info(i.as_mut_ptr());
-        i.assume_init()
-    }
+fn board_info() -> crate::board::api::Info {
+    crate::board::api::info()
 }
 
 fn send_slave_config(slave_id: u8) {
@@ -565,14 +553,14 @@ fn handle_settings_cmd(p: &[u8]) {
         CMD_SET_FREQ if p.len() >= 3 => {
             let freq = u16_at(1);
             set_u16(b"asicfrequency", freq);
-            crate::board::ffi::board_load_settings();
+            crate::board::api::board_load_settings();
             log!(Info, TAG_SLAVE, "CMD SET_FREQ {freq}MHz → applied");
             send_config = true;
         }
         CMD_SET_VOLTAGE if p.len() >= 3 => {
             let mv = u16_at(1);
             set_u16(b"asicvoltage", mv);
-            crate::board::ffi::board_load_settings();
+            crate::board::api::board_load_settings();
             log!(Info, TAG_SLAVE, "CMD SET_VOLTAGE {mv}mV → applied");
             send_config = true;
         }
@@ -595,7 +583,7 @@ fn handle_settings_cmd(p: &[u8]) {
         CMD_SET_DISPLAY if p.len() >= 3 => {
             set_u16(b"flipscreen", (p[1] != 0) as u16);
             set_u16(b"autoscreenoff", (p[2] != 0) as u16);
-            crate::board::ffi::board_load_settings();
+            crate::board::api::board_load_settings();
             log!(
                 Info,
                 TAG_SLAVE,

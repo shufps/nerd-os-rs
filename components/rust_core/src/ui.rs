@@ -424,9 +424,12 @@ const GREY: u32 = 0xDEDADE;
 const GREY2: u32 = 0xDEDEDE;
 
 fn board_model(asic: bool) -> &'static CStr {
-    let i = crate::board::ffi::info();
-    // SAFETY: profile strings of the board info (c"..." literals)
-    unsafe { crate::board::ffi::static_text(if asic { i.asic_model } else { i.device_model }) }
+    let i = crate::board::api::info();
+    if asic {
+        i.asic_model
+    } else {
+        i.device_model
+    }
 }
 
 impl Ui {
@@ -1059,7 +1062,7 @@ impl Ui {
             g.high_fee.set_text_str(l, &v.fastest_fee.to_string());
         }
 
-        let vcore = (crate::board::ffi::board_power_value(3) * 1000.0) as i32 as u16;
+        let vcore = (crate::board::api::board_power_value(3) * 1000.0) as i32 as u16;
         self.mining.vcore.set_text_str(l, &format!("{vcore}mV"));
     }
 
@@ -1082,7 +1085,7 @@ impl Ui {
             s.pool.set_text_str(l, &host);
             s.port.set_text_str(l, &m.pool_port(sel).to_string());
         }
-        let b = crate::board::ffi::info();
+        let b = crate::board::api::info();
         s.freq.set_text_str(l, &b.asic_frequency.to_string());
         s.vcore.set_text_str(l, &b.asic_voltage_mv.to_string());
         s.fan.set_text_str(

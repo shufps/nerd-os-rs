@@ -6,7 +6,7 @@
 
 use core::ffi::{c_int, CStr};
 
-use crate::board::ffi::{self as b, info, static_text};
+use crate::board::api::{self as b, info};
 use crate::board_core::CHIP_TEMPS;
 
 pub fn bapi_is_initialized() -> bool {
@@ -118,16 +118,13 @@ pub fn bapi_has_hashrate_counter() -> bool {
     info().has_hash_counter
 }
 pub fn bapi_mining_agent() -> &'static CStr {
-    // SAFETY: a profile string of the board info (a c"..." literal)
-    unsafe { static_text(info().mining_agent) }
+    info().mining_agent
 }
 pub fn bapi_asic_model() -> &'static CStr {
-    // SAFETY: a profile string of the board info (a c"..." literal)
-    unsafe { static_text(info().asic_model) }
+    info().asic_model
 }
 pub fn bapi_device_model() -> &'static CStr {
-    // SAFETY: a profile string of the board info (a c"..." literal)
-    unsafe { static_text(info().device_model) }
+    info().device_model
 }
 pub fn bapi_asic_min_difficulty(dual_pool: bool) -> u32 {
     let i = info();

@@ -4,7 +4,7 @@
 //! wall clock. The OTP state itself is in `otp.rs`.
 
 use crate::idf::idf_const;
-use core::ffi::{c_char, c_int, CStr};
+use core::ffi::{c_int, CStr};
 use std::sync::Mutex;
 
 use qrcodegen::{QrCode, QrCodeEcc, QrSegment, Version};
@@ -107,33 +107,8 @@ pub fn start_enrollment() -> c_int {
     }
 }
 
-/// The bytes of `p` (None for NULL).
-///
-/// # Safety
-/// `p` is NULL or NUL-terminated and stays valid for `'a`.
-unsafe fn opt<'a>(p: *const c_char) -> Option<&'a [u8]> {
-    // SAFETY: NUL-terminated and alive (caller contract); NULL is checked
-    (!p.is_null()).then(|| unsafe { CStr::from_ptr(p) }.to_bytes())
-}
-
 pub(crate) mod ffi {
     use super::*;
-
-    /// # Safety
-    /// Strings NUL-terminated or NULL.
-    pub unsafe extern "C" fn otp_dev_init(
-        hostname: *const c_char,
-        mac: *const c_char,
-        model: *const c_char,
-    ) {
-        let s = |p| {
-            // SAFETY: the strings of this call (its contract); copied at once
-            unsafe { opt(p) }
-                .map(|b| String::from_utf8_lossy(b).into_owned())
-                .unwrap_or_default()
-        };
-        init(&s(hostname), &s(mac), &s(model));
-    }
 
     pub extern "C" fn otp_dev_start_enrollment() -> c_int {
         start_enrollment()

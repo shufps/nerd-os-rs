@@ -36,7 +36,7 @@ fn node_id(req: &mut Request) -> Result<u8, EspErr> {
     }
 }
 
-use crate::board::ffi::info as board_info;
+use crate::board::api::info as board_info;
 
 /// `GET /api/v2/can/nodes`
 pub fn nodes(req: &mut Request) -> EspErr {
@@ -60,7 +60,7 @@ pub fn nodes(req: &mut Request) -> EspErr {
     }
     let m = CanMasterNode {
         mac: crate::network::mac_addr().as_ptr(),
-        device_model: b.device_model,
+        device_model: b.device_model.as_ptr(),
         version: version.as_ptr(),
         shutdown: power_mgmt::is_shutdown(),
         hashrate: crate::system::current_hashrate(),
@@ -68,7 +68,7 @@ pub fn nodes(req: &mut Request) -> EspErr {
         temp: power_mgmt::get(3),
         vr_temp: power_mgmt::get(4),
         current: power_mgmt::get(2),
-        vout: crate::board::ffi::board_power_value(3),
+        vout: crate::board::api::board_power_value(3),
         board_error: crate::system::error().0,
         free_heap_int: crate::idf::task::free_heap(CAP_INTERNAL) as c_int,
         frequency: b.asic_frequency,

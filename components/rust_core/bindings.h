@@ -13,3 +13,4 @@
 #include "mbedtls/platform.h"
 #include "mbedtls/ssl.h"
 #include "mdns.h"
+#include "lwip/netdb.h"

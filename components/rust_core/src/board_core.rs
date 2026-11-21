@@ -2,7 +2,7 @@
 //! `main/boards/board.cpp` and `nerdqaxeplus.cpp`): the frequency/voltage
 //! limits (validation and the clamping of the stored settings), the ASIC
 //! chip temperatures and the decoding of the PMBus status registers of the
-//! TPS536x7 buck controllers into a board error. C API: `board_core.h`.
+//! TPS536x7 buck controllers into a board error.
 //! Verified against the C++ code by `tests/board_core.rs`.
 //!
 //! Behaviour notes:
@@ -143,25 +143,6 @@ impl Default for ChipTemps {
 }
 
 pub static CHIP_TEMPS: ChipTemps = ChipTemps::new();
-
-mod ffi {
-    use super::*;
-
-    #[no_mangle]
-    pub extern "C" fn board_chip_temp_set(nr: c_int, temp: f32) {
-        CHIP_TEMPS.set(nr, temp)
-    }
-
-    #[no_mangle]
-    pub extern "C" fn board_chip_temp(nr: c_int) -> f32 {
-        CHIP_TEMPS.get(nr)
-    }
-
-    #[no_mangle]
-    pub extern "C" fn board_chip_temp_max() -> f32 {
-        CHIP_TEMPS.max()
-    }
-}
 
 #[cfg(test)]
 mod tests {

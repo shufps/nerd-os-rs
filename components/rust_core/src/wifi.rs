@@ -6,7 +6,7 @@
 //! connected/failed event bits, the status shown and the hooks of the
 //! network manager. The C++ side carries out the returned actions (`esp_wifi_*`,
 //! event bits, status, hooks, the backoff timer) in their bit order, the
-//! order of the former code. C API: `wifi_state.h`.
+//! order of the former code.
 //!
 //! Behaviour notes:
 //! - the backoff is a timer (`act::BACKOFF`, then `backoff_done()`), not a

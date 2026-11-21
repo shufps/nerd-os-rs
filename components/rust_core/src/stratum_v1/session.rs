@@ -128,77 +128,7 @@ impl Session {
 
 pub(crate) mod ffi {
     use super::*;
-    use core::ffi::{c_char, CStr};
-    use std::sync::Mutex;
-
-    /// Shared by the task that owns the connection and the task submitting
-    /// shares, hence the lock.
-    pub struct Handle(pub(crate) Mutex<Session>);
-
-    impl Handle {
-        pub(crate) fn with<T>(&self, f: impl FnOnce(&mut Session) -> T) -> T {
-            let mut s = self.0.lock().unwrap_or_else(|e| e.into_inner());
-            f(&mut s)
-        }
-    }
-
-    unsafe fn bytes<'a>(p: *const c_char) -> &'a [u8] {
-        if p.is_null() {
-            &[]
-        } else {
-            CStr::from_ptr(p).to_bytes()
-        }
-    }
-
-    /// Writes `request` plus NUL into `buf`; returns its length, or 0 if it
-    /// does not fit (then the request is not counted as pending either).
-    unsafe fn write(
-        handle: &Handle,
-        buf: *mut c_char,
-        buf_len: usize,
-        f: impl FnOnce(&mut Session) -> Vec<u8>,
-    ) -> usize {
-        handle.with(|s| {
-            let request = f(s);
-            if buf.is_null() || request.len() + 1 > buf_len {
-                s.untrack_last();
-                return 0;
-            }
-            core::ptr::copy_nonoverlapping(request.as_ptr(), buf as *mut u8, request.len());
-            *buf.add(request.len()) = 0;
-            request.len()
-        })
-    }
-
-    #[no_mangle]
-    pub extern "C" fn stratum_v1_session_new() -> *mut Handle {
-        Box::into_raw(Box::new(Handle(Mutex::new(Session::default()))))
-    }
-
-    /// # Safety
-    /// `s` must come from `stratum_v1_session_new()` (or be NULL).
-    #[no_mangle]
-    pub unsafe extern "C" fn stratum_v1_session_free(s: *mut Handle) {
-        if !s.is_null() {
-            drop(Box::from_raw(s));
-        }
-    }
-
-    /// # Safety
-    /// `s` must be a valid handle, `line` NUL-terminated, `message` zeroed.
-    #[no_mangle]
-    pub unsafe extern "C" fn stratum_v1_session_parse(
-        s: *mut Handle,
-        line: *const c_char,
-        message: *mut Message,
-    ) -> bool {
-        if line.is_null() || message.is_null() {
-            return false;
-        }
-        let ok = (*s).with(|session| session.parse(bytes(line), &mut *message));
-        log_parsed(ok, &*message);
-        ok
-    }
+    use core::ffi::CStr;
 
     /// The log lines of the former `StratumApi::parse()`.
     pub(crate) unsafe fn log_parsed(ok: bool, m: &Message) {
@@ -228,73 +158,6 @@ pub(crate) mod ffi {
             STRATUM_UNKNOWN => log!(Warn, TAG, "Unhandled stratum message"),
             _ => {}
         }
-    }
-
-    /// # Safety
-    /// `s` must be a valid handle and `buf` hold `buf_len` bytes.
-    #[no_mangle]
-    pub unsafe extern "C" fn stratum_v1_session_subscribe(
-        s: *mut Handle,
-        buf: *mut c_char,
-        buf_len: usize,
-        device: *const c_char,
-        asic: *const c_char,
-        version: *const c_char,
-    ) -> usize {
-        write(&*s, buf, buf_len, |session| {
-            session.subscribe(bytes(device), bytes(asic), bytes(version))
-        })
-    }
-
-    /// # Safety
-    /// `s` must be a valid handle and `buf` hold `buf_len` bytes.
-    #[no_mangle]
-    pub unsafe extern "C" fn stratum_v1_session_configure(
-        s: *mut Handle,
-        buf: *mut c_char,
-        buf_len: usize,
-    ) -> usize {
-        write(&*s, buf, buf_len, Session::configure_version_rolling)
-    }
-
-    /// # Safety
-    /// `s` must be a valid handle and `buf` hold `buf_len` bytes.
-    #[no_mangle]
-    pub unsafe extern "C" fn stratum_v1_session_authorize(
-        s: *mut Handle,
-        buf: *mut c_char,
-        buf_len: usize,
-        user: *const c_char,
-        password: *const c_char,
-    ) -> usize {
-        write(&*s, buf, buf_len, |session| {
-            session.authorize(bytes(user), bytes(password))
-        })
-    }
-
-    /// # Safety
-    /// `s` must be a valid handle and `buf` hold `buf_len` bytes.
-    #[no_mangle]
-    pub unsafe extern "C" fn stratum_v1_session_suggest_difficulty(
-        s: *mut Handle,
-        buf: *mut c_char,
-        buf_len: usize,
-        difficulty: u32,
-    ) -> usize {
-        write(&*s, buf, buf_len, |session| {
-            session.suggest_difficulty(difficulty)
-        })
-    }
-
-    /// # Safety
-    /// `s` must be a valid handle and `buf` hold `buf_len` bytes.
-    #[no_mangle]
-    pub unsafe extern "C" fn stratum_v1_session_extranonce_subscribe(
-        s: *mut Handle,
-        buf: *mut c_char,
-        buf_len: usize,
-    ) -> usize {
-        write(&*s, buf, buf_len, Session::extranonce_subscribe)
     }
 }
 
@@ -373,19 +236,19 @@ mod tests {
             .starts_with("{\"id\": 1,"));
     }
 
-    /// The connection task and the submitting task use one handle.
+    /// The connection task and the submitting task share one session.
     #[test]
     fn concurrent_submits_get_unique_ids() {
         use std::collections::HashSet;
-        let handle = ffi::stratum_v1_session_new() as usize;
+        use std::sync::{Arc, Mutex};
+        let session = Arc::new(Mutex::new(Session::default()));
         let threads: Vec<_> = (0..4)
             .map(|_| {
+                let session = session.clone();
                 std::thread::spawn(move || {
                     let mut ids = Vec::new();
                     for _ in 0..500 {
-                        // SAFETY: a valid handle until freed below.
-                        let h = unsafe { &*(handle as *const ffi::Handle) };
-                        let line = h.with(|s| s.submit(b"u", b"j", b"00", 0, 0, 0));
+                        let line = session.lock().unwrap().submit(b"u", b"j", b"00", 0, 0, 0);
                         let v: serde_json::Value = serde_json::from_slice(&line).unwrap();
                         ids.push(v["id"].as_i64().unwrap());
                     }
@@ -398,7 +261,5 @@ mod tests {
             .flat_map(|t| t.join().unwrap())
             .collect();
         assert_eq!(ids.iter().collect::<HashSet<_>>().len(), 2000);
-        // SAFETY: created above, no longer used.
-        unsafe { ffi::stratum_v1_session_free(handle as *mut _) };
     }
 }

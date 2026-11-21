@@ -56,8 +56,6 @@ pub fn parse(api: Api, body: &[u8], values: &mut Values) -> bool {
     true
 }
 
-mod ffi {}
-
 #[cfg(test)]
 mod tests {
     use super::*;

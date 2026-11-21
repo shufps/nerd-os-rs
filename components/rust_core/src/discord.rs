@@ -2,7 +2,7 @@
 //! the alert settings with their Kconfig defaults, the device's address,
 //! the sender task (8 KB stack in PSRAM, priority 5) and the HTTPS POST
 //! (5 s timeout, the certificate bundle). Texts, queue and sender loop are
-//! in `alerts.rs`. C API: `discord.h`.
+//! in `alerts.rs`.
 
 use core::ffi::{c_int, c_void, CStr};
 
@@ -107,11 +107,6 @@ fn diff_text(d: f64) -> String {
 pub(crate) mod ffi {
     use super::*;
     use crate::alerts::kind;
-
-    #[no_mangle]
-    pub extern "C" fn discord_start() {
-        start()
-    }
 
     pub extern "C" fn discord_send_test() -> bool {
         send(kind::TEST, "", "", 0, 0, 0, 0)

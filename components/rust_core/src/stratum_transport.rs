@@ -2,7 +2,7 @@
 //! `stratum_transport_noise.cpp`): TCP or TLS (certificate bundle, common
 //! name) over `esp_transport`, keep-alive per the settings, TCP_NODELAY, and
 //! for Stratum v2 the Noise_NX handshake (`stratum_v2/noise.rs`) on top of
-//! TCP. C API: `stratum_transport.h`.
+//! TCP.
 //!
 //! As before: the lock is held across the whole TCP/TLS connect (a share
 //! submit never sees a half-built transport); `close()` first shuts the

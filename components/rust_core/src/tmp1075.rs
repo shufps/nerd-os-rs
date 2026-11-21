@@ -33,10 +33,6 @@ pub fn read_temperature(index: c_int) -> f32 {
     }
 }
 
-// firmware only
-#[cfg(target_os = "espidf")]
-mod ffi {}
-
 #[cfg(test)]
 mod tests {
     use super::*;

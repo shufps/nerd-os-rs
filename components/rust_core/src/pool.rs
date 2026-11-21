@@ -1,7 +1,7 @@
 //! Pool selection and coinbase verification decisions of the stratum manager
 //! (port of the logic in `main/stratum/stratum_manager*.cpp`). The C++
 //! managers keep their mutex, tasks, config and alerts; they pass the current
-//! state in and carry out the returned [`Actions`]. C API: `pool_policy.h`.
+//! state in and carry out the returned [`Actions`].
 //!
 //! Verified against verbatim copies of the C++ logic by
 //! `tests/pool_policy.rs`. In dual-pool mode a disconnected

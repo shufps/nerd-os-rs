@@ -48,24 +48,6 @@ impl LineBuffer {
     }
 }
 
-mod ffi {
-    use super::*;
-
-    #[no_mangle]
-    pub extern "C" fn stratum_v1_lines_new() -> *mut LineBuffer {
-        Box::into_raw(Box::default())
-    }
-
-    /// # Safety
-    /// `lines` must come from `stratum_v1_lines_new()` (or be NULL).
-    #[no_mangle]
-    pub unsafe extern "C" fn stratum_v1_lines_free(lines: *mut LineBuffer) {
-        if !lines.is_null() {
-            drop(Box::from_raw(lines));
-        }
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -199,5 +199,3 @@ impl Tmp451 {
         bus.read(self.addr, REG_STATUS)
     }
 }
-
-mod ffi {}

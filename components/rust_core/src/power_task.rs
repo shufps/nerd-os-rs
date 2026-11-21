@@ -305,7 +305,5 @@ impl PowerTask {
     }
 }
 
-mod ffi {}
-
 #[cfg(test)]
 mod tests;

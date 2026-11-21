@@ -2,7 +2,7 @@
 //! `hashrate_monitor_task.cpp`): every 5 s the nonce counter (0x90) and the
 //! hardware error counter (0x4c) of each chip are read; the counter deltas
 //! over time give a rate per chip, the total goes through a 5-tap median
-//! and a smoothing step. C API: `hashrate_monitor.h`.
+//! and a smoothing step.
 //!
 //! Behaviour notes:
 //! - the chip table is created under the lock (the result task may already
@@ -220,44 +220,20 @@ pub(crate) mod ffi {
         init(usize::try_from(asic_count).unwrap_or(0));
     }
 
-    #[no_mangle]
-    pub extern "C" fn hashrate_monitor_on_counter(asic: c_int, counter: u32) {
-        on_counter(asic, counter);
-    }
-
-    #[no_mangle]
-    pub extern "C" fn hashrate_monitor_on_errors(asic: c_int, counter: u32) {
-        on_errors(asic, counter);
-    }
-
-    #[no_mangle]
     pub extern "C" fn hashrate_monitor_chip(asic: c_int) -> f32 {
         with(|m| m.chip(asic).map_or(0.0, |c| c.hashes.rate))
     }
 
-    #[no_mangle]
     pub extern "C" fn hashrate_monitor_chip_errors(asic: c_int) -> f32 {
         with(|m| m.chip(asic).map_or(0.0, |c| c.errors.rate))
     }
 
-    #[no_mangle]
     pub extern "C" fn hashrate_monitor_total() -> f32 {
         with(|m| m.hashrate)
     }
 
-    #[no_mangle]
     pub extern "C" fn hashrate_monitor_smoothed() -> f32 {
         with(|m| m.smoothed)
-    }
-
-    #[no_mangle]
-    pub extern "C" fn hashrate_monitor_set_external(ghs: f32) {
-        set_external(ghs);
-    }
-
-    #[no_mangle]
-    pub extern "C" fn hashrate_monitor_external() -> f32 {
-        external()
     }
 }
 

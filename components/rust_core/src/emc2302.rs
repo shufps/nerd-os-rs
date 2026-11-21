@@ -1,7 +1,7 @@
 //! EMC2302 two-channel fan controller (port of
 //! `main/boards/drivers/EMC2302.cpp`): init (polarity, push-pull outputs,
 //! 19.53 kHz PWM, 5-edge tach), duty cycle per channel, RPM from the tach
-//! counter. C API: the former `EMC2302.h` functions. Verified against the
+//! counter. Verified against the
 //! C++ driver by `tests/emc2302.rs`.
 //!
 //! Edge cases:
@@ -91,49 +91,6 @@ pub fn speed(bus: &mut impl RegBus, channel: c_int) -> Option<u16> {
     let r = rpm(msb, lsb);
     log!(Info, TAG, "fan speed: {r}RPM");
     Some(r)
-}
-
-pub(crate) mod ffi {
-    use super::*;
-    use crate::i2c::Master;
-
-    const ESP_OK: c_int = 0;
-    const ESP_FAIL: c_int = -1;
-
-    #[no_mangle]
-    pub extern "C" fn EMC2302_init(invert_polarity: bool) -> bool {
-        init(&mut Master, invert_polarity)
-    }
-
-    #[no_mangle]
-    pub extern "C" fn EMC2302_set_fan_polarity(invert: bool) -> bool {
-        set_polarity(&mut Master, invert)
-    }
-
-    #[no_mangle]
-    pub extern "C" fn EMC2302_set_fan_speed(channel: c_int, percent: f32) -> c_int {
-        if set_speed(&mut Master, channel, percent) {
-            ESP_OK
-        } else {
-            ESP_FAIL
-        }
-    }
-
-    /// # Safety
-    /// `dst` writable.
-    #[no_mangle]
-    pub unsafe extern "C" fn EMC2302_get_fan_speed(channel: c_int, dst: *mut u16) -> c_int {
-        match speed(&mut Master, channel) {
-            Some(r) => {
-                *dst = r;
-                ESP_OK
-            }
-            None => {
-                *dst = 0;
-                ESP_FAIL
-            }
-        }
-    }
 }
 
 #[cfg(test)]

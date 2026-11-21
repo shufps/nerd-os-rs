@@ -3,7 +3,7 @@
 //! display, from the configured mempool instance (default
 //! `CONFIG_MEMPOOL_URL`). One fetch at start; while the display shows the
 //! page (fetching enabled), every 60 s. The responses are parsed by
-//! `apis.rs`. C API: `apis_fetcher.h`.
+//! `apis.rs`.
 //!
 //! Behaviour notes: chunked response bodies are read too (custom mempool
 //! instances behind a proxy that chunks); enabling while a fetch runs is not
@@ -52,7 +52,14 @@ static ENABLE: Enable = Enable {
     wake: Condvar::new(),
 };
 
-fn values() -> Values {
+/// Starts fetching (wakes the task right away).
+pub fn enable_fetching() {
+    *ENABLE.on.lock().unwrap_or_else(|e| e.into_inner()) = true;
+    ENABLE.wake.notify_one();
+}
+
+/// The latest values.
+pub fn values() -> Values {
     *VALUES.lock().unwrap_or_else(|e| e.into_inner())
 }
 
@@ -230,53 +237,8 @@ pub(crate) mod ffi {
     use super::*;
 
     /// The task entry (`xTaskCreatePSRAM`).
-    #[no_mangle]
     pub unsafe extern "C" fn apis_task(_: *mut c_void) {
         run()
-    }
-
-    /// Starts fetching (wakes the task right away).
-    #[no_mangle]
-    pub extern "C" fn apis_enable_fetching() {
-        *ENABLE.on.lock().unwrap_or_else(|e| e.into_inner()) = true;
-        ENABLE.wake.notify_one();
-    }
-
-    #[no_mangle]
-    pub extern "C" fn apis_get_price() -> u32 {
-        values().price_usd
-    }
-    #[no_mangle]
-    pub extern "C" fn apis_get_block_height() -> u32 {
-        values().block_height
-    }
-    #[no_mangle]
-    pub extern "C" fn apis_get_blocks_to_halving() -> u32 {
-        blocks_to_halving(values().block_height)
-    }
-    #[no_mangle]
-    pub extern "C" fn apis_get_halving_percent() -> u32 {
-        halving_percent(values().block_height)
-    }
-    #[no_mangle]
-    pub extern "C" fn apis_get_net_hash() -> u64 {
-        values().net_hash
-    }
-    #[no_mangle]
-    pub extern "C" fn apis_get_net_difficulty() -> u64 {
-        values().net_difficulty
-    }
-    #[no_mangle]
-    pub extern "C" fn apis_get_lowest_fee() -> u32 {
-        values().hour_fee
-    }
-    #[no_mangle]
-    pub extern "C" fn apis_get_mid_fee() -> u32 {
-        values().half_hour_fee
-    }
-    #[no_mangle]
-    pub extern "C" fn apis_get_fastest_fee() -> u32 {
-        values().fastest_fee
     }
 }
 

@@ -1,8 +1,7 @@
 //! The Stratum v1 connection loop (port of `StratumTaskV1::protocolLoop()`
 //! and the send/receive loops of `StratumApi`): setup requests, receiving
 //! lines, handing them to the manager. The socket is reached through [`Io`];
-//! the task's flags and the manager through [`Hooks`]. C API (send, submit,
-//! receive; for the reference tests): `stratum_v1.h`.
+//! the task's flags and the manager through [`Hooks`].
 //!
 //! Behaviour notes:
 //! * a stop or reconnect request is noticed on every receive timeout, not
@@ -325,7 +324,7 @@ pub fn run(
 
 mod ffi {
     use super::*;
-    use core::ffi::{c_char, c_int, c_void, CStr};
+    use core::ffi::{c_int, c_void};
 
     /// `stratum_io_t`: the C++ transport.
     #[repr(C)]
@@ -355,81 +354,6 @@ mod ffi {
         fn delay_ms(&mut self, ms: u32) {
             // SAFETY: as above.
             unsafe { (self.delay_ms)(self.ctx, ms) }
-        }
-    }
-
-    unsafe fn bytes<'a>(p: *const c_char) -> &'a [u8] {
-        if p.is_null() {
-            &[]
-        } else {
-            CStr::from_ptr(p).to_bytes()
-        }
-    }
-
-    /// # Safety
-    /// `io` valid, `data` holds `len` bytes.
-    #[no_mangle]
-    pub unsafe extern "C" fn stratum_v1_send_all(
-        io: *const CIo,
-        data: *const u8,
-        len: usize,
-    ) -> bool {
-        let data = if len == 0 {
-            &[][..]
-        } else {
-            core::slice::from_raw_parts(data, len)
-        };
-        send_all(&mut &*io, data)
-    }
-
-    /// Formats and sends a `mining.submit` (port of
-    /// `StratumApi::submitShare()`); `version` is the rolled version delta.
-    ///
-    /// # Safety
-    /// `io` valid, `session` from `stratum_v1_session_new()`, strings
-    /// NUL-terminated or NULL.
-    #[no_mangle]
-    #[allow(clippy::too_many_arguments)]
-    pub unsafe extern "C" fn stratum_v1_submit(
-        io: *const CIo,
-        session: *const super::super::session::ffi::Handle,
-        user: *const c_char,
-        job_id: *const c_char,
-        extranonce2: *const c_char,
-        ntime: u32,
-        nonce: u32,
-        version: u32,
-    ) -> bool {
-        send_tracked(&mut &*io, &(*session).0, |s| {
-            s.submit(
-                bytes(user),
-                bytes(job_id),
-                bytes(extranonce2),
-                ntime,
-                nonce,
-                version,
-            )
-        })
-    }
-
-    /// The next line as a `malloc()`ed string the caller frees, or NULL.
-    ///
-    /// # Safety
-    /// `io` valid, `lines` from `stratum_v1_lines_new()`.
-    #[no_mangle]
-    pub unsafe extern "C" fn stratum_v1_receive_line(
-        io: *const CIo,
-        lines: *mut LineBuffer,
-    ) -> *mut c_char {
-        match receive_line(&mut &*io, &mut *lines, || false) {
-            Ok(line) => {
-                let p = crate::cutil::c_strdup(&line);
-                if p.is_null() {
-                    (*lines).clear();
-                }
-                p
-            }
-            Err(_) => core::ptr::null_mut(),
         }
     }
 }

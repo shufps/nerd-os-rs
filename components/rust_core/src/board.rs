@@ -7,7 +7,7 @@
 //! (regulator, fans, temperature sensors, ethernet and CAN options, control
 //! pins) on the Rust drivers, the power sequencing (`board_power.rs`). The
 //! firmware is built for one board; it is chosen at runtime by its
-//! `BOARD_*` id. C API: `board_rs.h`.
+//! `BOARD_*` id.
 //!
 //! The class hierarchy is flattened: each method matches the board id the
 //! way the C++ overrides did.
@@ -563,7 +563,7 @@ impl power::Hw for PowerHw<'_> {
     }
     fn dac_set(&mut self, code: u8) {
         if is_axe(self.id) {
-            crate::ds4432u::ffi::DS4432U_set_current_code(0, code);
+            crate::ds4432u::set_code(&mut crate::i2c::Master, 0, code);
         }
     }
     fn serial_clear(&mut self) {
@@ -800,7 +800,7 @@ impl Board {
                 log!(Info, t, "No CAN extension board");
             }
         }
-        crate::emc2302::ffi::EMC2302_init(fan_invert);
+        crate::emc2302::init(&mut crate::i2c::Master, fan_invert);
         self.set_fan_speed(fan_perc);
         self.set_fan_speed(fan_perc);
         gpio_output(QAXE_VREG_EN, false);
@@ -881,7 +881,7 @@ impl Board {
 
     fn init_q1370(&self, fan_invert: bool, fan_perc: f32) -> bool {
         let t = tag(self.id());
-        crate::emc2302::ffi::EMC2302_init(fan_invert);
+        crate::emc2302::init(&mut crate::i2c::Master, fan_invert);
         self.set_fan_speed(fan_perc);
         self.set_fan_speed(fan_perc);
         let mut hw = self.hw();
@@ -919,15 +919,15 @@ impl Board {
             log!(Error, t, "I2C initializing failed");
             return false;
         }
-        crate::emc2101::ffi::EMC2101_init(fan_invert);
+        crate::emc2101::init(&mut crate::i2c::Master, fan_invert);
         if id == NerdAxe {
             self.set_fan_speed(fan_perc);
             gpio_output(AXE_PWR_EN, true);
             gpio_output(AXE_ASIC_RST, false);
             return true;
         }
-        crate::emc2101::ffi::EMC2101_set_ideality_factor(EMC2101_IDEALITY_1_0319);
-        crate::emc2101::ffi::EMC2101_set_beta_compensation(EMC2101_BETA_11);
+        crate::emc2101::set_ideality_factor(&mut crate::i2c::Master, EMC2101_IDEALITY_1_0319);
+        crate::emc2101::set_beta_compensation(&mut crate::i2c::Master, EMC2101_BETA_11);
         self.set_fan_speed(fan_perc);
         let tps = axe_tps();
         if id == NerdAxeGaia {
@@ -1053,10 +1053,10 @@ impl Board {
     pub fn set_fan_speed_ch(&self, ch: c_int, perc: f32) {
         if is_axe(self.id()) {
             if ch == 0 {
-                crate::emc2101::ffi::EMC2101_set_fan_speed(perc);
+                crate::emc2101::set_speed(&mut crate::i2c::Master, perc);
             }
         } else {
-            crate::emc2302::ffi::EMC2302_set_fan_speed(ch, perc);
+            crate::emc2302::set_speed(&mut crate::i2c::Master, ch, perc);
         }
     }
 
@@ -1068,20 +1068,17 @@ impl Board {
 
     pub fn fan_rpm(&self, ch: c_int) -> u16 {
         if is_axe(self.id()) {
-            crate::emc2101::ffi::EMC2101_get_fan_speed()
+            crate::emc2101::speed(&mut crate::i2c::Master)
         } else {
-            let mut rpm = 0;
-            // SAFETY: rpm is a writable local u16 for the call
-            unsafe { crate::emc2302::ffi::EMC2302_get_fan_speed(ch, &mut rpm) };
-            rpm
+            crate::emc2302::speed(&mut crate::i2c::Master, ch).unwrap_or(0)
         }
     }
 
     pub fn set_fan_polarity(&self, invert: bool) {
         if is_axe(self.id()) {
-            crate::emc2101::ffi::EMC2101_set_fan_polarity(invert);
+            crate::emc2101::set_polarity(&mut crate::i2c::Master, invert);
         } else {
-            crate::emc2302::ffi::EMC2302_set_fan_polarity(invert);
+            crate::emc2302::set_polarity(&mut crate::i2c::Master, invert);
         }
     }
 
@@ -1096,17 +1093,17 @@ impl Board {
                 if index > 0 {
                     0.0
                 } else {
-                    crate::emc2101::ffi::EMC2101_get_internal_temp() as f32 + 5.0
+                    crate::emc2101::internal_temp(&mut crate::i2c::Master) as f32 + 5.0
                 }
             }
             NerdAxeGamma | NerdAxeGaia => {
                 if !initialized {
-                    return crate::emc2101::ffi::EMC2101_get_internal_temp() as f32 + 5.0;
+                    return crate::emc2101::internal_temp(&mut crate::i2c::Master) as f32 + 5.0;
                 }
                 if index > 0 {
                     return 0.0;
                 }
-                let t = crate::emc2101::ffi::EMC2101_get_external_temp();
+                let t = crate::emc2101::external_temp(&mut crate::i2c::Master);
                 log!(
                     Info,
                     tag(id),
@@ -1182,9 +1179,9 @@ impl Board {
         let id = self.id();
         match id {
             NerdAxe => match what {
-                0 => crate::ina260::ffi::INA260_read_voltage() / 1000.0,
-                1 => crate::ina260::ffi::INA260_read_current() / 1000.0,
-                2 => crate::ina260::ffi::INA260_read_power() / 1000.0,
+                0 => crate::ina260::voltage(&mut crate::i2c::Master) / 1000.0,
+                1 => crate::ina260::current(&mut crate::i2c::Master) / 1000.0,
+                2 => crate::ina260::power(&mut crate::i2c::Master) / 1000.0,
                 3 => crate::idf::adc::vcore_mv() as f32 / 1000.0,
                 _ => 0.0,
             },
@@ -1536,7 +1533,6 @@ pub(crate) mod ffi {
     }
 
     /// Creates the board (`BOARD_*`); false for an unknown id.
-    #[no_mangle]
     pub extern "C" fn board_create(id: c_int) -> bool {
         let Some(id) = BoardId::from_int(id) else {
             return false;
@@ -1559,176 +1555,91 @@ pub(crate) mod ffi {
         }
     }
 
-    #[no_mangle]
     pub extern "C" fn board_init() -> bool {
         b().init()
     }
 
-    #[no_mangle]
     pub extern "C" fn board_init_asics() -> bool {
         b().init_asics()
     }
 
-    #[no_mangle]
     pub extern "C" fn board_load_settings() {
         b().load_settings()
     }
 
-    #[no_mangle]
     pub extern "C" fn board_shutdown() {
         b().shutdown()
     }
 
-    #[no_mangle]
     pub extern "C" fn board_set_voltage(volts: f32) -> bool {
         b().set_voltage(volts)
     }
 
-    #[no_mangle]
     pub extern "C" fn board_set_asic_frequency(mhz: f32) -> bool {
         b().set_asic_frequency(mhz)
     }
 
-    #[no_mangle]
     pub extern "C" fn board_set_vr_frequency(hz: u32) {
         b().set_vr_frequency(hz)
     }
 
-    #[no_mangle]
-    pub extern "C" fn board_validate_voltage_logged(volts: f32) -> bool {
-        let l = b().state().limits();
-        if !board_core::validate_voltage(volts, &l) {
-            log!(
-                Error,
-                c"board",
-                "Validation error. ASIC voltage {} outside the limits {}..{}",
-                (volts * 1000.0) as c_int,
-                l.abs_min_voltage_mv,
-                l.abs_max_voltage_mv
-            );
-            return false;
-        }
-        true
-    }
-
-    #[no_mangle]
-    pub extern "C" fn board_validate_frequency_logged(mhz: f32) -> bool {
-        let l = b().state().limits();
-        if !board_core::validate_frequency(mhz, &l) {
-            log!(
-                Error,
-                c"board",
-                "Validation error. ASIC Frequency {} is higher than absolute maximum value {}",
-                crate::cutil::fixed(mhz as f64, 3),
-                crate::cutil::fixed(l.abs_max_frequency as f64, 3)
-            );
-            return false;
-        }
-        true
-    }
-
-    #[no_mangle]
     pub extern "C" fn board_set_fan_speed_ch(ch: c_int, perc: f32) {
         b().set_fan_speed_ch(ch, perc)
     }
 
-    #[no_mangle]
-    pub extern "C" fn board_set_fan_speed(perc: f32) {
-        b().set_fan_speed(perc)
-    }
-
-    #[no_mangle]
     pub extern "C" fn board_fan_rpm(ch: c_int) -> u16 {
         b().fan_rpm(ch)
     }
 
-    #[no_mangle]
     pub extern "C" fn board_set_fan_polarity(invert: bool) {
         b().set_fan_polarity(invert)
     }
 
-    #[no_mangle]
     pub extern "C" fn board_temperature(index: c_int) -> f32 {
         b().temperature(index)
     }
 
-    #[no_mangle]
     pub extern "C" fn board_vr_temp() -> f32 {
         b().vr_temp()
     }
 
-    #[no_mangle]
     pub extern "C" fn board_vr_temp_internal() -> f32 {
         b().vr_temp_internal()
     }
 
     /// 0 vin, 1 iin, 2 pin, 3 vout, 4 iout, 5 pout
-    #[no_mangle]
     pub extern "C" fn board_power_value(what: c_int) -> f32 {
         b().power(what)
     }
 
-    #[no_mangle]
     pub extern "C" fn board_request_buck_telemetry() {
         b().request_buck_telemetry()
     }
 
-    #[no_mangle]
     pub extern "C" fn board_request_chip_temps() {
         b().request_chip_temps()
     }
 
-    /// # Safety
-    /// `status` writable.
-    #[no_mangle]
-    pub unsafe extern "C" fn board_fault(status: *mut u32) -> c_int {
-        let (e, s) = b().fault();
-        *status = s;
-        e
-    }
-
-    #[no_mangle]
     pub extern "C" fn board_has_ethernet() -> bool {
         b().has_ethernet()
     }
 
-    /// The HAT pins into `out` (SCLK, MOSI, MISO, CS); false without.
-    ///
-    /// # Safety
-    /// `out` writable for 4 values.
-    #[no_mangle]
-    pub unsafe extern "C" fn board_eth_pins(out: *mut c_int) -> bool {
-        match b().eth_pins() {
-            Some(p) => {
-                let o = core::slice::from_raw_parts_mut(out, 4);
-                o.copy_from_slice(&[p.sclk, p.mosi, p.miso, p.cs]);
-                true
-            }
-            None => false,
-        }
-    }
-
-    #[no_mangle]
     pub extern "C" fn board_detect_ethernet() {
         b().detect_ethernet()
     }
 
-    #[no_mangle]
     pub extern "C" fn board_has_can_extension() -> bool {
         b().has_can_extension()
     }
 
-    #[no_mangle]
     pub extern "C" fn board_is_can_slave() -> bool {
         b().is_can_slave()
     }
 
-    #[no_mangle]
     pub extern "C" fn board_can_tx_pin() -> c_int {
         b().can_pins().0
     }
 
-    #[no_mangle]
     pub extern "C" fn board_can_rx_pin() -> c_int {
         b().can_pins().1
     }
@@ -1788,7 +1699,6 @@ pub(crate) mod ffi {
     ///
     /// # Safety
     /// `out` writable.
-    #[no_mangle]
     pub unsafe extern "C" fn board_info(out: *mut Info) {
         *out = info();
     }
@@ -1847,24 +1757,12 @@ pub(crate) mod ffi {
         }
     }
 
-    #[no_mangle]
-    pub extern "C" fn board_info_sizeof() -> usize {
-        core::mem::size_of::<Info>()
-    }
-
-    #[no_mangle]
     pub extern "C" fn board_is_initialized() -> bool {
         BOARD.get().is_some_and(|b| b.state().initialized)
     }
 
-    #[no_mangle]
     pub extern "C" fn board_is_axe() -> bool {
         is_axe(b().id())
-    }
-
-    #[no_mangle]
-    pub extern "C" fn board_is_shutdown() -> bool {
-        BOARD.get().is_some_and(|b| b.state().shutdown)
     }
 }
 

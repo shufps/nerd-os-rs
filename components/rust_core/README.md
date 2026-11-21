@@ -1,17 +1,21 @@
 # rust_core
 
-Rust parts of the firmware. cargo builds this crate as one static library,
-which the ESP-IDF build links like any other component. Each module exposes a
-C ABI that matches a header in `include/`, so C/C++ callers stay unchanged.
+The firmware (everything except the display fonts and images and the web
+UI in `main/`). cargo builds this crate as one static library, which the
+ESP-IDF build links like any other component; the entry point is
+`app_main()` in `src/boot_firmware.rs`. Only two symbols are exported to C:
+`app_main` and `ws_log_enqueue` (for `ws_log.c`).
 
-| Module | C header | Replaces |
-|---|---|---|
-| `src/coinbase.rs` | `coinbase_decoder.h` | former `components/coinbase_decoder` (C) |
-| `src/stratum_v1/` | `stratum_v1.h` | message parsing, request formatting, line framing, the session (message IDs, matching responses to requests) and the send/receive loops of `StratumApi`; the connection loop of `StratumTaskV1::protocolLoop` (the socket is the C++ transport, `StratumTransport::io()`); job construction of `MiningInfoV1::buildBmJob` |
-| `src/stratum_v2/` | `sv2_protocol.h`, `sv2_noise.h`, `sv2_session.h` | Stratum v2 binary codec and Noise transport (former `components/stratum_v2/sv2_protocol.c` and `sv2_noise.c`, same C APIs); session state (pending jobs, prevhash, extranonce prefix, target, submits) and the connection loop (`StratumTaskV2::protocolLoop`, on the C++ Noise transport) of `StratumTaskV2`; job construction of `MiningInfoV2*` |
-| `src/stratum_task.rs` | `stratum_task_loop.h` | the task loop shared by v1 and v2 (`StratumTaskBase::task`): config, network, DNS, connect, protocol loop, reconnect delay, error counting |
-| `src/pool.rs` | `pool_policy.h` | decisions of the stratum managers: failover and dual-pool pool selection, job dithering, ASIC difficulty, coinbase verification (`main/stratum/stratum_manager*.cpp` carries them out) |
-| `src/mining.rs` | `mining_rs.h` | job math shared by the protocols: double SHA-256, merkle root, header byte orders, `test_nonce_value()` |
+| Area | Modules |
+|---|---|
+| boot, system task | `boot.rs`, `boot_firmware.rs`, `system.rs`, `tasks.rs` |
+| board and hardware | `board*.rs`, `asic/`, `tps546.rs`, `tps536x7.rs`, `emc2101.rs`, `emc2302.rs`, `ina260.rs`, `ds4432u.rs`, `power_mgmt.rs`, `fan_control.rs` |
+| mining | `jobs.rs`, `mining*.rs`, `hashrate.rs`, `history.rs` |
+| pools | `pool*.rs`, `stratum_v1/`, `stratum_v2/`, `stratum_task.rs`, `coinbase.rs` |
+| network, HTTP | `network.rs`, `wifi*.rs`, `w5500.rs`, `http_*.rs`, `ota_*.rs` |
+| display | `display*.rs`, `ui.rs`, `lvgl.rs` |
+| config, OTP, alerts | `config*.rs`, `cfg.rs`, `otp*.rs`, `discord.rs`, `influx.rs` |
+| CAN swarm | `can*.rs` |
 
 Supporting modules:
 - `src/cutil.rs` reproduces C behaviour (`hex2bin`, newlib's `strtoul`) and

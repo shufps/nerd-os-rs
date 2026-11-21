@@ -4,7 +4,7 @@
 //! decoded coinbase, the verification counters and the block reason. The
 //! decoding is [`crate::coinbase`], the decision [`crate::pool::verify`];
 //! the alert, the reconnect and the board fault flag are done by the caller
-//! from the returned [`Outcome`]. C API: `pool_coinbase.h`.
+//! from the returned [`Outcome`].
 //!
 //! One mutex for all of it: the block reason is cleared by the settings
 //! handler and read by the job task.

@@ -4,12 +4,12 @@
 //! hashrate, and the system task: every 5 s it updates the display (IP,
 //! found block overlay, error overlay, values) and pushes a history sample.
 //! The display is reached through [`crate::display`], the board through
-//! `board_api.rs`. C API: `system_state.h`.
+//! `board_api.rs`.
 //!
 //! The strings that change at runtime (WiFi status, SSID, IP address) are
 //! copied out under a lock, so a reader never sees a half-written string.
 
-use core::ffi::{c_char, c_int, CStr};
+use core::ffi::{c_int, CStr};
 use std::ffi::CString;
 use std::sync::{Mutex, MutexGuard, OnceLock};
 use std::time::Duration;
@@ -442,137 +442,9 @@ pub fn run() -> ! {
 pub(crate) mod ffi {
     use super::*;
 
-    unsafe fn bytes<'a>(p: *const c_char) -> &'a [u8] {
-        if p.is_null() {
-            &[]
-        } else {
-            CStr::from_ptr(p).to_bytes()
-        }
-    }
-
-    /// Copies `s` into `buf` (`len` bytes, NUL-terminated, cut if needed).
-    unsafe fn copy_out(s: &CStr, buf: *mut c_char, len: usize) {
-        if buf.is_null() || len == 0 {
-            return;
-        }
-        let b = s.to_bytes();
-        let n = b.len().min(len - 1);
-        core::ptr::copy_nonoverlapping(b.as_ptr(), buf as *mut u8, n);
-        *buf.add(n) = 0;
-    }
-
-    #[no_mangle]
-    pub extern "C" fn system_init(asic_count: c_int) {
-        init(asic_count);
-    }
-
     /// The system task entry; never returns.
-    #[no_mangle]
     pub unsafe extern "C" fn system_task(_: *mut core::ffi::c_void) {
         run()
-    }
-
-    #[no_mangle]
-    pub extern "C" fn system_start_us() -> i64 {
-        start_us()
-    }
-
-    /// # Safety
-    /// `s` NUL-terminated or NULL.
-    #[no_mangle]
-    pub unsafe extern "C" fn system_set_wifi_status(s: *const c_char) {
-        set_wifi_status(bytes(s));
-    }
-
-    /// # Safety
-    /// `s` NUL-terminated or NULL.
-    #[no_mangle]
-    pub unsafe extern "C" fn system_set_ssid(s: *const c_char) {
-        set_ssid(bytes(s));
-    }
-
-    /// # Safety
-    /// `buf` writable for `len` bytes.
-    #[no_mangle]
-    pub unsafe extern "C" fn system_wifi_status(buf: *mut c_char, len: usize) {
-        copy_out(&wifi_status(), buf, len);
-    }
-
-    /// # Safety
-    /// `buf` writable for `len` bytes.
-    #[no_mangle]
-    pub unsafe extern "C" fn system_ip(buf: *mut c_char, len: usize) {
-        copy_out(&ip(), buf, len);
-    }
-
-    /// The host name (fixed after init).
-    #[no_mangle]
-    pub extern "C" fn system_hostname() -> *const c_char {
-        hostname().as_ptr()
-    }
-
-    #[no_mangle]
-    pub extern "C" fn system_set_ap_state(on: bool) {
-        set_ap_state(on);
-    }
-
-    #[no_mangle]
-    pub extern "C" fn system_ap_state() -> bool {
-        ap_state()
-    }
-
-    #[no_mangle]
-    pub extern "C" fn system_set_startup_done() {
-        set_startup_done();
-    }
-
-    #[no_mangle]
-    pub extern "C" fn system_startup_done() -> bool {
-        startup_done()
-    }
-
-    #[no_mangle]
-    pub extern "C" fn system_read_reset_reason() -> c_int {
-        read_reset_reason()
-    }
-
-    /// A static string.
-    #[no_mangle]
-    pub extern "C" fn system_reset_reason() -> *const c_char {
-        reset_reason().as_ptr()
-    }
-
-    #[no_mangle]
-    pub extern "C" fn system_current_hashrate() -> f32 {
-        current_hashrate()
-    }
-
-    #[no_mangle]
-    pub extern "C" fn system_set_error(e: c_int, code: u32) {
-        set_error(e, code);
-    }
-
-    #[no_mangle]
-    pub extern "C" fn system_set_error_if_none(e: c_int, code: u32) {
-        set_error_if_none(e, code);
-    }
-
-    #[no_mangle]
-    pub extern "C" fn system_clear_error(e: c_int) {
-        clear_error(e);
-    }
-
-    /// The error; its code into `*code` (if not NULL).
-    ///
-    /// # Safety
-    /// `code` writable or NULL.
-    #[no_mangle]
-    pub unsafe extern "C" fn system_error(code: *mut u32) -> c_int {
-        let (e, c) = error();
-        if !code.is_null() {
-            *code = c;
-        }
-        e
     }
 }
 

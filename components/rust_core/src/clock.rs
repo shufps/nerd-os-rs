@@ -106,27 +106,3 @@ pub fn start() {
     }
     log!(Info, TAG, "SNTP started");
 }
-
-// firmware only (the host reference code has its own now())
-#[cfg(target_os = "espidf")]
-mod ffi {
-    #[no_mangle]
-    pub extern "C" fn now_ms() -> u64 {
-        super::now_ms()
-    }
-
-    #[no_mangle]
-    pub extern "C" fn now() -> u32 {
-        super::now()
-    }
-
-    #[no_mangle]
-    pub extern "C" fn is_time_synced() -> bool {
-        super::is_time_synced()
-    }
-
-    #[no_mangle]
-    pub extern "C" fn clock_sntp_start() {
-        super::start()
-    }
-}

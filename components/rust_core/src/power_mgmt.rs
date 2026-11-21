@@ -3,7 +3,7 @@
 //! mutex shared by everything that touches the ASICs and the I2C devices),
 //! shutdown and restart, the task that runs the power loop (`power_task.rs`)
 //! with the fan control (`fan_control.rs`) on the board (`board_api.rs`), and
-//! the values the other tasks read. C API: `power_mgmt.h`.
+//! the values the other tasks read.
 
 use core::ffi::{c_int, c_void, CStr};
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -345,44 +345,7 @@ pub fn get(what: c_int) -> f32 {
 pub(crate) mod ffi {
     use super::*;
 
-    #[no_mangle]
     pub unsafe extern "C" fn pm_task(_: *mut c_void) {
         run()
-    }
-    #[no_mangle]
-    pub extern "C" fn pm_lock() {
-        lock()
-    }
-    #[no_mangle]
-    pub extern "C" fn pm_unlock() {
-        unlock()
-    }
-    #[no_mangle]
-    pub extern "C" fn pm_is_shutdown() -> bool {
-        is_shutdown()
-    }
-    #[no_mangle]
-    pub extern "C" fn pm_shutdown() {
-        shutdown()
-    }
-    #[no_mangle]
-    pub extern "C" fn pm_restart() {
-        restart()
-    }
-    #[no_mangle]
-    pub extern "C" fn pm_get(what: c_int) -> f32 {
-        get(what)
-    }
-    #[no_mangle]
-    pub extern "C" fn pm_fan_get(ch: c_int, what: c_int) -> u16 {
-        fan_get(ch, what)
-    }
-    #[no_mangle]
-    pub extern "C" fn pm_fan_load_settings() {
-        fan_load_settings()
-    }
-    #[no_mangle]
-    pub extern "C" fn pm_fan_pid_use_max() -> bool {
-        FANS.get().is_some_and(|f| f.pid_use_max())
     }
 }

@@ -2,7 +2,7 @@
 //! `StratumManager`, `StratumManagerFallback` and `StratumManagerDualPool`):
 //! accepted and rejected shares, pool and network difficulty, best session
 //! and all-time difficulty, found blocks, the time of the last share
-//! response. C API: `pool_stats.h`.
+//! response.
 //!
 //! In failover mode both pools share one set of counters (only one pool
 //! mines at a time); in dual pool mode each pool has its own, and the

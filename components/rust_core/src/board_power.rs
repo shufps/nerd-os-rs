@@ -313,5 +313,3 @@ pub fn shutdown(hw: &mut impl Hw, v: Variant, limits: &Limits) {
     }
     hw.state(STATE_SHUTDOWN, 1);
 }
-
-mod ffi {}

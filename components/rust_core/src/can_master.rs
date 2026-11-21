@@ -391,6 +391,26 @@ impl Master {
 
 static MASTER: Mutex<Master> = Mutex::new(Master::new());
 
+/// A received frame (the CAN task); what it means for the caller.
+pub fn frame(id: u32, dlc: u8, data: &[u8; 8], now_us: i64) -> Event {
+    with(|m| m.frame(id, dlc, data, now_us))
+}
+
+/// The periodic step (timeouts).
+pub fn tick(now_us: i64) {
+    with(|m| m.tick(now_us));
+}
+
+/// The slave registry from its saved form.
+pub fn load_registry(blob: &[u8]) {
+    with(|m| m.load_registry(blob));
+}
+
+/// Forgets a slave.
+pub fn delete(slave: u8) {
+    with(|m| m.delete(slave as usize));
+}
+
 fn with<T>(f: impl FnOnce(&mut Master) -> T) -> T {
     f(&mut MASTER.lock().unwrap_or_else(|e| e.into_inner()))
 }
@@ -402,7 +422,6 @@ pub(crate) mod ffi {
     ///
     /// # Safety
     /// `data` points to the frame's 8 data bytes, `out` writable.
-    #[no_mangle]
     pub unsafe extern "C" fn can_master_frame(
         id: u32,
         dlc: u8,
@@ -410,21 +429,18 @@ pub(crate) mod ffi {
         now_us: i64,
         out: *mut Event,
     ) {
-        *out = with(|m| m.frame(id, dlc, &*data, now_us));
+        *out = frame(id, dlc, &*data, now_us);
     }
 
-    #[no_mangle]
     pub extern "C" fn can_master_tick(now_us: i64) {
-        with(|m| m.tick(now_us));
+        tick(now_us);
     }
 
     /// # Safety
     /// `blob` holds `len` bytes.
-    #[no_mangle]
     pub unsafe extern "C" fn can_master_load_registry(blob: *const u8, len: usize) {
         if !blob.is_null() {
-            let b = core::slice::from_raw_parts(blob, len);
-            with(|m| m.load_registry(b));
+            load_registry(core::slice::from_raw_parts(blob, len));
         }
     }
 
@@ -434,30 +450,25 @@ pub(crate) mod ffi {
         *out = with(|m| m.registry());
     }
 
-    #[no_mangle]
     pub extern "C" fn can_master_delete(slave: u8) {
-        with(|m| m.delete(slave as usize));
+        delete(slave);
     }
 
-    #[no_mangle]
     pub extern "C" fn can_master_is_slave_active(slave: u8) -> bool {
         with(|m| m.slot(slave as usize).is_some_and(|s| s.used && s.online))
     }
 
-    #[no_mangle]
     pub extern "C" fn can_master_is_slave_known(slave: u8) -> bool {
         with(|m| m.slot(slave as usize).is_some_and(|s| s.used))
     }
 
     /// (never set: foreign slaves are not detected yet)
-    #[no_mangle]
     pub extern "C" fn can_master_is_slave_foreign(_slave: u8) -> bool {
         false
     }
 
     /// # Safety
     /// `out` holds 6 bytes.
-    #[no_mangle]
     pub unsafe extern "C" fn can_master_get_slave_mac(slave: u8, out: *mut [u8; 6]) -> bool {
         match with(|m| m.slot(slave as usize).filter(|s| s.used).map(|s| s.mac)) {
             Some(mac) => {
@@ -470,7 +481,6 @@ pub(crate) mod ffi {
 
     /// # Safety
     /// `out` holds a `can_slave_telemetry_t` (49 bytes).
-    #[no_mangle]
     pub unsafe extern "C" fn can_master_get_slave_telemetry(
         slave: u8,
         out: *mut [u8; TELEMETRY_LEN],
@@ -490,7 +500,6 @@ pub(crate) mod ffi {
 
     /// # Safety
     /// `out` holds a `can_slave_config_t` (46 bytes).
-    #[no_mangle]
     pub unsafe extern "C" fn can_master_get_slave_config(
         slave: u8,
         out: *mut [u8; CONFIG_LEN],
@@ -505,7 +514,6 @@ pub(crate) mod ffi {
     }
 
     /// Sum of the power (W) the known slaves report.
-    #[no_mangle]
     pub extern "C" fn can_master_get_slave_fleet_power() -> f32 {
         with(|m| {
             m.slots[1..]

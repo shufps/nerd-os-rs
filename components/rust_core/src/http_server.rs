@@ -5,7 +5,7 @@
 //! checks (network, CORS headers, OTP) before the handler, answers unknown
 //! URIs with a redirect to `/` (captive portal), serves the recovery page
 //! and the CORS preflights, and starts the captive portal DNS server. The
-//! handlers are in the `http_*` modules. C API: `http_server.h`.
+//! handlers are in the `http_*` modules.
 
 use crate::idf::idf_const;
 use core::ffi::{c_char, c_int, c_void, CStr};
@@ -32,9 +32,8 @@ pub struct ServerCtx {
 /// The page served in recovery mode (the web UI could not be mounted).
 static RECOVERY_PAGE: &[u8] = include_bytes!("recovery_page.html");
 
-/// `http_server`: the server handle (the web socket code sends with it).
-#[no_mangle]
-pub static http_server: AtomicPtr<c_void> = AtomicPtr::new(core::ptr::null_mut());
+/// The server handle (the web socket code sends with it).
+pub static HTTP_SERVER: AtomicPtr<c_void> = AtomicPtr::new(core::ptr::null_mut());
 
 /// The web UI filesystem failed: only the recovery page
 /// and the uploads are served.
@@ -45,7 +44,7 @@ fn recovery() -> bool {
 }
 
 fn server() -> httpd::Handle {
-    http_server.load(Ordering::Acquire)
+    HTTP_SERVER.load(Ordering::Acquire)
 }
 
 /// core dumps in flash: the download route exists
@@ -432,7 +431,7 @@ pub fn start() -> EspErr {
         unsafe { crate::cutil::c_free(ctx as *mut c_void) };
         return ESP_FAIL;
     }
-    http_server.store(handle, Ordering::Release);
+    HTTP_SERVER.store(handle, Ordering::Release);
 
     // SAFETY: the server is running; `ctx` is initialized and never freed (it
     // stays the routes' user context); the handler matches the err callback type
@@ -452,7 +451,6 @@ pub fn start() -> EspErr {
 pub(crate) mod ffi {
     use super::*;
 
-    #[no_mangle]
     pub extern "C" fn start_rest_server(_: *mut c_void) -> EspErr {
         start()
     }

@@ -16,14 +16,11 @@ mod golden;
 use golden::Rec;
 
 // rust_core's own exports (the history and the CAN master are globals)
-extern "C" {
-    fn can_master_frame(id: u32, dlc: u8, data: *const [u8; 8], now_us: i64, out: *mut [u8; 24]);
-    fn can_master_load_registry(blob: *const u8, len: usize);
-    fn can_master_delete(slave: u8);
-    fn can_master_tick(now_us: i64);
-    fn history_init(asic_count: c_int) -> bool;
-    fn history_push(rate: f32, vreg: f32, asic: f32, ts: u64);
-}
+use rust_core::can_master::{
+    delete as can_master_delete, frame as can_master_frame,
+    load_registry as can_master_load_registry, tick as can_master_tick,
+};
+use rust_core::history::{init as history_init, push as history_push};
 
 static LOCK: Mutex<()> = Mutex::new(());
 
@@ -274,12 +271,10 @@ fn system_info() {
     let mut r = Rng(0x5157);
     let mut rec = Rec::new("http_json", "system_info");
     // a history with samples: 1 h of 5 s samples ending at 10 h
-    unsafe {
-        assert!(history_init(4));
-        for k in 0..720u64 {
-            let ts = 36_000_000 - (720 - k) * 5000;
-            history_push(r.below(20_000) as f32, r.f32(), r.f32(), ts);
-        }
+    assert!(history_init(4));
+    for k in 0..720u64 {
+        let ts = 36_000_000 - (720 - k) * 5000;
+        history_push(r.below(20_000) as f32, r.f32(), r.f32(), ts);
     }
     let mut checked_history = 0;
     for _ in 0..4000 {
@@ -356,7 +351,7 @@ fn asic_info() {
 /// The history used by the tests with history exports.
 fn with_history(r: &mut Rng) {
     static INIT: std::sync::Once = std::sync::Once::new();
-    INIT.call_once(|| unsafe {
+    INIT.call_once(|| {
         assert!(history_init(4));
         let mut r = Rng(0x415);
         for k in 0..720u64 {
@@ -671,20 +666,13 @@ fn v2_settings() {
 }
 
 /// A multi-frame message (7 payload bytes per frame, the last one SEQ_LAST).
-unsafe fn send_message(base: u32, slave: u8, msg: &[u8], now: i64) {
+fn send_message(base: u32, slave: u8, msg: &[u8], now: i64) {
     let chunks: Vec<&[u8]> = msg.chunks(7).collect();
     for (k, chunk) in chunks.iter().enumerate() {
         let mut data = [0u8; 8];
         data[0] = if k + 1 == chunks.len() { 0xff } else { k as u8 };
         data[1..1 + chunk.len()].copy_from_slice(chunk);
-        let mut ev = [0u8; 24];
-        can_master_frame(
-            base + slave as u32,
-            1 + chunk.len() as u8,
-            &data,
-            now,
-            &mut ev,
-        );
+        let _ = can_master_frame(base + slave as u32, 1 + chunk.len() as u8, &data, now);
     }
 }
 
@@ -696,7 +684,7 @@ fn can_swarm() {
     let mut slaves_seen = 0;
     for round in 0..1500 {
         let now = 1_000_000_000 + round as i64 * 100_000_000;
-        unsafe {
+        {
             for i in 1..32 {
                 can_master_delete(i);
             }
@@ -709,7 +697,7 @@ fn can_swarm() {
                     blob[i * 7 + 6] = 1;
                 }
             }
-            can_master_load_registry(blob.as_ptr(), blob.len());
+            can_master_load_registry(&blob);
             for i in 1..32u8 {
                 if blob[i as usize * 7 + 6] == 0 {
                     continue;

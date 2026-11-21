@@ -223,8 +223,6 @@ pub fn updater() -> &'static Updater {
     &UPDATER
 }
 
-mod ffi {}
-
 #[cfg(test)]
 mod tests {
     use super::*;

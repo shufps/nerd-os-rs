@@ -3,7 +3,7 @@
 //! state, persisted in the configuration; checking a TOTP code with replay
 //! protection, minting and checking session tokens, and the `otpauth://`
 //! URI of a new enrollment (its QR code: `otp_device.rs`).
-//! The algorithms are in `http_auth.rs`. C API: `otp_state.h`.
+//! The algorithms are in `http_auth.rs`.
 //!
 //! All state is behind one lock, including the secret, the enabled flag
 //! and loading/saving the settings.
@@ -78,13 +78,7 @@ fn fill_random(buf: &mut [u8]) {
 /// Asks the configuration to be written (`Config::flush()`).
 fn flush() {
     #[cfg(target_os = "espidf")]
-    {
-        extern "C" {
-            fn config_request_flush();
-        }
-        // SAFETY: plain C++ function without arguments
-        unsafe { config_request_flush() }
-    }
+    crate::config_nvs::request_flush();
 }
 
 impl Otp {
@@ -317,6 +311,16 @@ pub fn login(totp: &[u8], now: i64, time_synced: bool, now_ms: u64) -> Auth {
     Auth::Failed
 }
 
+/// An enrollment (QR code) is active.
+pub fn enrollment_active() -> bool {
+    with(|o| o.enrollment)
+}
+
+/// Ends an active enrollment.
+pub fn disable_enrollment() {
+    with(|o| o.enrollment = false);
+}
+
 pub(crate) mod ffi {
     use super::*;
 
@@ -330,16 +334,6 @@ pub(crate) mod ffi {
 
     pub extern "C" fn otp_set_enabled(enabled: bool) {
         with(|o| o.enabled = enabled);
-    }
-
-    #[no_mangle]
-    pub extern "C" fn otp_enrollment_active() -> bool {
-        with(|o| o.enrollment)
-    }
-
-    #[no_mangle]
-    pub extern "C" fn otp_disable_enrollment() {
-        with(|o| o.enrollment = false);
     }
 }
 

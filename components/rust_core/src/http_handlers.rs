@@ -294,7 +294,8 @@ fn otp_create(req: &mut Request) -> EspErr {
 }
 
 fn otp_patch(req: &mut Request) -> EspErr {
-    use crate::otp::ffi::{otp_disable_enrollment, otp_save, otp_set_enabled};
+    use crate::otp::disable_enrollment as otp_disable_enrollment;
+    use crate::otp::ffi::{otp_save, otp_set_enabled};
     // stops an enrollment (if one runs), hides the QR in any case
     otp_disable_enrollment();
     crate::display::send_hide_qr();

@@ -957,13 +957,7 @@ pub(crate) mod ffi {
         }
     }
 
-    #[no_mangle]
-    pub extern "C" fn network_wifi_rssi() -> c_int {
-        wifi_rssi()
-    }
-
     /// The station MAC ("" before WiFi is up).
-    #[no_mangle]
     pub extern "C" fn network_mac_addr() -> *const c_char {
         mac_addr().as_ptr()
     }

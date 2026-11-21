@@ -2,10 +2,10 @@
 # static library, which is linked like any other component library.
 # Requires the "esp" Rust toolchain (espup), see README.md.
 
-# tcp_transport: sv2_noise.h includes esp_transport.h; driver/esp_adc: the
-# headers layout_check.c checks the Rust mirrors of the IDF structs against
-idf_component_register(SRCS "posix_stubs.c" "layout_check.c" "ws_log.c" INCLUDE_DIRS "include"
-    REQUIRES tcp_transport PRIV_REQUIRES driver esp_adc esp_wifi mbedtls lwip esp_http_client esp_app_format esp_http_server esp_netif esp_eth esp_partition app_update spiffs nvs_flash espressif__mdns lvgl esp_lcd esp_psram)
+# the headers layout_check.c checks the Rust mirrors of the IDF structs
+# against, and those of the bindings (bindings.h); no public headers
+idf_component_register(SRCS "posix_stubs.c" "layout_check.c" "ws_log.c"
+    PRIV_REQUIRES tcp_transport driver esp_adc esp_wifi mbedtls lwip esp_http_client esp_app_format esp_http_server esp_netif esp_eth esp_partition app_update spiffs nvs_flash espressif__mdns lvgl esp_lcd esp_psram)
 
 if(IDF_TARGET STREQUAL "esp32s3")
     set(RUST_TARGET "xtensa-esp32s3-espidf")

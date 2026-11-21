@@ -55,8 +55,6 @@ pub fn authority_key(b58: &str) -> Result<[u8; 32], KeyError> {
     Ok(key)
 }
 
-mod ffi {}
-
 #[cfg(test)]
 mod tests {
     use super::*;

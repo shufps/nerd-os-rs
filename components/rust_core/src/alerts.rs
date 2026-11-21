@@ -263,8 +263,6 @@ fn post_message(message: &str, post: &mut impl FnMut(&str, &str) -> c_int) -> bo
     }
 }
 
-mod ffi {}
-
 #[cfg(test)]
 mod tests {
     use super::*;

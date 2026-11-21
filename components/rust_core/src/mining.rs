@@ -1,6 +1,6 @@
 //! Job math shared by the Stratum protocols: double SHA-256, merkle root,
 //! byte orders of the header fields and the difficulty of a found nonce.
-//! C API: `mining_rs.h`.
+//!
 //!
 //! Port of parts of the former `components/bm1397/mining.cpp`, verified
 //! against its outputs by `tests/mining.rs`.
@@ -120,31 +120,6 @@ pub fn nonce_difficulty(
     header[72..76].copy_from_slice(&nbits.to_le_bytes());
     header[76..80].copy_from_slice(&nonce.to_le_bytes());
     TRUEDIFFONE / le256_to_f64(&sha256d(&header))
-}
-
-mod ffi {
-    use super::*;
-
-    /// # Safety
-    /// `prev_block_hash` and `merkle_root` must point to 32 bytes each.
-    #[no_mangle]
-    pub unsafe extern "C" fn mining_nonce_difficulty(
-        version: u32,
-        prev_block_hash: *const [u8; 32],
-        merkle_root: *const [u8; 32],
-        ntime: u32,
-        nbits: u32,
-        nonce: u32,
-    ) -> f64 {
-        nonce_difficulty(
-            version,
-            &*prev_block_hash,
-            &*merkle_root,
-            ntime,
-            nbits,
-            nonce,
-        )
-    }
 }
 
 #[cfg(test)]

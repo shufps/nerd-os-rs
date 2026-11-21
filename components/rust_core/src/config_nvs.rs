@@ -233,17 +233,3 @@ pub fn init(single_fan: bool, overheat_default: u16) {
         TASK_RUNNING.store(true, Ordering::Release);
     }
 }
-
-// firmware only (the host settings tests record their own flushes)
-#[cfg(target_os = "espidf")]
-mod ffi {
-    #[no_mangle]
-    pub extern "C" fn config_nvs_init(single_fan: bool, overheat_default: u16) {
-        super::init(single_fan, overheat_default)
-    }
-
-    #[no_mangle]
-    pub extern "C" fn config_request_flush() {
-        super::request_flush()
-    }
-}

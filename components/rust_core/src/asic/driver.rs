@@ -1,8 +1,7 @@
 //! The BM13xx chain driver (port of the `Asic` class and the chip classes
 //! `BM1366`/`BM1368`/`BM1370`/`BM1373`): init sequences, chip enumeration,
 //! jobs, responses, ticket mask, hash and version rolling frequency. The UART
-//! is `serial.rs`, reached through [`Uart`]. C API:
-//! `asic_driver.h`.
+//! is `serial.rs`, reached through [`Uart`].
 //!
 //! Several tasks use one driver at the same time (jobs, results, counters,
 //! frequency changes), as before; the state is behind a mutex that is never
@@ -489,7 +488,7 @@ mod tests {
 
 pub(crate) mod ffi {
     use super::*;
-    use core::ffi::{c_char, c_void};
+    use core::ffi::c_void;
 
     /// `asic_uart_t`
     #[repr(C)]
@@ -554,194 +553,5 @@ pub(crate) mod ffi {
         }
     }
 
-    /// # Safety
-    /// `uart` valid; its callbacks for the lifetime of the driver.
-    #[no_mangle]
-    pub unsafe extern "C" fn asic_driver_new(chip: i32, uart: *const CUart) -> *mut Handle {
-        Handle::new(chip, *uart).map_or(core::ptr::null_mut(), |h| Box::into_raw(Box::new(h)))
-    }
-
-    /// # Safety
-    /// `d` from `asic_driver_new()` (or NULL).
-    #[no_mangle]
-    pub unsafe extern "C" fn asic_driver_free(d: *mut Handle) {
-        if !d.is_null() {
-            drop(Box::from_raw(d));
-        }
-    }
-
     // All functions below: `d` from `asic_driver_new()`.
-
-    /// # Safety
-    /// See above.
-    #[no_mangle]
-    pub unsafe extern "C" fn asic_driver_name(d: *const Handle) -> *const c_char {
-        (*d).driver.chip().name().as_ptr()
-    }
-
-    /// # Safety
-    /// See above.
-    #[no_mangle]
-    pub unsafe extern "C" fn asic_driver_small_core_count(d: *const Handle) -> u16 {
-        (*d).driver.chip().small_core_count()
-    }
-
-    /// # Safety
-    /// See above.
-    #[no_mangle]
-    pub unsafe extern "C" fn asic_driver_default_vr_frequency(d: *const Handle) -> u32 {
-        (*d).driver.chip().default_vr_frequency()
-    }
-
-    /// # Safety
-    /// See above.
-    #[no_mangle]
-    pub unsafe extern "C" fn asic_driver_init(
-        d: *const Handle,
-        frequency: u64,
-        asic_count: u16,
-        difficulty: u32,
-        vr_frequency: u32,
-    ) -> u8 {
-        (*d).run(|drv, u| drv.init(u, frequency, asic_count, difficulty, vr_frequency))
-    }
-
-    /// # Safety
-    /// See above.
-    #[no_mangle]
-    pub unsafe extern "C" fn asic_driver_set_max_baud(d: *const Handle) -> i32 {
-        (*d).run(|drv, u| drv.set_max_baud(u))
-    }
-
-    /// # Safety
-    /// See above.
-    #[no_mangle]
-    pub unsafe extern "C" fn asic_driver_set_frequency(d: *const Handle, target: f32) -> bool {
-        (*d).run(|drv, u| drv.set_frequency(u, target))
-    }
-
-    /// # Safety
-    /// See above; `actual` writable or NULL.
-    #[no_mangle]
-    pub unsafe extern "C" fn asic_driver_send_hash_frequency(
-        d: *const Handle,
-        target: f32,
-        actual: *mut f32,
-    ) -> bool {
-        let ok = (*d).run(|drv, u| drv.send_hash_frequency(u, target));
-        if !actual.is_null() {
-            *actual = (*d).driver.actual_frequency();
-        }
-        ok
-    }
-
-    /// # Safety
-    /// See above.
-    #[no_mangle]
-    pub unsafe extern "C" fn asic_driver_set_vr_frequency(d: *const Handle, freq_hz: u32) {
-        (*d).run(|drv, u| drv.set_vr_frequency(u, freq_hz))
-    }
-
-    /// # Safety
-    /// See above.
-    #[no_mangle]
-    pub unsafe extern "C" fn asic_driver_set_difficulty_mask(d: *const Handle, difficulty: i32) {
-        (*d).run(|drv, u| drv.set_difficulty_mask(u, difficulty))
-    }
-
-    /// # Safety
-    /// See above; the hashes hold 32 bytes each.
-    #[no_mangle]
-    #[allow(clippy::too_many_arguments)]
-    pub unsafe extern "C" fn asic_driver_send_work(
-        d: *const Handle,
-        job_id: u32,
-        starting_nonce: u32,
-        nbits: u32,
-        ntime: u32,
-        merkle_root_be: *const [u8; 32],
-        prev_block_hash_be: *const [u8; 32],
-        version: u32,
-    ) -> u8 {
-        (*d).run(|drv, u| {
-            drv.send_work(
-                u,
-                job_id,
-                starting_nonce,
-                nbits,
-                ntime,
-                &*merkle_root_be,
-                &*prev_block_hash_be,
-                version,
-            )
-        })
-    }
-
-    /// # Safety
-    /// See above; `job` holds 82 bytes.
-    #[no_mangle]
-    pub unsafe extern "C" fn asic_driver_send_raw_job(d: *const Handle, job: *const [u8; JOB_LEN]) {
-        (*d).run(|drv, u| drv.send_raw_job(u, &*job))
-    }
-
-    /// # Safety
-    /// See above; `result` writable.
-    #[no_mangle]
-    pub unsafe extern "C" fn asic_driver_process_work(
-        d: *const Handle,
-        result: *mut TaskResult,
-    ) -> bool {
-        match (*d).run(|drv, u| drv.process_work(u)) {
-            Some(r) => {
-                *result = r;
-                true
-            }
-            None => false,
-        }
-    }
-
-    /// # Safety
-    /// See above.
-    #[no_mangle]
-    pub unsafe extern "C" fn asic_driver_request_chip_temp(d: *const Handle) {
-        (*d).run(|drv, u| drv.request_chip_temp(u))
-    }
-
-    /// # Safety
-    /// See above.
-    #[no_mangle]
-    pub unsafe extern "C" fn asic_driver_reset_counter(d: *const Handle, reg: u8) {
-        (*d).run(|drv, u| drv.reset_counter(u, reg))
-    }
-
-    /// # Safety
-    /// See above.
-    #[no_mangle]
-    pub unsafe extern "C" fn asic_driver_read_counter(d: *const Handle, reg: u8) {
-        (*d).run(|drv, u| drv.read_counter(u, reg))
-    }
-
-    /// # Safety
-    /// See above; `data` holds `len` bytes.
-    #[no_mangle]
-    pub unsafe extern "C" fn asic_driver_send_frame(
-        d: *const Handle,
-        header: u8,
-        data: *const u8,
-        len: usize,
-    ) {
-        let data = if data.is_null() || len == 0 {
-            &[][..]
-        } else {
-            core::slice::from_raw_parts(data, len)
-        };
-        (*d).run(|drv, u| drv.send(u, header, data))
-    }
-
-    /// # Safety
-    /// See above.
-    #[no_mangle]
-    pub unsafe extern "C" fn asic_driver_set_address_interval(d: *const Handle, interval: u8) {
-        (*d).driver.set_address_interval(interval)
-    }
 }

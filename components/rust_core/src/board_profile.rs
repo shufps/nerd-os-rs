@@ -4,7 +4,7 @@
 //! defaults, power gauge ranges, pool difficulties, colours and themes, and
 //! the version rolling frequency, per board as the constructor chain left
 //! them, with the hardware detections as inputs (Q1373 straps and VR device
-//! code, NerdOCTAXE-γ VR detect pin). C API: `board_profile.h`. Verified
+//! code, NerdOCTAXE-γ VR detect pin). Verified
 //! against the former constructors by `tests/board_profile.rs`.
 //!
 //! Note: the Q1370/Q1373 keep the BM1368's default version rolling frequency
@@ -640,32 +640,5 @@ fn q1370() -> Profile {
                 ..nerdqaxeplus()
             }
         }
-    }
-}
-
-mod ffi {
-    use super::*;
-
-    /// The profile of `board` (`BOARD_*`); false for an unknown board.
-    ///
-    /// # Safety
-    /// `detect` valid or NULL, `out` writable.
-    #[no_mangle]
-    pub unsafe extern "C" fn board_profile(
-        board: c_int,
-        detect: *const Detect,
-        out: *mut Profile,
-    ) -> bool {
-        let Some(b) = BoardId::from_int(board) else {
-            return false;
-        };
-        let d = detect.as_ref().copied().unwrap_or_default();
-        *out = profile(b, &d);
-        true
-    }
-
-    #[no_mangle]
-    pub extern "C" fn board_profile_sizeof() -> usize {
-        core::mem::size_of::<Profile>()
     }
 }

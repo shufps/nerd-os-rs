@@ -2,7 +2,7 @@
 //! `http_utils.cpp` and `http_cors.cpp`): TOTP codes (RFC 6238, HMAC-SHA1,
 //! 30 s, 6 digits, +-1 step, replay mask), session tokens (HMAC-SHA256 over a
 //! Base32 payload), the failed-attempt rate limit and the check that a
-//! request comes from a private network. C API: `http_auth.h`.
+//! request comes from a private network.
 //!
 //! Behaviour notes:
 //! * the session endpoint counts failed TOTP codes like every other
@@ -333,7 +333,6 @@ pub(crate) mod ffi {
         rate_limit().blocked(now_ms)
     }
 
-    #[no_mangle]
     pub extern "C" fn auth_rate_limit_failure(now_ms: u64) -> bool {
         rate_limit().record_failure(now_ms)
     }

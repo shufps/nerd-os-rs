@@ -2,11 +2,11 @@
 //! `main/tasks/create_jobs_task.cpp` and `construct_bm_job()`): extranonce2,
 //! coinbase transaction, merkle root and the job's hash fields.
 
-use core::ffi::{c_char, c_int};
+use core::ffi::c_char;
 use std::io::Write;
 
 use super::{MiningNotify, EXTRANONCE2_LEN};
-use crate::cutil::{hex2bin, until_nul};
+use crate::cutil::hex2bin;
 use crate::mining::{merkle_root, JobHashes};
 
 /// Longest extranonce2 hex string plus NUL.
@@ -71,52 +71,6 @@ pub fn build_parts(
 
     let root = merkle_root(&tx, merkle_branches);
     Some((JobHashes::new(root, prev_block_hash), extranonce2))
-}
-
-mod ffi {
-    use super::*;
-    use core::ffi::CStr;
-
-    unsafe fn bytes<'a>(p: *const c_char) -> Option<&'a [u8]> {
-        (!p.is_null()).then(|| until_nul(CStr::from_ptr(p).to_bytes()))
-    }
-
-    /// Fills `*job` for the current notify; false for missing strings or an
-    /// `extranonce2_len` outside 1..=16.
-    ///
-    /// # Safety
-    /// `notify` and `job` must be valid; strings NUL-terminated or NULL.
-    #[no_mangle]
-    pub unsafe extern "C" fn stratum_v1_build_job(
-        notify: *const MiningNotify,
-        extranonce1: *const c_char,
-        extranonce2_len: c_int,
-        extranonce2: u32,
-        job: *mut Job,
-    ) -> bool {
-        if notify.is_null() || job.is_null() {
-            return false;
-        }
-        let notify = &*notify;
-        let (Some(cb1), Some(en1), Some(cb2)) = (
-            bytes(notify.coinbase_1),
-            bytes(extranonce1),
-            bytes(notify.coinbase_2),
-        ) else {
-            return false;
-        };
-        let Some((hashes, en2)) = build(notify, [cb1, en1, cb2], extranonce2_len, extranonce2)
-        else {
-            return false;
-        };
-        let job = &mut *job;
-        job.hashes = hashes;
-        job.extranonce2 = [0; EXTRANONCE2_HEX_MAX];
-        for (dst, &b) in job.extranonce2.iter_mut().zip(en2.as_bytes()) {
-            *dst = b as c_char;
-        }
-        true
-    }
 }
 
 #[cfg(test)]

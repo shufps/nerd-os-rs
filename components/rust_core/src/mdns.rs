@@ -186,5 +186,3 @@ pub fn start(hostname: &str, board_version: i32, asic_count: i32, family: &str, 
     );
     STARTED.store(true, Ordering::Release);
 }
-
-mod ffi {}

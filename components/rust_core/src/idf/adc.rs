@@ -95,7 +95,3 @@ pub fn vcore_mv() -> u16 {
         sys::esp_adc_cal_raw_to_voltage(sys::adc1_get_raw(CHANNEL) as u32, &*c) as u16
     }
 }
-
-// firmware only
-#[cfg(target_os = "espidf")]
-mod ffi {}

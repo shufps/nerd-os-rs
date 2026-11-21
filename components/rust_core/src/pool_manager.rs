@@ -6,8 +6,7 @@
 //! the pool policy (`pool.rs`) which pools are connected, hands the pool
 //! messages to `pool_dispatch.rs`, submits shares, keeps the statistics
 //! (`pool_stats.rs`) and the coinbase verification (`pool_coinbase.rs`), and
-//! starts the ping tasks (`ping.rs`, `ping_session.rs`). C API:
-//! `pool_manager.h`.
+//! starts the ping tasks (`ping.rs`, `ping_session.rs`).
 //!
 //! The manager lock (`m_mutex`, not recursive) is the mutex around the pool
 //! configs; it is held where the C++ code held it.
@@ -25,7 +24,7 @@
 //!   (`load_settings()`): the policy and the statistics switch mode and
 //!   the pools are connected as the new mode wants.
 
-use core::ffi::{c_char, c_int, c_void, CStr};
+use core::ffi::{c_int, c_void, CStr};
 use std::ffi::CString;
 use std::sync::atomic::{AtomicBool, AtomicI32, AtomicU32, Ordering::*};
 use std::sync::{Arc, Mutex, MutexGuard, OnceLock};
@@ -1539,16 +1538,7 @@ pub(crate) mod ffi {
         get()
     }
 
-    unsafe fn cstr<'a>(p: *const c_char) -> &'a CStr {
-        if p.is_null() {
-            c""
-        } else {
-            CStr::from_ptr(p)
-        }
-    }
-
     /// Creates the manager (once); `dual`: dual pool mode, else failover.
-    #[no_mangle]
     pub extern "C" fn pool_mgr_create(dual: bool) {
         let _ = MANAGER.set(Manager::new(dual));
     }
@@ -1558,100 +1548,54 @@ pub(crate) mod ffi {
     }
 
     /// The manager task; never returns.
-    #[no_mangle]
     pub unsafe extern "C" fn pool_mgr_task(_: *mut c_void) {
         if let Some(m) = m() {
             m.run();
         }
     }
 
-    #[no_mangle]
     pub extern "C" fn pool_mgr_is_dual() -> bool {
         m().is_some_and(|m| m.is_dual())
     }
 
-    #[no_mangle]
-    pub extern "C" fn pool_mgr_is_initialized() -> bool {
-        m().is_some_and(|m| m.initialized.load(Acquire))
-    }
-
-    /// # Safety
-    /// Strings NUL-terminated or NULL.
-    #[no_mangle]
-    #[allow(clippy::too_many_arguments)]
-    pub unsafe extern "C" fn pool_mgr_submit_share(
-        pool: c_int,
-        job_id: *const c_char,
-        extranonce2: *const c_char,
-        ntime: u32,
-        nonce: u32,
-        version_rolled: u32,
-        version_base: u32,
-    ) {
-        if let Some(m) = m() {
-            m.submit_share(
-                (pool & 1) as usize,
-                cstr(job_id),
-                cstr(extranonce2),
-                ntime,
-                nonce,
-                version_rolled,
-                version_base,
-            );
-        }
-    }
-
-    #[no_mangle]
     pub extern "C" fn pool_mgr_check_best_diff(pool: c_int, diff: f64, nbits: u32) {
         if let Some(m) = m() {
             m.check_best_diff(pool, diff, nbits);
         }
     }
 
-    #[no_mangle]
     pub extern "C" fn pool_mgr_check_found_block(_pool: c_int, diff: f64, nbits: u32) {
         if let Some(m) = m() {
             m.check_found_block(diff, nbits);
         }
     }
 
-    #[no_mangle]
     pub extern "C" fn pool_mgr_next_active_pool() -> c_int {
         m().map_or(-1, Manager::next_active_pool)
     }
 
-    #[no_mangle]
     pub extern "C" fn pool_mgr_select_asic_diff(pool: c_int, pool_diff: u32) -> u32 {
         m().map_or(pool_diff, |m| m.select_asic_diff(pool, pool_diff))
     }
 
-    #[no_mangle]
-    pub extern "C" fn pool_mgr_is_connected(pool: c_int) -> bool {
-        m().is_some_and(|m| m.is_connected((pool & 1) as usize))
-    }
-
-    #[no_mangle]
     pub extern "C" fn pool_mgr_reconnect_all() {
         if let Some(m) = m() {
             m.reconnect_all();
         }
     }
 
-    #[no_mangle]
     pub extern "C" fn pool_mgr_load_settings() {
         if let Some(m) = m() {
             m.load_settings();
         }
     }
 
-    #[no_mangle]
     pub extern "C" fn pool_mgr_reset_session_stats() {
         if let Some(m) = m() {
             m.reset_session_stats();
         }
     }
 
-    #[no_mangle]
     pub extern "C" fn pool_mgr_reset_all_time_stats() {
         if let Some(m) = m() {
             m.reset_all_time_stats();
@@ -1660,80 +1604,18 @@ pub(crate) mod ffi {
 
     /// # Safety
     /// `info` writable.
-    #[no_mangle]
     pub unsafe extern "C" fn pool_mgr_info(info: *mut ManagerInfo) {
         if let Some(m) = m() {
             *info = m.info();
         }
     }
 
-    /// The host of `pool` ("-" if none) into `buf`, copied under the lock.
-    ///
-    /// # Safety
-    /// `buf` writable for `len` bytes (or NULL).
-    #[no_mangle]
-    pub unsafe extern "C" fn pool_mgr_pool_host(pool: c_int, buf: *mut c_char, len: usize) {
-        if buf.is_null() || len == 0 {
-            return;
-        }
-        let h = m().map_or_else(|| c"-".into(), |m| m.pool_host(pool));
-        let b = h.as_bytes();
-        let n = b.len().min(len - 1);
-        core::ptr::copy_nonoverlapping(b.as_ptr(), buf as *mut u8, n);
-        *buf.add(n) = 0;
-    }
-
-    #[no_mangle]
-    pub extern "C" fn pool_mgr_pool_port(pool: c_int) -> c_int {
-        m().map_or(0, |m| m.pool_port(pool))
-    }
-
-    #[no_mangle]
-    pub extern "C" fn pool_mgr_active_balance(pool: c_int) -> c_int {
-        m().map_or(0, |m| m.active_balance(pool))
-    }
-
-    #[no_mangle]
-    pub extern "C" fn pool_mgr_display_pool(pool: c_int) -> c_int {
-        m().map_or(0, |m| m.policy.display_pool(pool))
-    }
-
-    #[no_mangle]
-    pub extern "C" fn pool_mgr_using_fallback() -> bool {
-        m().is_some_and(|m| !m.is_dual() && m.selected() == 1)
-    }
-
-    #[no_mangle]
-    pub extern "C" fn pool_mgr_pool_errors() -> c_int {
-        m().map_or(0, Manager::pool_errors)
-    }
-
-    /// The aggregated statistics (zeros before the manager exists).
-    ///
-    /// # Safety
-    /// `out` writable.
-    #[no_mangle]
-    pub unsafe extern "C" fn pool_mgr_summary(out: *mut stats::Summary) {
-        *out = m().map_or_else(Default::default, |m| m.summary());
-    }
-
-    /// The counters of one pool (zeros before the manager exists).
-    ///
-    /// # Safety
-    /// `out` writable.
-    #[no_mangle]
-    pub unsafe extern "C" fn pool_mgr_pool_stats(pool: c_int, out: *mut stats::PoolSummary) {
-        *out = m().map_or_else(Default::default, |m| m.stats.pool(pool));
-    }
-
     /// Round trip time (ms) of the pool the v1 API shows; 0 without ping.
-    #[no_mangle]
     pub extern "C" fn pool_mgr_ping_rtt() -> f64 {
         m().map_or(0.0, |m| m.compat_ping(crate::ping::ffi::ping_last_rtt))
     }
 
     /// Recent ping loss (0..1) of the pool the v1 API shows.
-    #[no_mangle]
     pub extern "C" fn pool_mgr_ping_loss() -> f64 {
         m().map_or(0.0, |m| m.compat_ping(crate::ping::ffi::ping_recent_loss))
     }

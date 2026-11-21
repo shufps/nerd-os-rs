@@ -1,7 +1,6 @@
 //! INA260 current/voltage/power monitor of the NerdAxe (port of
 //! `main/boards/drivers/nerdaxe/INA260.cpp`): 16-bit big-endian registers,
-//! 1.25 mA, 1.25 mV and 10 mW per LSB. C API: the former `INA260.h`
-//! functions. Verified against the C++ driver by
+//! 1.25 mA, 1.25 mV and 10 mW per LSB. Verified against the C++ driver by
 //! `tests/ina260_ds4432u.rs`.
 //!
 //! The current register is signed (two's complement), so a slightly
@@ -45,29 +44,4 @@ pub fn voltage(bus: &mut impl RegBus) -> f32 {
 /// mW; 0 on a bus error.
 pub fn power(bus: &mut impl RegBus) -> f32 {
     read16(bus, REG_POWER, "power").map_or(0.0, |v| (v as u32 * 10) as f32)
-}
-
-pub(crate) mod ffi {
-    use super::*;
-    use crate::i2c::Master;
-
-    #[no_mangle]
-    pub extern "C" fn INA260_installed() -> bool {
-        installed(&mut Master)
-    }
-
-    #[no_mangle]
-    pub extern "C" fn INA260_read_current() -> f32 {
-        current(&mut Master)
-    }
-
-    #[no_mangle]
-    pub extern "C" fn INA260_read_voltage() -> f32 {
-        voltage(&mut Master)
-    }
-
-    #[no_mangle]
-    pub extern "C" fn INA260_read_power() -> f32 {
-        power(&mut Master)
-    }
 }

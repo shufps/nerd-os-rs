@@ -3,7 +3,7 @@
 //! ring buffer, the 1 min / 10 min / 1 h / 1 d sliding averages (with a
 //! "ramping" display value while a window is not filled yet), the export
 //! of a time range for the charts, and the share count per chip.
-//! C API: `history.h`.
+//!
 //!
 //! Behaviour notes:
 //! - the current averages and timestamp are read under the lock (doubles and
@@ -12,7 +12,7 @@
 //! - float to integer conversions saturate (an out-of-range rate or chart
 //!   value gives the nearest representable one).
 
-use core::ffi::{c_int, c_void, CStr};
+use core::ffi::{c_int, CStr};
 use std::sync::Mutex;
 
 use crate::cutil::fixed;
@@ -321,6 +321,27 @@ pub fn export(
     more.unwrap_or(false)
 }
 
+/// Allocates the history (about 1.2 MB, PSRAM); false without memory.
+pub fn init(asic_count: usize) -> bool {
+    log!(Info, TAG, "History size {SAMPLES} samples");
+    let h = History::new(asic_count);
+    let ok = h.is_some();
+    *HISTORY.lock().unwrap_or_else(|e| e.into_inner()) = h;
+    ok
+}
+
+/// A sample (every 5 s).
+pub fn push(rate: f32, vreg_temp: f32, asic_temp: f32, timestamp_ms: u64) {
+    let line = with(|h| {
+        h.push(rate, vreg_temp, asic_temp, timestamp_ms);
+        h.summary()
+    });
+    match line {
+        Some(l) => log!(Info, TAG, "{l}"),
+        None => log!(Warn, TAG, "PSRAM not initialized"),
+    }
+}
+
 fn with<T>(f: impl FnOnce(&mut History) -> T) -> Option<T> {
     HISTORY
         .lock()
@@ -332,34 +353,14 @@ fn with<T>(f: impl FnOnce(&mut History) -> T) -> Option<T> {
 pub(crate) mod ffi {
     use super::*;
 
-    /// Allocates the history (about 1.2 MB, PSRAM); false without memory.
-    #[no_mangle]
     pub extern "C" fn history_init(asic_count: c_int) -> bool {
-        log!(Info, TAG, "History size {SAMPLES} samples");
-        let h = History::new(usize::try_from(asic_count).unwrap_or(0));
-        let ok = h.is_some();
-        *HISTORY.lock().unwrap_or_else(|e| e.into_inner()) = h;
-        ok
+        init(usize::try_from(asic_count).unwrap_or(0))
     }
 
-    #[no_mangle]
-    pub extern "C" fn history_available() -> bool {
-        with(|_| ()).is_some()
-    }
-
-    #[no_mangle]
     pub extern "C" fn history_push(rate: f32, vreg_temp: f32, asic_temp: f32, timestamp_ms: u64) {
-        let line = with(|h| {
-            h.push(rate, vreg_temp, asic_temp, timestamp_ms);
-            h.summary()
-        });
-        match line {
-            Some(l) => log!(Info, TAG, "{l}"),
-            None => log!(Warn, TAG, "PSRAM not initialized"),
-        }
+        push(rate, vreg_temp, asic_temp, timestamp_ms)
     }
 
-    #[no_mangle]
     pub extern "C" fn history_push_share(asic: c_int) {
         if let Some(Some(line)) = with(|h| h.push_share(asic)) {
             log!(Info, TAG, "{line}");
@@ -367,32 +368,12 @@ pub(crate) mod ffi {
     }
 
     /// The display average of window 0..3 (1m, 10m, 1h, 1d).
-    #[no_mangle]
     pub extern "C" fn history_current(window: c_int) -> f64 {
         with(|h| h.current(usize::try_from(window).unwrap_or(usize::MAX))).unwrap_or(0.0)
     }
 
-    #[no_mangle]
     pub extern "C" fn history_current_timestamp() -> u64 {
         with(|h| h.current_timestamp()).unwrap_or(0)
-    }
-
-    /// Calls `row` for each exported sample (see `History::export`); returns
-    /// whether the limit cut the range.
-    ///
-    /// # Safety
-    /// `row` is valid and called with `ctx`.
-    #[no_mangle]
-    pub unsafe extern "C" fn history_export(
-        start: u64,
-        end: u64,
-        current: u64,
-        limit: u32,
-        now_ms: u64,
-        row: unsafe extern "C" fn(ctx: *mut c_void, row: *const Row),
-        ctx: *mut c_void,
-    ) -> bool {
-        export(start, end, current, limit, now_ms, |r| row(ctx, &r))
     }
 }
 

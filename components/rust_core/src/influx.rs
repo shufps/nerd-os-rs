@@ -2,7 +2,7 @@
 //! `main/tasks/influx_task.cpp`): the power, temperature and fan samples
 //! are averaged between writes; every 15 s one line-protocol record goes
 //! to the server, after the bucket is checked (or created) and the last
-//! totals are loaded. The HTTP requests are a C++ hook. C API: `influx_rs.h`.
+//! totals are loaded. The HTTP requests are a C++ hook.
 //!
 //! Behaviour notes:
 //! - bucket, org and prefix (from the settings) are escaped for the URL,

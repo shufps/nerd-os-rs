@@ -150,7 +150,6 @@ pub(crate) mod ffi {
     ///
     /// # Safety
     /// A FreeRTOS task entry.
-    #[no_mangle]
     pub unsafe extern "C" fn wifi_monitor_task(_: *mut c_void) {
         std::thread::sleep(PERIOD);
         reset_stats();

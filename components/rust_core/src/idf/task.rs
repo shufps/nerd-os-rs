@@ -245,23 +245,3 @@ pub fn restart() -> ! {
     #[cfg(not(target_os = "espidf"))]
     panic!("esp_restart")
 }
-
-// firmware only
-#[cfg(target_os = "espidf")]
-mod ffi {
-    use super::*;
-
-    /// # Safety
-    /// See `create_psram()`.
-    #[no_mangle]
-    pub unsafe extern "C" fn xTaskCreatePSRAM(
-        code: TaskFn,
-        name: *const c_char,
-        stack_bytes: u32,
-        params: *mut c_void,
-        prio: u32,
-        handle: *mut TaskHandle,
-    ) -> i32 {
-        create_psram(code, name, stack_bytes, params, prio, handle)
-    }
-}

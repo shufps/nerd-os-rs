@@ -283,7 +283,6 @@ pub(crate) mod ffi {
     ///
     /// # Safety
     /// A FreeRTOS task entry.
-    #[no_mangle]
     pub unsafe extern "C" fn create_jobs_task(_: *mut c_void) {
         log!(
             Info,
@@ -299,7 +298,6 @@ pub(crate) mod ffi {
     ///
     /// # Safety
     /// A FreeRTOS task entry.
-    #[no_mangle]
     #[allow(non_snake_case)]
     pub unsafe extern "C" fn ASIC_result_task(_: *mut c_void) {
         crate::mining_tasks::ResultTask::default().run(&mut Results)
@@ -309,7 +307,6 @@ pub(crate) mod ffi {
     ///
     /// # Safety
     /// A FreeRTOS task entry.
-    #[no_mangle]
     pub unsafe extern "C" fn influx_task(_: *mut c_void) {
         let settings = crate::influx::Settings {
             enabled: crate::cfg::influx_enabled(),
@@ -325,7 +322,6 @@ pub(crate) mod ffi {
 
     /// Starts the hashrate monitor (the counters read every 5 s); false
     /// without initialized ASICs.
-    #[no_mangle]
     pub extern "C" fn hashrate_monitor_start() -> bool {
         let Some(a) = asics() else {
             log!(

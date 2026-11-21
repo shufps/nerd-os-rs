@@ -5,7 +5,7 @@
 //! IP and on a change of the preferred interface. The events come from the
 //! WiFi/Ethernet drivers; the C++ side carries out the returned actions
 //! (`esp_wifi_*`, `esp_netif_set_default_netif()`, event bits, hooks) in
-//! their bit order, the order of the former code. C API: `netmgr.h`.
+//! their bit order, the order of the former code.
 //!
 //! The state is behind a lock: it is written by the event loop and read by
 //! the HTTP and display tasks.

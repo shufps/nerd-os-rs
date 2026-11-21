@@ -3,7 +3,7 @@
 //! `mining_info_v2.cpp`, `create_jobs_sv2.cpp` and `AsicJobs` in
 //! `asic_jobs.h`): per pool the latest work from the pool, built into
 //! `bm_job`s on request, and the tables that map the job IDs sent to the
-//! ASICs (and CAN slaves) back to their jobs. C API: `jobs.h`.
+//! ASICs (and CAN slaves) back to their jobs.
 //!
 //! Each pool has a Stratum v1 work and, once used, an SV2 standard and an
 //! SV2 extended channel work; the one updated last is the active one, as

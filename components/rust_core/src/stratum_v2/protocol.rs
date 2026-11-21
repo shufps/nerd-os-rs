@@ -1,5 +1,5 @@
 //! Stratum v2 binary codec: frame header, message builders and parsers.
-//! C API: `sv2_protocol.h` (unchanged function names and signatures).
+//!
 //!
 //! Port of `components/stratum_v2/sv2_protocol.c`, verified against it by
 //! `tests/sv2_protocol.rs`. Output parameters are only meaningful

@@ -103,8 +103,6 @@ pub fn resolve(base: &[u8], uri: &[u8]) -> Option<File> {
     })
 }
 
-mod ffi {}
-
 #[cfg(test)]
 mod tests {
     use super::*;

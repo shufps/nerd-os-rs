@@ -144,5 +144,3 @@ impl Fxl6408 {
         Ok((v >> pin) & 1 != 0)
     }
 }
-
-mod ffi {}

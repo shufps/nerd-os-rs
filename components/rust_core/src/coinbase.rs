@@ -1,7 +1,7 @@
 //! Coinbase transaction decoder.
 //!
 //! Extracts block height, scriptsig (miner tag) and transaction outputs from
-//! the coinbase data of a stratum `mining.notify`. C API: `coinbase_decoder.h`.
+//! the coinbase data of a stratum `mining.notify`.
 //!
 //! This is a port of the former C component `coinbase_decoder`. It reproduces
 //! the C behaviour exactly (verified by `tests/coinbase.rs`)
@@ -345,12 +345,11 @@ pub fn process(
     Ok(())
 }
 
-/// C entry point, see `coinbase_decoder.h`.
+/// The decoder with the former C signature (the golden tests use it).
 ///
 /// # Safety
 /// The string arguments must be NULL or NUL-terminated, `result` must be NULL
 /// or point to a writable `coinbase_result_t`.
-#[no_mangle]
 pub unsafe extern "C" fn coinbase_process(
     coinbase_1: *const c_char,
     coinbase_2: *const c_char,

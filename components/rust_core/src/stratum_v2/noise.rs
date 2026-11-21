@@ -1,8 +1,8 @@
 //! Noise_NX_Secp256k1+EllSwift_ChaChaPoly_SHA256, the encrypted transport of
-//! Stratum v2, as initiator. C API: `sv2_noise.h` (unchanged).
+//! Stratum v2, as initiator.
 //!
 //! Port of `components/stratum_v2/sv2_noise.c`, verified against it by
-//! `tests/sv2_noise.rs` (through the C API). [`Handshake`] and
+//! `tests/sv2_noise.rs`. [`Handshake`] and
 //! [`Cipher`] are pure (bytes in, bytes out); [`handshake`], [`Sender::send`]
 //! and [`Receiver::recv`] add the socket I/O through a [`Wire`] (on the device
 //! [`EspWire`], `esp_transport_read/write`). The two directions are separate
@@ -545,109 +545,6 @@ impl Wire for EspWire {
             done += r as usize;
         }
         true
-    }
-}
-
-/// The C API (`sv2_noise.h`).
-pub(crate) mod ffi {
-    use super::*;
-
-    /// `sv2_noise_ctx_t`
-    pub struct NoiseCtx {
-        cipher: Option<Cipher>,
-    }
-
-    #[no_mangle]
-    pub extern "C" fn sv2_noise_create() -> *mut NoiseCtx {
-        Box::into_raw(Box::new(NoiseCtx { cipher: None }))
-    }
-
-    /// # Safety
-    /// `ctx` must come from `sv2_noise_create()` (or be NULL).
-    #[no_mangle]
-    pub unsafe extern "C" fn sv2_noise_destroy(ctx: *mut NoiseCtx) {
-        if !ctx.is_null() {
-            drop(Box::from_raw(ctx)); // wipes the keys
-        }
-    }
-
-    /// `now`: Unix time, or 0 while the clock is not synced (the certificate
-    /// validity period is not checked then).
-    ///
-    /// # Safety
-    /// `ctx` and `transport` must be valid; `authority_pubkey` NULL or 32
-    /// bytes.
-    #[no_mangle]
-    pub unsafe extern "C" fn sv2_noise_handshake(
-        ctx: *mut NoiseCtx,
-        transport: EspHandle,
-        authority_pubkey: *const [u8; 32],
-        now: u32,
-    ) -> c_int {
-        let authority = authority_pubkey.as_ref();
-        let now = (now != 0).then_some(now);
-        match handshake(&mut EspWire::new(transport), authority, now) {
-            Some(cipher) => {
-                (*ctx).cipher = Some(cipher);
-                0
-            }
-            None => -1,
-        }
-    }
-
-    /// # Safety
-    /// `ctx` and `transport` must be valid and `frame` hold `frame_len`
-    /// bytes.
-    #[no_mangle]
-    pub unsafe extern "C" fn sv2_noise_send(
-        ctx: *mut NoiseCtx,
-        transport: EspHandle,
-        frame: *const u8,
-        frame_len: c_int,
-    ) -> c_int {
-        let Some(cipher) = ctx.as_mut().and_then(|c| c.cipher.as_mut()) else {
-            return -1;
-        };
-        if frame_len < FRAME_HEADER_SIZE as c_int {
-            return -1;
-        }
-        let frame = core::slice::from_raw_parts(frame, frame_len as usize);
-        if cipher.send.send(&mut EspWire::new(transport), frame) {
-            0
-        } else {
-            -1
-        }
-    }
-
-    /// # Safety
-    /// `ctx` and `transport` must be valid, `hdr_out` 6 bytes, `payload_out`
-    /// hold `max_payload_len` bytes, `payload_len_out` writable.
-    #[no_mangle]
-    pub unsafe extern "C" fn sv2_noise_recv(
-        ctx: *mut NoiseCtx,
-        transport: EspHandle,
-        hdr_out: *mut [u8; FRAME_HEADER_SIZE],
-        payload_out: *mut u8,
-        max_payload_len: c_int,
-        payload_len_out: *mut c_int,
-    ) -> c_int {
-        let Some(cipher) = ctx.as_mut().and_then(|c| c.cipher.as_mut()) else {
-            return -1;
-        };
-        *payload_len_out = 0;
-        let buf: &mut [u8] = if payload_out.is_null() || max_payload_len <= 0 {
-            &mut []
-        } else {
-            core::slice::from_raw_parts_mut(payload_out, max_payload_len as usize)
-        };
-        match cipher.recv.recv(&mut EspWire::new(transport), buf) {
-            Some(hdr) => {
-                *hdr_out = hdr;
-                *payload_len_out = parse_frame_header(&hdr).msg_length as c_int;
-                0
-            }
-            None => -1,
-        }
     }
 }
 

@@ -1,7 +1,7 @@
 //! OTP glue of the device (port of `main/otp/otp.cpp`): the device identity
 //! for the otpauth URI, the QR code of an enrollment (the `qrcodegen`
 //! crate, version 1..10, ECC medium, for the 170 px display), and the checks with the
-//! wall clock. The OTP state itself is in `otp.rs`. C API: `otp_device.h`.
+//! wall clock. The OTP state itself is in `otp.rs`.
 
 use crate::idf::idf_const;
 use core::ffi::{c_char, c_int, CStr};

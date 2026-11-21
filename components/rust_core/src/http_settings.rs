@@ -1,8 +1,7 @@
 //! Settings request bodies of the HTTP API (port of the JSON handling in
 //! `PATCH /api/system` with `StratumManager::saveSettings()`, and
-//! `PATCH /api/v2/settings`): the body is parsed into typed writes, which the
-//! C++ side applies to the config (`settings_apply.cpp`). C API:
-//! `http_settings.h`.
+//! `PATCH /api/v2/settings`): the body is parsed into typed writes, which
+//! `settings_apply.rs` applies to the config.
 //!
 //! The JSON is read with ArduinoJson's rules ([`crate::ajson`]), and
 //! `is<T>()` only accepts values of that type (integers in range for integer
@@ -415,79 +414,6 @@ pub fn otp_body(body: &[u8]) -> OtpBody {
             .get("enabled")
             .as_bool()
             .map_or(OtpBody::NoEnabled, OtpBody::Enabled),
-    }
-}
-
-pub(crate) mod ffi {
-    use super::*;
-    use core::ffi::{c_char, c_void};
-
-    /// `settings_sink_t`
-    #[repr(C)]
-    pub struct Sink {
-        pub ctx: *mut c_void,
-        pub set: unsafe extern "C" fn(*mut c_void, u16, i32, u32, *const c_char),
-    }
-
-    unsafe fn run(
-        body: *const c_char,
-        len: usize,
-        sink: *const Sink,
-        f: impl Fn(&Json) -> Vec<Write>,
-    ) -> bool {
-        let body = if body.is_null() || len == 0 {
-            &[][..]
-        } else {
-            core::slice::from_raw_parts(body as *const u8, len)
-        };
-        let Ok(doc) = crate::ajson::deserialize(body) else {
-            return false;
-        };
-        let sink = &*sink;
-        for w in f(&doc) {
-            let text = w
-                .text
-                .map(|t| std::ffi::CString::new(t).unwrap_or_default());
-            let ptr = text.as_ref().map_or(core::ptr::null(), |t| t.as_ptr());
-            (sink.set)(sink.ctx, w.setting as u16, w.index, w.num, ptr);
-        }
-        true
-    }
-
-    /// # Safety
-    /// `body` holds `len` bytes; the sink callback is valid.
-    #[no_mangle]
-    pub unsafe extern "C" fn http_can_node_body(
-        body: *const c_char,
-        len: usize,
-        sink: *const Sink,
-    ) -> bool {
-        run(body, len, sink, can_node)
-    }
-
-    /// 0: ok (`*enabled` set), 1: invalid JSON, 2: no bool `enabled`.
-    ///
-    /// # Safety
-    /// `body` holds `len` bytes, `enabled` is writable.
-    #[no_mangle]
-    pub unsafe extern "C" fn http_otp_body(
-        body: *const c_char,
-        len: usize,
-        enabled: *mut bool,
-    ) -> i32 {
-        let body = if body.is_null() || len == 0 {
-            &[][..]
-        } else {
-            core::slice::from_raw_parts(body as *const u8, len)
-        };
-        match otp_body(body) {
-            OtpBody::Invalid => 1,
-            OtpBody::NoEnabled => 2,
-            OtpBody::Enabled(b) => {
-                *enabled = b;
-                0
-            }
-        }
     }
 }
 

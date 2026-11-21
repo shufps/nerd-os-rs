@@ -4,13 +4,12 @@
 //! setters the firmware uses. Values convert like ArduinoJson's `as<T>()`,
 //! and the document is written byte for byte as `serializeJson()` did, so
 //! older firmware reads it back. The NVS access and the migration from
-//! the old per-setting keys stay in C++. C API: `config_store.h`.
+//! the old per-setting keys stay in C++.
 
-use core::ffi::{c_char, c_void, CStr};
+use core::ffi::CStr;
 use std::sync::Mutex;
 
 use crate::ajson::{self, Json, Num};
-use crate::cutil::c_strdup;
 use crate::log::log;
 
 const TAG: &CStr = c"nvs_config";
@@ -165,123 +164,6 @@ pub fn clear() {
 
 pub fn mark_dirty() {
     with(|s| s.dirty = true);
-}
-
-mod ffi {
-    use super::*;
-
-    unsafe fn key<'a>(p: *const c_char) -> &'a [u8] {
-        if p.is_null() {
-            b""
-        } else {
-            CStr::from_ptr(p).to_bytes()
-        }
-    }
-
-    /// # Safety
-    /// `json` holds `len` bytes (or is NULL).
-    #[no_mangle]
-    pub unsafe extern "C" fn config_load(json: *const u8, len: usize) -> bool {
-        let json = if json.is_null() {
-            &[][..]
-        } else {
-            core::slice::from_raw_parts(json, len)
-        };
-        load(json)
-    }
-
-    #[no_mangle]
-    pub extern "C" fn config_mark_dirty() {
-        mark_dirty();
-    }
-
-    /// A `malloc()`ed copy of the string, else of `def`; NULL if neither.
-    ///
-    /// # Safety
-    /// Strings NUL-terminated or NULL.
-    #[no_mangle]
-    pub unsafe extern "C" fn config_get_str(k: *const c_char, def: *const c_char) -> *mut c_char {
-        match get_str(key(k)) {
-            Some(v) => c_strdup(&v),
-            None if def.is_null() => core::ptr::null_mut(),
-            None => c_strdup(CStr::from_ptr(def).to_bytes()),
-        }
-    }
-
-    /// NULL stores null (as assigning a null `const char *` did).
-    ///
-    /// # Safety
-    /// Strings NUL-terminated or NULL.
-    #[no_mangle]
-    pub unsafe extern "C" fn config_set_str(k: *const c_char, value: *const c_char) {
-        let v = if value.is_null() {
-            Json::Null
-        } else {
-            Json::Str(CStr::from_ptr(value).to_bytes().to_vec())
-        };
-        set(key(k), v);
-    }
-
-    /// # Safety
-    /// `k` NUL-terminated.
-    #[no_mangle]
-    pub unsafe extern "C" fn config_get_u16(k: *const c_char, def: u16) -> u16 {
-        get_u16(key(k), def)
-    }
-
-    /// # Safety
-    /// `k` NUL-terminated.
-    #[no_mangle]
-    pub unsafe extern "C" fn config_set_u16(k: *const c_char, value: u16) {
-        set(key(k), Json::Num(Num::U(value as u64)));
-    }
-
-    /// # Safety
-    /// `k` NUL-terminated.
-    #[no_mangle]
-    pub unsafe extern "C" fn config_get_bool(k: *const c_char, def: bool) -> bool {
-        get_bool(key(k), def)
-    }
-
-    /// # Safety
-    /// `k` NUL-terminated.
-    #[no_mangle]
-    pub unsafe extern "C" fn config_set_bool(k: *const c_char, value: bool) {
-        set(key(k), Json::Bool(value));
-    }
-
-    /// # Safety
-    /// `k` NUL-terminated.
-    #[no_mangle]
-    pub unsafe extern "C" fn config_get_u64(k: *const c_char, def: u64) -> u64 {
-        get_u64(key(k), def)
-    }
-
-    /// # Safety
-    /// `k` NUL-terminated.
-    #[no_mangle]
-    pub unsafe extern "C" fn config_set_u64(k: *const c_char, value: u64) {
-        set(key(k), Json::Num(Num::U(value)));
-    }
-
-    /// # Safety
-    /// `k` NUL-terminated.
-    #[no_mangle]
-    pub unsafe extern "C" fn config_has(k: *const c_char) -> bool {
-        has(key(k))
-    }
-
-    /// See `flush_with()`; `write` gets the JSON and its length.
-    ///
-    /// # Safety
-    /// `write` valid, called with `ctx`.
-    #[no_mangle]
-    pub unsafe extern "C" fn config_flush(
-        write: unsafe extern "C" fn(ctx: *mut c_void, json: *const u8, len: usize) -> bool,
-        ctx: *mut c_void,
-    ) -> bool {
-        flush_with(|json| write(ctx, json.as_ptr(), json.len()))
-    }
 }
 
 #[cfg(test)]

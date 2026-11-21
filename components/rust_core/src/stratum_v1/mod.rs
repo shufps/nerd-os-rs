@@ -1,6 +1,5 @@
 //! Stratum v1: parsing of pool messages, request formatting, line framing and
-//! job construction.
-//! C API: `stratum_v1.h`; the socket I/O stays in `StratumApi` (C++).
+//! job construction; the connection loop is `connection.rs`.
 //!
 //! Port of the codec part of `main/stratum/stratum_api.cpp`, verified against
 //! it by `tests/stratum_v1.rs`. Input validation:

@@ -330,12 +330,6 @@ impl ResultTask {
 pub(crate) mod ffi {
     use super::*;
 
-    #[no_mangle]
-    pub extern "C" fn trigger_job_creation() {
-        trigger();
-    }
-
-    #[no_mangle]
     pub extern "C" fn asic_result_duplicates() -> u64 {
         duplicates()
     }

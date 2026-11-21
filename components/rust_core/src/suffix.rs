@@ -64,30 +64,6 @@ pub fn suffix_string(mut val: u64, sig_digits: i32) -> String {
     String::from_utf8_lossy(&buf[..len]).into_owned()
 }
 
-mod ffi {
-    use super::*;
-
-    /// Into `buf` (`size` bytes, terminated).
-    ///
-    /// # Safety
-    /// `buf` writable for `size` bytes.
-    #[no_mangle]
-    pub unsafe extern "C" fn suffixString(
-        val: u64,
-        buf: *mut c_char,
-        size: usize,
-        sig_digits: c_int,
-    ) {
-        if buf.is_null() || size == 0 {
-            return;
-        }
-        let s = suffix_string(val, sig_digits);
-        let k = s.len().min(size - 1);
-        core::ptr::copy_nonoverlapping(s.as_ptr(), buf as *mut u8, k);
-        *buf.add(k) = 0;
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;

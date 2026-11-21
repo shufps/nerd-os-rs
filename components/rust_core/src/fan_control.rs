@@ -329,8 +329,6 @@ impl FanController {
     }
 }
 
-mod ffi {}
-
 #[cfg(test)]
 mod tests {
     use super::*;

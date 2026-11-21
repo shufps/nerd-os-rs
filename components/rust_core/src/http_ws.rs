@@ -128,7 +128,7 @@ unsafe fn send(line: *mut c_char) {
     // the socket number is reused after a close: send only while it is a
     // web socket (the close callback resets FD before)
     let fd = FD.load(Ordering::Acquire);
-    let server = crate::http_server::http_server.load(Ordering::Acquire);
+    let server = crate::http_server::HTTP_SERVER.load(Ordering::Acquire);
     if !server.is_null()
         && fd >= 0
         && (sys::httpd_ws_get_fd_info(server, fd) != WS_CLIENT_WEBSOCKET

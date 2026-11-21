@@ -1035,31 +1035,28 @@ impl Ui {
             .set_text_str(l, &text::efficiency(power, ghs));
         self.mining.power.set_text_str(l, &text::watts(power));
 
-        use crate::apis_fetcher::ffi as api;
+        use crate::apis_fetcher as api;
+        let v = api::values();
         if btc_shown || self.btc_price == 0 {
-            self.btc_price = api::apis_get_price();
+            self.btc_price = v.price_usd;
             self.btc
                 .price
                 .set_text_str(l, &format!("{}$", self.btc_price));
         }
         if global_shown || self.block_height == 0 {
-            self.block_height = api::apis_get_block_height();
+            self.block_height = v.block_height;
             let g = &self.global;
             g.block.set_text_str(l, &self.block_height.to_string());
             g.blocks_to_halving
-                .set_text_str(l, &api::apis_get_blocks_to_halving().to_string());
+                .set_text_str(l, &api::blocks_to_halving(v.block_height).to_string());
             g.halving_percent
-                .set_text_str(l, &format!("{}%", api::apis_get_halving_percent()));
-            g.hashrate
-                .set_text_str(l, &api::apis_get_net_hash().to_string());
+                .set_text_str(l, &format!("{}%", api::halving_percent(v.block_height)));
+            g.hashrate.set_text_str(l, &v.net_hash.to_string());
             g.difficulty
-                .set_text_str(l, &format!("{}T", api::apis_get_net_difficulty()));
-            g.low_fee
-                .set_text_str(l, &api::apis_get_lowest_fee().to_string());
-            g.mid_fee
-                .set_text_str(l, &api::apis_get_mid_fee().to_string());
-            g.high_fee
-                .set_text_str(l, &api::apis_get_fastest_fee().to_string());
+                .set_text_str(l, &format!("{}T", v.net_difficulty));
+            g.low_fee.set_text_str(l, &v.hour_fee.to_string());
+            g.mid_fee.set_text_str(l, &v.half_hour_fee.to_string());
+            g.high_fee.set_text_str(l, &v.fastest_fee.to_string());
         }
 
         let vcore = (crate::board::ffi::board_power_value(3) * 1000.0) as i32 as u16;

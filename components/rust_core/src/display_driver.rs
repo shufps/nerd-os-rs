@@ -415,14 +415,14 @@ impl Driver {
             State::Portal => {}
             State::Mining => {
                 if !self.led_control(b1, b2) && b1 {
-                    crate::apis_fetcher::ffi::apis_enable_fetching();
+                    crate::apis_fetcher::enable_fetching();
                     self.enter(State::Settings, now);
                 }
             }
             State::Settings => {
                 if !self.led_control(b1, b2) && b1 {
                     self.enter(State::Btc, now);
-                    crate::apis_fetcher::ffi::apis_enable_fetching();
+                    crate::apis_fetcher::enable_fetching();
                 }
             }
             State::Btc => {
@@ -439,7 +439,7 @@ impl Driver {
                 if b1 || b2 {
                     // aborts the enrollment (and ends the overlay, as the
                     // web UI's cancel does)
-                    crate::otp::ffi::otp_disable_enrollment();
+                    crate::otp::disable_enrollment();
                     self.overlay = false;
                     self.enter(State::Mining, now);
                 }
@@ -547,7 +547,7 @@ impl Driver {
         };
         match m {
             Msg::ShowQr => {
-                if !crate::otp::ffi::otp_enrollment_active() {
+                if !crate::otp::enrollment_active() {
                     log!(Error, TAG, "no otp enrollment active");
                     return;
                 }

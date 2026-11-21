@@ -747,35 +747,26 @@ fn slave_telemetry_loop() -> ! {
 pub(crate) mod ffi {
     use super::*;
 
-    #[no_mangle]
-    pub extern "C" fn can_init(tx: c_int, rx: c_int) {
-        init(tx, rx)
-    }
-
     /// # Safety
     /// A FreeRTOS task entry.
-    #[no_mangle]
     pub unsafe extern "C" fn can_master_task(_: *mut c_void) {
         master_loop()
     }
 
     /// # Safety
     /// A FreeRTOS task entry.
-    #[no_mangle]
     pub unsafe extern "C" fn can_slave_task(_: *mut c_void) {
         slave_loop()
     }
 
     /// # Safety
     /// A FreeRTOS task entry.
-    #[no_mangle]
     pub unsafe extern "C" fn can_slave_result_task(_: *mut c_void) {
         slave_result_loop()
     }
 
     /// # Safety
     /// A FreeRTOS task entry.
-    #[no_mangle]
     pub unsafe extern "C" fn can_slave_telemetry_task(_: *mut c_void) {
         slave_telemetry_loop()
     }

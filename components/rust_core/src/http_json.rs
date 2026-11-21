@@ -5,7 +5,7 @@
 //! getters as before; the documents are built here with the member order and
 //! the number types of the ArduinoJson code (a `float` is written with 6
 //! decimal places, a `double` with 9 unless it is a lossless float), so the
-//! output is byte-identical. C API: `http_json.h`. Verified against the
+//! output is byte-identical. Verified against the
 //! former handler code by `tests/http_json.rs`.
 //!
 //! Difference: `coreVoltageActual` of a NaN or out-of-range output voltage is
@@ -1343,30 +1343,6 @@ pub unsafe fn can_swarm(m: &CanMasterNode) -> Json {
     let mut d = Obj::new();
     d.obj("fleet", fleet).arr("nodes", nodes);
     d.into()
-}
-
-mod ffi {
-    use super::*;
-
-    /// `sizeof` of the structs, checked against the C header.
-    #[no_mangle]
-    pub extern "C" fn http_json_sizeof(which: c_int) -> usize {
-        match which {
-            0 => core::mem::size_of::<ManagerInfo>(),
-            1 => core::mem::size_of::<FanInfo>(),
-            2 => core::mem::size_of::<SystemInfo>(),
-            3 => core::mem::size_of::<AsicInfo>(),
-            4 => core::mem::size_of::<Dashboard>(),
-            5 => core::mem::size_of::<V2System>(),
-            6 => core::mem::size_of::<V2Identify>(),
-            7 => core::mem::size_of::<AlertInfo>(),
-            8 => core::mem::size_of::<InfluxInfo>(),
-            9 => core::mem::size_of::<WifiNetwork>(),
-            10 => core::mem::size_of::<SettingsPool>(),
-            11 => core::mem::size_of::<V2Settings>(),
-            _ => core::mem::size_of::<CanMasterNode>(),
-        }
-    }
 }
 
 mod ffi_v2 {}

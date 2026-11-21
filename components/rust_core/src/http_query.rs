@@ -3,7 +3,7 @@
 //! /api/system/reset-stats` and the node IDs and actions of
 //! `/api/v2/can/nodes/*`). The numbers are read like newlib did on the
 //! device: `strtoul()` with a 32-bit `unsigned long`, `strtoull()`, `atoi()`
-//! with a 32-bit `long`. C API: `http_query.h`.
+//! with a 32-bit `long`.
 
 /// `httpd_query_key_value()` (ESP-IDF): the value of `key` (compared without
 /// case) in `name=value&...`; `None` if missing or if it needs more than
@@ -208,61 +208,6 @@ pub fn can_node_action(uri: &[u8]) -> (NodeId, Option<NodeAction>) {
         _ => None,
     };
     (id, action)
-}
-
-mod ffi {
-    use super::*;
-    use core::ffi::{c_char, CStr};
-
-    unsafe fn opt<'a>(p: *const c_char) -> Option<&'a [u8]> {
-        (!p.is_null()).then(|| CStr::from_ptr(p).to_bytes())
-    }
-
-    /// # Safety
-    /// `query` NUL-terminated or NULL (no query), `out` writable.
-    #[no_mangle]
-    pub unsafe extern "C" fn http_history_query(
-        query: *const c_char,
-        v2: bool,
-        out: *mut HistoryQuery,
-    ) {
-        *out = history_query(opt(query), v2);
-    }
-
-    /// # Safety
-    /// `query` NUL-terminated or NULL.
-    #[no_mangle]
-    pub unsafe extern "C" fn http_query_all_time(query: *const c_char) -> bool {
-        all_time(opt(query))
-    }
-
-    /// The node ID, or -1 (missing), -2 (invalid).
-    ///
-    /// # Safety
-    /// `uri` NUL-terminated.
-    #[no_mangle]
-    pub unsafe extern "C" fn http_can_node_id(uri: *const c_char) -> i32 {
-        match can_node_id(opt(uri).unwrap_or_default()) {
-            NodeId::Missing => -1,
-            NodeId::Invalid => -2,
-            NodeId::Id(id) => id as i32,
-        }
-    }
-
-    /// The node ID, or -2 (invalid); `*action`: 0 restart, 1 shutdown,
-    /// 2 identify, -1 unknown.
-    ///
-    /// # Safety
-    /// `uri` NUL-terminated, `action` writable.
-    #[no_mangle]
-    pub unsafe extern "C" fn http_can_node_action(uri: *const c_char, action: *mut i32) -> i32 {
-        let (id, a) = can_node_action(opt(uri).unwrap_or_default());
-        *action = a.map_or(-1, |a| a as i32);
-        match id {
-            NodeId::Id(id) => id as i32,
-            _ => -2,
-        }
-    }
 }
 
 #[cfg(test)]

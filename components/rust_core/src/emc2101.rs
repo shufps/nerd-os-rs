@@ -2,7 +2,7 @@
 //! (port of `main/boards/drivers/nerdaxe/EMC2101.cpp`): tach input, PWM
 //! polarity, the 6-bit duty cycle, RPM from the tach counter, the internal
 //! and the external (ASIC diode) temperature, ideality and beta settings.
-//! C API: the former `EMC2101.h` functions. Verified against the C++
+//! Verified against the C++
 //! driver by `tests/emc2101.rs`.
 //!
 //! Behaviour notes:
@@ -141,51 +141,6 @@ pub fn set_ideality_factor(bus: &mut impl RegBus, ideality: u8) {
 pub fn set_beta_compensation(bus: &mut impl RegBus, beta: u8) {
     if !bus.write(ADDR, REG_BETA_COMPENSATION, beta) {
         log!(Error, TAG, "error setting beta compensation");
-    }
-}
-
-pub(crate) mod ffi {
-    use super::*;
-    use crate::i2c::Master;
-
-    #[no_mangle]
-    pub extern "C" fn EMC2101_init(invert_polarity: bool) -> bool {
-        init(&mut Master, invert_polarity)
-    }
-
-    #[no_mangle]
-    pub extern "C" fn EMC2101_set_fan_polarity(invert: bool) -> bool {
-        set_polarity(&mut Master, invert)
-    }
-
-    #[no_mangle]
-    pub extern "C" fn EMC2101_set_fan_speed(fraction: f32) {
-        set_speed(&mut Master, fraction)
-    }
-
-    #[no_mangle]
-    pub extern "C" fn EMC2101_get_fan_speed() -> u16 {
-        speed(&mut Master)
-    }
-
-    #[no_mangle]
-    pub extern "C" fn EMC2101_get_external_temp() -> f32 {
-        external_temp(&mut Master)
-    }
-
-    #[no_mangle]
-    pub extern "C" fn EMC2101_get_internal_temp() -> u8 {
-        internal_temp(&mut Master)
-    }
-
-    #[no_mangle]
-    pub extern "C" fn EMC2101_set_ideality_factor(ideality: u8) {
-        set_ideality_factor(&mut Master, ideality)
-    }
-
-    #[no_mangle]
-    pub extern "C" fn EMC2101_set_beta_compensation(beta: u8) {
-        set_beta_compensation(&mut Master, beta)
     }
 }
 

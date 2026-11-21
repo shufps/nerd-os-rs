@@ -11,6 +11,7 @@
 //!   names the device, `localhost` or a `.local` host,
 //! * session token signatures are compared in constant time.
 
+use std::net::{IpAddr, Ipv6Addr};
 use std::sync::Mutex;
 
 use crate::crypto::{ct_eq, hmac_sha1, hmac_sha256};
@@ -287,10 +288,33 @@ pub fn is_private(ip: u32) -> bool {
         || (0xc0a8_0000..=0xc0a8_ffff).contains(&ip)
 }
 
+/// An IPv6 LAN address: link-local (fe80::/10) or unique local (fc00::/7).
+pub fn is_private_v6(ip: &Ipv6Addr) -> bool {
+    let s = ip.segments()[0];
+    s & 0xffc0 == 0xfe80 || s & 0xfe00 == 0xfc00
+}
+
+/// Whether a requester is on the LAN; an IPv4-mapped IPv6 address is
+/// judged by its IPv4 address.
+pub fn is_private_addr(ip: IpAddr) -> bool {
+    match ip {
+        IpAddr::V4(v4) => is_private(v4.into()),
+        IpAddr::V6(v6) => match v6.to_ipv4_mapped() {
+            Some(v4) => is_private(v4.into()),
+            None => is_private_v6(&v6),
+        },
+    }
+}
+
 /// The host of an `Origin` header `http://host[:port][/...]`; `None` for any
 /// other scheme (the device serves http only).
 pub fn origin_host(origin: &[u8]) -> Option<&[u8]> {
     let rest = origin.strip_prefix(b"http://")?;
+    if rest.starts_with(b"[") {
+        // an IPv6 literal, with its brackets
+        let end = rest.iter().position(|&c| c == b']')?;
+        return Some(&rest[..=end]);
+    }
     let end = rest
         .iter()
         .position(|&c| c == b'/' || c == b':' || c == 0)
@@ -301,17 +325,17 @@ pub fn origin_host(origin: &[u8]) -> Option<&[u8]> {
 /// Whether a request may use the API: in AP mode always; otherwise the
 /// requester must have a private address (also when the `Origin` names the
 /// device, `localhost` or `*.local`), and an `Origin`, if sent, must name
-/// the device, `localhost`, a `.local` host or a private IPv4 address.
+/// the device, `localhost`, a `.local` host or a private IPv4 or IPv6 address.
 pub fn network_allowed(
     ap_mode: bool,
-    request_ip: u32,
+    request_ip: IpAddr,
     origin: Option<&[u8]>,
     hostname: &[u8],
 ) -> bool {
     if ap_mode {
         return true;
     }
-    if !is_private(request_ip) {
+    if !is_private_addr(request_ip) {
         return false;
     }
     let Some(origin) = origin else {
@@ -324,6 +348,11 @@ pub fn network_allowed(
         || host == b"localhost"
         || host.ends_with(b".local")
         || parse_ipv4(host).is_some_and(|ip| ip != u32::MAX && is_private(ip))
+        || host
+            .strip_prefix(b"[")
+            .and_then(|h| h.strip_suffix(b"]"))
+            .and_then(|h| core::str::from_utf8(h).ok()?.parse::<Ipv6Addr>().ok())
+            .is_some_and(|ip| is_private_v6(&ip))
 }
 
 pub(crate) mod api {
@@ -397,8 +426,8 @@ mod tests {
 
     #[test]
     fn origin_cannot_bypass_the_private_address_check() {
-        let public = 0x0808_0808;
-        let lan = 0xc0a8_0105;
+        let public = IpAddr::V4(0x0808_0808.into());
+        let lan = IpAddr::V4(0xc0a8_0105.into());
         for origin in [
             &b"http://localhost"[..],
             b"http://miner.local",
@@ -422,5 +451,55 @@ mod tests {
         ));
         assert!(!network_allowed(false, lan, Some(b"http://8.8.8.8"), b"x"));
         assert!(network_allowed(true, public, Some(b"http://8.8.8.8"), b"x"));
+    }
+
+    #[test]
+    fn ipv6_requesters_are_judged_by_their_whole_address() {
+        let v6 = |s: &str| IpAddr::V6(s.parse().unwrap());
+        // IPv4-mapped: the IPv4 rules
+        assert!(network_allowed(false, v6("::ffff:192.168.1.5"), None, b"x"));
+        assert!(!network_allowed(false, v6("::ffff:8.8.8.8"), None, b"x"));
+        // LAN IPv6
+        assert!(network_allowed(false, v6("fe80::1"), None, b"x"));
+        assert!(network_allowed(
+            false,
+            v6("fd5b:7a1c:2e90:1::55"),
+            None,
+            b"x"
+        ));
+        // a global address ending in a private IPv4 address is not on the LAN
+        assert!(!network_allowed(
+            false,
+            v6("2001:db8::c0a8:105"),
+            None,
+            b"x"
+        ));
+        assert!(!network_allowed(
+            false,
+            v6("2001:db8::ffff:c0a8:105"),
+            None,
+            b"x"
+        ));
+        assert!(!network_allowed(false, v6("::1:c0a8:105"), None, b"x"));
+        // the Origin of a page opened by its IPv6 address
+        let lan = v6("fd00::2");
+        assert!(network_allowed(false, lan, Some(b"http://[fd00::1]"), b"x"));
+        assert!(network_allowed(
+            false,
+            lan,
+            Some(b"http://[fe80::1]:80/a"),
+            b"x"
+        ));
+        assert!(!network_allowed(
+            false,
+            lan,
+            Some(b"http://[2001:db8::1]"),
+            b"x"
+        ));
+        assert!(!network_allowed(false, lan, Some(b"http://[fd00::1"), b"x"));
+        assert_eq!(
+            origin_host(b"http://[fd00::1]:80/x"),
+            Some(&b"[fd00::1]"[..])
+        );
     }
 }

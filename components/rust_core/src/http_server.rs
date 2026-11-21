@@ -80,7 +80,7 @@ pub fn with_scratch<T>(
 fn network_allowed(req: &mut Request) -> bool {
     const T: &CStr = c"http_cors";
     let ap_mode = crate::system::ap_state();
-    let mut ip_be = 0u32;
+    let mut ip = std::net::IpAddr::V4(std::net::Ipv4Addr::UNSPECIFIED);
     if !ap_mode {
         let fd = req.sockfd();
         let mut addr = httpd::SockaddrIn6::default();
@@ -90,21 +90,25 @@ fn network_allowed(req: &mut Request) -> bool {
             log!(Error, T, "Error getting client IP");
             return false;
         }
-        // the IPv4-mapped address, in network byte order
-        ip_be = addr.sin6_addr[3];
+        // the words are in network byte order; an IPv4 peer is IPv4-mapped
+        let mut b = [0u8; 16];
+        for (d, w) in b.chunks_exact_mut(4).zip(addr.sin6_addr) {
+            d.copy_from_slice(&w.to_ne_bytes());
+        }
+        let v6 = std::net::Ipv6Addr::from(b);
+        ip = v6.to_ipv4_mapped().map_or(v6.into(), Into::into);
     }
     // an Origin header that does not fit counts as none, as before
     let origin = req.header(c"Origin", 128);
     let hostname = crate::system::hostname();
     if crate::http_auth::network_allowed(
         ap_mode,
-        u32::from_be(ip_be),
+        ip,
         origin.as_deref().map(CStr::to_bytes),
         hostname.to_bytes(),
     ) {
         return true;
     }
-    let ip = std::net::Ipv4Addr::from(u32::from_be(ip_be));
     let origin = origin.as_deref().map_or("-".into(), CStr::to_string_lossy);
     log!(Error, T, "denied: {ip} (origin {origin})");
     false

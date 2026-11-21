@@ -273,7 +273,12 @@ fn network_check_matches_reference_except_origin() {
             o.truncate(127);
             o
         });
-        let current = http_auth::network_allowed(ap, ip, origin.as_deref(), &hostname);
+        let current = http_auth::network_allowed(
+            ap,
+            std::net::IpAddr::V4(ip.into()),
+            origin.as_deref(),
+            &hostname,
+        );
         rec.add(format!(
             "ap {ap} ip {ip:08x} origin {:?} -> {current}",
             origin.as_ref().map(|o| o.escape_ascii().to_string())

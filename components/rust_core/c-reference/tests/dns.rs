@@ -32,6 +32,9 @@ impl Rng {
 }
 
 fn reference(req: &[u8], ip: [u8; 4]) -> Option<Vec<u8>> {
+    // the reference keeps the address and its rule table in statics
+    static LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+    let _g = LOCK.lock().unwrap_or_else(|e| e.into_inner());
     let mut out = [0u8; 256];
     let n = unsafe {
         ref_dns_reply(

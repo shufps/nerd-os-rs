@@ -18,3 +18,4 @@
 #include "esp_lcd_panel_ops.h"
 #include "esp_lcd_panel_vendor.h"
 #include "esp_psram.h"
+#include "lwip/netdb.h"

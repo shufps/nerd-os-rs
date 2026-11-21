@@ -690,6 +690,10 @@ unsafe extern "C" fn ip_event(_: *mut c_void, _: *const c_char, id: i32, data: *
     let [ip, netmask, gw] = sys::got_ip(data);
     *IP.lock().unwrap_or_else(|e| e.into_inner()) = ip_str(&ip);
     HAS_IP.store(true, Ordering::Release);
+    // Start IPv6: a link-local address enables router discovery and SLAAC.
+    if let Some(n) = netif() {
+        crate::network::create_ip6_linklocal(n);
+    }
     log!(
         Warn,
         TAG,

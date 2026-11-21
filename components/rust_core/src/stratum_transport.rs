@@ -305,7 +305,9 @@ impl Transport {
                 }
             }
         }
-        let target = if tls { host } else { ip.unwrap_or(host) };
+        // Connect to the resolved address. TLS still checks the certificate
+        // against host (set as the common name above).
+        let target = ip.unwrap_or(host);
         log!(
             Info,
             TAG,

@@ -4,7 +4,7 @@
 //! `PATCH` and `DELETE /api/v2/can/nodes/{id}`.
 
 use crate::idf::idf_const;
-use core::ffi::{c_char, c_int, CStr};
+use core::ffi::{c_int, CStr};
 use std::ffi::CString;
 
 use crate::can;
@@ -20,21 +20,13 @@ idf_const!(CAP_INTERNAL: u32 = MALLOC_CAP_INTERNAL, 1 << 11);
 
 #[cfg(target_os = "espidf")]
 mod sys {
-    use super::*;
     pub use crate::idf::raw::heap_caps_get_free_size;
-    extern "C" {
-        pub fn network_mac_addr() -> *const c_char;
-    }
 }
 
 #[cfg(not(target_os = "espidf"))]
 mod sys {
-    use super::*;
     pub unsafe fn heap_caps_get_free_size(_: u32) -> usize {
         0
-    }
-    pub unsafe fn network_mac_addr() -> *const c_char {
-        c"".as_ptr()
     }
 }
 
@@ -100,7 +92,7 @@ pub unsafe extern "C" fn nodes(req: *mut Req) -> EspErr {
         }
     }
     let m = CanMasterNode {
-        mac: sys::network_mac_addr(),
+        mac: crate::network::mac_addr().as_ptr(),
         device_model: b.device_model,
         version: version.as_ptr(),
         shutdown: power_mgmt::is_shutdown(),

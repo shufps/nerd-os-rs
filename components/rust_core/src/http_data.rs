@@ -46,13 +46,10 @@ pub struct Partition {
 
 #[cfg(target_os = "espidf")]
 mod sys {
-    use super::*;
     pub use crate::idf::raw::{
         esp_ota_get_running_partition, heap_caps_get_free_size, httpd_req_get_url_query_str,
     };
     extern "C" {
-        pub fn network_mac_addr() -> *const c_char;
-        pub fn network_wifi_rssi() -> c_int;
         pub fn disp_load_settings();
     }
 }
@@ -63,12 +60,6 @@ mod sys {
     use super::*;
     pub unsafe fn heap_caps_get_free_size(_: u32) -> usize {
         0
-    }
-    pub unsafe fn network_mac_addr() -> *const c_char {
-        c"".as_ptr()
-    }
-    pub unsafe fn network_wifi_rssi() -> c_int {
-        -90
     }
     pub unsafe fn disp_load_settings() {}
     pub unsafe fn esp_ota_get_running_partition() -> *const Partition {
@@ -221,8 +212,8 @@ unsafe extern "C" fn system_info(req: *mut Req) -> EspErr {
     s.small_core_count = small_core_count();
     s.device_model = b.device_model;
     s.hostip = hostip.as_ptr();
-    s.mac_addr = sys::network_mac_addr();
-    s.wifi_rssi = sys::network_wifi_rssi();
+    s.mac_addr = crate::network::mac_addr().as_ptr();
+    s.wifi_rssi = crate::network::wifi_rssi();
 
     s.power = power_mgmt::get(0);
     s.max_power = b.max_pin;

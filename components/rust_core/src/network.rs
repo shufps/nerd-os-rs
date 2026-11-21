@@ -641,6 +641,11 @@ pub fn scan() -> Result<Vec<ScanResult>, EspErr> {
     Ok(list)
 }
 
+/// The station MAC as text ("" before WiFi is up).
+pub fn mac_addr() -> &'static CStr {
+    MAC.get().map_or(c"", |m| m.as_c_str())
+}
+
 /// The access point's RSSI (dBm), -90 while not connected.
 pub fn wifi_rssi() -> c_int {
     sys::sta_rssi().map_or(-90, |r| r as c_int)
@@ -827,16 +832,6 @@ pub fn preferred_ip() -> Option<(String, bool)> {
     None
 }
 
-/// `text` into `buf` (cut, NUL-terminated).
-unsafe fn copy_out(text: &str, buf: *mut c_char, len: usize) {
-    if buf.is_null() || len == 0 {
-        return;
-    }
-    let n = text.len().min(len - 1);
-    core::ptr::copy_nonoverlapping(text.as_ptr(), buf as *mut u8, n);
-    *buf.add(n) = 0;
-}
-
 pub(crate) mod ffi {
     use super::*;
 
@@ -857,46 +852,6 @@ pub(crate) mod ffi {
         }
     }
 
-    /// The preferred interface's address into `buf` ("0.0.0.0" without
-    /// one); false without one.
-    ///
-    /// # Safety
-    /// `buf` writable for `len` bytes (or NULL).
-    #[no_mangle]
-    pub unsafe extern "C" fn network_preferred_ip(buf: *mut c_char, len: usize) -> bool {
-        network_preferred_ip_eth(buf, len, core::ptr::null_mut())
-    }
-
-    /// As `network_preferred_ip()`, and whether it is Ethernet.
-    ///
-    /// # Safety
-    /// `buf` writable for `len` bytes (or NULL), `eth` writable or NULL.
-    #[no_mangle]
-    pub unsafe extern "C" fn network_preferred_ip_eth(
-        buf: *mut c_char,
-        len: usize,
-        eth: *mut bool,
-    ) -> bool {
-        if buf.is_null() || len == 0 {
-            return false;
-        }
-        let p = preferred_ip();
-        copy_out(p.as_ref().map_or("0.0.0.0", |(ip, _)| ip), buf, len);
-        if !eth.is_null() {
-            *eth = p.as_ref().is_some_and(|(_, e)| *e);
-        }
-        p.is_some()
-    }
-
-    /// The access point's SSID (13 bytes).
-    ///
-    /// # Safety
-    /// `ssid` writable for 13 bytes.
-    #[no_mangle]
-    pub unsafe extern "C" fn network_ap_ssid(ssid: *mut c_char) {
-        copy_out(&ap_ssid(), ssid, 13);
-    }
-
     #[no_mangle]
     pub extern "C" fn network_wifi_rssi() -> c_int {
         wifi_rssi()
@@ -905,6 +860,6 @@ pub(crate) mod ffi {
     /// The station MAC ("" before WiFi is up).
     #[no_mangle]
     pub extern "C" fn network_mac_addr() -> *const c_char {
-        MAC.get().map_or(c"".as_ptr(), |m| m.as_ptr())
+        mac_addr().as_ptr()
     }
 }

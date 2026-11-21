@@ -32,11 +32,8 @@ const SESSION_TTL_S: u32 = 24 * 3600;
 
 #[cfg(target_os = "espidf")]
 mod sys {
-    use super::*;
     pub use crate::idf::raw::{heap_caps_get_free_size, vTaskDelay};
     extern "C" {
-        pub fn network_mac_addr() -> *const c_char;
-        pub fn network_wifi_rssi() -> c_int;
         pub fn ui_send_show_qr() -> bool;
         pub fn ui_send_hide_qr() -> bool;
         pub fn disp_load_settings();
@@ -46,16 +43,9 @@ mod sys {
 #[cfg(not(target_os = "espidf"))]
 #[allow(non_snake_case)]
 mod sys {
-    use super::*;
     pub unsafe fn vTaskDelay(_: u32) {}
     pub unsafe fn heap_caps_get_free_size(_: u32) -> usize {
         0
-    }
-    pub unsafe fn network_mac_addr() -> *const c_char {
-        c"".as_ptr()
-    }
-    pub unsafe fn network_wifi_rssi() -> c_int {
-        -90
     }
     pub unsafe fn ui_send_show_qr() -> bool {
         false
@@ -219,10 +209,10 @@ unsafe extern "C" fn v2_system(req: *mut Req) -> EspErr {
         last_reset_reason: crate::system::reset_reason().as_ptr(),
         hostname: hostname.as_ptr(),
         ssid: ssid.as_ptr(),
-        mac_addr: sys::network_mac_addr(),
+        mac_addr: crate::network::mac_addr().as_ptr(),
         ip_addr: ip.as_ptr(),
         wifi_status: wifi_status.as_ptr(),
-        wifi_rssi: sys::network_wifi_rssi(),
+        wifi_rssi: crate::network::wifi_rssi(),
         free_heap: sys::heap_caps_get_free_size(CAP_SPIRAM) as u64,
         free_heap_int: sys::heap_caps_get_free_size(CAP_INTERNAL) as u64,
     };

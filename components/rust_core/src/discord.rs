@@ -4,8 +4,6 @@
 //! (5 s timeout, the certificate bundle). Texts, queue and sender loop are
 //! in `alerts.rs`. C API: `discord.h`.
 
-#[cfg(target_os = "espidf")]
-use core::ffi::c_char;
 use core::ffi::{c_int, c_void, CStr};
 
 use crate::alerts;
@@ -84,33 +82,12 @@ pub fn start() {
     log!(Info, TAG, "Discord task started");
 }
 
-#[cfg(target_os = "espidf")]
-extern "C" {
-    /// the preferred interface's address (network_manager.cpp)
-    fn network_preferred_ip(buf: *mut c_char, len: usize) -> bool;
-    /// the station MAC as text (connect.cpp)
-    fn network_mac_addr() -> *const c_char;
-}
-
-/// The device's address and MAC for a message (only looked up for enabled
-/// alerts).
+/// The device's address ("0.0.0.0" without one) and MAC for a message
+/// (only looked up for enabled alerts).
 fn device() -> (String, String) {
-    #[cfg(target_os = "espidf")]
-    unsafe {
-        let mut ip = [0 as c_char; 20];
-        network_preferred_ip(ip.as_mut_ptr(), ip.len());
-        let mac = network_mac_addr();
-        (
-            CStr::from_ptr(ip.as_ptr()).to_string_lossy().into_owned(),
-            if mac.is_null() {
-                String::new()
-            } else {
-                CStr::from_ptr(mac).to_string_lossy().into_owned()
-            },
-        )
-    }
-    #[cfg(not(target_os = "espidf"))]
-    (String::new(), String::new())
+    let ip = crate::network::preferred_ip().map_or_else(|| "0.0.0.0".into(), |(ip, _)| ip);
+    let mac = crate::network::mac_addr().to_string_lossy().into_owned();
+    (ip, mac)
 }
 
 /// Queues an alert (`alerts::send`), with the device block when enabled.

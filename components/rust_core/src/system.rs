@@ -89,8 +89,6 @@ mod sys {
     pub use crate::board_api::*;
     pub use crate::idf::raw::{esp_reset_reason, vTaskSuspend};
     extern "C" {
-        pub fn network_preferred_ip_eth(buf: *mut c_char, len: usize, eth: *mut bool) -> bool;
-        pub fn network_ap_ssid(ssid: *mut c_char);
         pub fn disp_wait_for_splashs();
         pub fn disp_portal_screen(ssid: *const c_char);
         pub fn disp_update_ip(ip: *const c_char);
@@ -119,10 +117,6 @@ mod sys {
     pub fn bapi_has_hashrate_counter() -> bool {
         false
     }
-    pub unsafe fn network_preferred_ip_eth(_: *mut c_char, _: usize, _: *mut bool) -> bool {
-        false
-    }
-    pub unsafe fn network_ap_ssid(_: *mut c_char) {}
     pub unsafe fn disp_wait_for_splashs() {}
     pub unsafe fn disp_portal_screen(_: *const c_char) {}
     pub unsafe fn disp_update_ip(_: *const c_char) {}
@@ -303,13 +297,10 @@ pub fn current_hashrate() -> f32 {
 /// The preferred interface's address ("0.0.0.0" without one) and whether
 /// it is Ethernet.
 fn preferred_ip() -> (bool, CString, bool) {
-    let mut buf = [0 as c_char; 16];
-    let mut eth = false;
-    let ok = unsafe { sys::network_preferred_ip_eth(buf.as_mut_ptr(), buf.len(), &mut eth) };
-    buf[15] = 0;
-    let ip = unsafe { CStr::from_ptr(buf.as_ptr()) };
-    let ip = if ip.is_empty() { c"0.0.0.0" } else { ip };
-    (ok, ip.into(), eth)
+    match crate::network::preferred_ip() {
+        Some((ip, eth)) if !ip.is_empty() => (true, CString::new(ip).unwrap_or_default(), eth),
+        p => (p.is_some(), c"0.0.0.0".into(), p.is_some_and(|(_, e)| e)),
+    }
 }
 
 /// The two temperature filters of the history samples.
@@ -388,11 +379,8 @@ pub fn run() -> ! {
                 break;
             }
             // not connected yet: show the access point
-            let mut ssid = [0 as c_char; 13];
-            unsafe {
-                sys::network_ap_ssid(ssid.as_mut_ptr());
-                sys::disp_portal_screen(ssid.as_ptr());
-            }
+            let ssid = CString::new(crate::network::ap_ssid()).unwrap_or_default();
+            unsafe { sys::disp_portal_screen(ssid.as_ptr()) };
             std::thread::sleep(Duration::from_secs(5));
         }
         unsafe { sys::disp_update_ip(ip().as_ptr()) };

@@ -1,54 +1,5 @@
-//! Helpers that reproduce C library behaviour and allocate memory that C code
-//! frees with `free()`.
-
-use core::ffi::{c_char, c_void};
-
-#[cfg(not(target_os = "espidf"))]
-extern "C" {
-    fn malloc(size: usize) -> *mut c_void;
-}
-
-extern "C" {
-    fn free(p: *mut c_void);
-}
-
-/// `free()` for memory from `c_malloc()` (or the C side); null is ignored.
-///
-/// # Safety
-/// `p` is null or a live allocation from `malloc()`/`c_malloc()`.
-pub unsafe fn c_free(p: *mut c_void) {
-    if !p.is_null() {
-        free(p);
-    }
-}
-
-#[cfg(target_os = "espidf")]
-mod caps {
-    pub use crate::idf::raw::{
-        heap_caps_malloc_prefer, MALLOC_CAP_8BIT, MALLOC_CAP_INTERNAL, MALLOC_CAP_SPIRAM,
-    };
-}
-
-/// `malloc()`, preferring PSRAM on the device like the firmware's `MALLOC()`
-/// (which uses PSRAM only). The C side releases it with `free()`.
-pub fn c_malloc(size: usize) -> *mut c_void {
-    #[cfg(target_os = "espidf")]
-    // SAFETY: plain allocation call; the varargs are the caps to try, in order.
-    unsafe {
-        use caps::*;
-        heap_caps_malloc_prefer(
-            size.max(1),
-            2,
-            MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT,
-            MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT,
-        )
-    }
-    #[cfg(not(target_os = "espidf"))]
-    // SAFETY: plain allocation call.
-    unsafe {
-        malloc(size.max(1))
-    }
-}
+//! Helpers that reproduce C library behaviour (`hex2bin`, newlib's
+//! `strtoul`, printf number formatting).
 
 /// Lowercase hex of `b`.
 pub fn to_hex(b: &[u8]) -> String {
@@ -211,24 +162,6 @@ pub fn now_us() -> i64 {
         static START: OnceLock<Instant> = OnceLock::new();
         START.get_or_init(Instant::now).elapsed().as_micros() as i64 + 1
     }
-}
-
-/// `bytes` with a terminating NUL in a `c_malloc()` buffer, the length (without
-/// the NUL) in `*len`; null if out of memory.
-///
-/// # Safety
-/// `len` is writable or null.
-pub unsafe fn malloc_copy(bytes: &[u8], len: *mut usize) -> *mut c_char {
-    let p = c_malloc(bytes.len() + 1) as *mut u8;
-    if p.is_null() {
-        return core::ptr::null_mut();
-    }
-    core::ptr::copy_nonoverlapping(bytes.as_ptr(), p, bytes.len());
-    *p.add(bytes.len()) = 0;
-    if !len.is_null() {
-        *len = bytes.len();
-    }
-    p as *mut c_char
 }
 
 #[cfg(test)]

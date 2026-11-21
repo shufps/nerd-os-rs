@@ -9,7 +9,9 @@
 //!   protected endpoint,
 //! * the requester's address must be private even when the `Origin` header
 //!   names the device, `localhost` or a `.local` host,
-//! * session token signatures are compared in constant time.
+//! * session token signatures are compared in constant time,
+//! * a used TOTP code stays used while its step is in the window (the
+//!   window moves to every newer step instead of starting over).
 
 use std::net::{IpAddr, Ipv6Addr};
 use std::sync::Mutex;
@@ -99,12 +101,21 @@ pub struct ReplayState {
 
 /// Checks a TOTP code (30 s steps, one step of tolerance either way); a code
 /// is accepted once per step.
+///
+/// A newer step moves the window to it; the marks of the steps still in the
+/// window move along, so a used code stays used.
 pub fn totp_verify(key: &[u8], now: i64, code: u32, state: &mut ReplayState) -> bool {
     let step = now / 30;
-    if state.base_step == 0 || step > state.base_step + 1 {
+    if state.base_step == 0 || step > state.base_step {
+        let shift = step - state.base_step;
+        let mask = if state.base_step != 0 && shift < 3 {
+            state.mask >> shift
+        } else {
+            0
+        };
         *state = ReplayState {
             base_step: step,
-            mask: 0,
+            mask,
         };
     } else if step < state.base_step - 1 {
         return false; // far too old
@@ -398,6 +409,35 @@ mod tests {
             // the same code again is a replay
             assert!(!totp_verify(key, t, code, &mut state), "replay T={t}");
         }
+    }
+
+    #[test]
+    fn a_used_code_stays_used_when_the_window_moves_on() {
+        let key = b"12345678901234567890";
+        let s = 1_000_000i64; // a time step
+        let mut state = ReplayState::default();
+        // the window is based at step s
+        assert!(totp_verify(key, s * 30, hotp(key, s as u64), &mut state));
+        // a code of step s + 1, used in step s + 1
+        let code = hotp(key, (s + 1) as u64);
+        assert!(totp_verify(key, (s + 1) * 30, code, &mut state));
+        // replayed in step s + 2, where step s + 1 is still in the window
+        assert!(!totp_verify(key, (s + 2) * 30, code, &mut state));
+    }
+
+    #[test]
+    fn the_next_step_is_accepted_one_step_after_the_base() {
+        // +-1 step: a code of the next step (client clock ahead) is valid
+        let key = b"12345678901234567890";
+        let s = 1_000_000i64;
+        let mut state = ReplayState::default();
+        assert!(totp_verify(key, s * 30, hotp(key, s as u64), &mut state));
+        assert!(totp_verify(
+            key,
+            (s + 1) * 30,
+            hotp(key, (s + 2) as u64),
+            &mut state
+        ));
     }
 
     #[test]

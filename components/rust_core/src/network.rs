@@ -956,9 +956,4 @@ pub(crate) mod ffi {
             );
         }
     }
-
-    /// The station MAC ("" before WiFi is up).
-    pub extern "C" fn network_mac_addr() -> *const c_char {
-        mac_addr().as_ptr()
-    }
 }

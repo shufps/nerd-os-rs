@@ -3,23 +3,15 @@
 //! against the outputs of the former board constructors
 //! (tests/golden/board_profile.txt, recorded by the differential tests).
 
-use std::ffi::{c_char, CStr};
+use std::ffi::CStr;
 
 use rust_core::board_profile::{profile, BoardId, Detect, Profile};
 
 mod golden;
 use golden::Rec;
 
-fn s(p: *const c_char) -> String {
-    assert!(!p.is_null());
-    unsafe { CStr::from_ptr(p) }.to_str().unwrap().to_owned()
-}
-
-fn list(p: *const u32, n: usize) -> Vec<u32> {
-    if n == 0 {
-        return Vec::new();
-    }
-    unsafe { std::slice::from_raw_parts(p, n) }.to_vec()
+fn s(p: &CStr) -> String {
+    p.to_str().unwrap().to_owned()
 }
 
 /// the fields as comparable text (pointers resolved)
@@ -31,14 +23,8 @@ fn fields(p: &Profile) -> Vec<(&'static str, String)> {
         ("asic_model", s(p.asic_model)),
         ("asic_count", p.asic_count.to_string()),
         ("job_interval_ms", p.job_interval_ms.to_string()),
-        (
-            "frequencies",
-            format!("{:?}", list(p.frequencies, p.frequency_count)),
-        ),
-        (
-            "voltages",
-            format!("{:?}", list(p.voltages, p.voltage_count)),
-        ),
+        ("frequencies", format!("{:?}", p.frequencies)),
+        ("voltages", format!("{:?}", p.voltages)),
         ("default_frequency", p.default_frequency.to_string()),
         ("default_voltage_mv", p.default_voltage_mv.to_string()),
         ("abs_max_frequency", p.abs_max_frequency.to_string()),

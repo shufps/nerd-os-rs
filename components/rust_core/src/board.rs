@@ -14,7 +14,7 @@
 
 use crate::asic::driver::ffi::Handle as Asics;
 use crate::idf::idf_const;
-use core::ffi::{c_char, c_int, CStr};
+use core::ffi::{c_int, CStr};
 use std::sync::{Mutex, MutexGuard, OnceLock};
 use std::time::Instant;
 
@@ -466,10 +466,8 @@ impl State {
         self.p.min_pin = 45.0;
         self.p.max_current_a = 10.0;
         self.p.abs_max_frequency = 1000;
-        self.p.frequencies = REV7_FREQUENCIES.as_ptr();
-        self.p.frequency_count = REV7_FREQUENCIES.len();
-        self.p.voltages = REV7_VOLTAGES.as_ptr();
-        self.p.voltage_count = REV7_VOLTAGES.len();
+        self.p.frequencies = &REV7_FREQUENCIES;
+        self.p.voltages = &REV7_VOLTAGES;
         self.p.default_voltage_mv = 1200;
         self.asic_voltage_mv = 1200;
         self.pid[0].target_temp = 65;
@@ -1503,37 +1501,16 @@ fn detect_num_temp_sensors(t: &CStr) -> c_int {
     found
 }
 
-pub(crate) mod ffi {
+/// The board for the other modules (one board, created at boot).
+pub mod api {
     use super::*;
 
     pub(crate) fn b() -> &'static Board {
         BOARD.get().expect("board not created")
     }
 
-    fn text(p: *const c_char) -> *const c_char {
-        if p.is_null() {
-            c"".as_ptr()
-        } else {
-            p
-        }
-    }
-
-    /// A profile string (a `'static` C string literal, or NULL).
-    ///
-    /// # Safety
-    /// `p` is NULL or a `'static` NUL-terminated string (the profile's
-    /// strings in [`Info`] are `c"..."` literals, board_profile.rs).
-    pub(crate) unsafe fn static_text(p: *const c_char) -> &'static CStr {
-        if p.is_null() {
-            c""
-        } else {
-            // SAFETY: a 'static C string (caller contract)
-            unsafe { CStr::from_ptr(p) }
-        }
-    }
-
     /// Creates the board (`BOARD_*`); false for an unknown id.
-    pub extern "C" fn board_create(id: c_int) -> bool {
+    pub fn board_create(id: c_int) -> bool {
         let Some(id) = BoardId::from_int(id) else {
             return false;
         };
@@ -1546,7 +1523,7 @@ pub(crate) mod ffi {
     }
 
     /// The board's `asic_chip_t`.
-    pub extern "C" fn board_asic_chip() -> c_int {
+    pub fn board_asic_chip() -> c_int {
         match b().id() {
             NerdAxe => 0,
             NerdQAxePlus | NerdOctaxePlus => 1,
@@ -1555,104 +1532,103 @@ pub(crate) mod ffi {
         }
     }
 
-    pub extern "C" fn board_init() -> bool {
+    pub fn board_init() -> bool {
         b().init()
     }
 
-    pub extern "C" fn board_init_asics() -> bool {
+    pub fn board_init_asics() -> bool {
         b().init_asics()
     }
 
-    pub extern "C" fn board_load_settings() {
+    pub fn board_load_settings() {
         b().load_settings()
     }
 
-    pub extern "C" fn board_shutdown() {
+    pub fn board_shutdown() {
         b().shutdown()
     }
 
-    pub extern "C" fn board_set_voltage(volts: f32) -> bool {
+    pub fn board_set_voltage(volts: f32) -> bool {
         b().set_voltage(volts)
     }
 
-    pub extern "C" fn board_set_asic_frequency(mhz: f32) -> bool {
+    pub fn board_set_asic_frequency(mhz: f32) -> bool {
         b().set_asic_frequency(mhz)
     }
 
-    pub extern "C" fn board_set_vr_frequency(hz: u32) {
+    pub fn board_set_vr_frequency(hz: u32) {
         b().set_vr_frequency(hz)
     }
 
-    pub extern "C" fn board_set_fan_speed_ch(ch: c_int, perc: f32) {
+    pub fn board_set_fan_speed_ch(ch: c_int, perc: f32) {
         b().set_fan_speed_ch(ch, perc)
     }
 
-    pub extern "C" fn board_fan_rpm(ch: c_int) -> u16 {
+    pub fn board_fan_rpm(ch: c_int) -> u16 {
         b().fan_rpm(ch)
     }
 
-    pub extern "C" fn board_set_fan_polarity(invert: bool) {
+    pub fn board_set_fan_polarity(invert: bool) {
         b().set_fan_polarity(invert)
     }
 
-    pub extern "C" fn board_temperature(index: c_int) -> f32 {
+    pub fn board_temperature(index: c_int) -> f32 {
         b().temperature(index)
     }
 
-    pub extern "C" fn board_vr_temp() -> f32 {
+    pub fn board_vr_temp() -> f32 {
         b().vr_temp()
     }
 
-    pub extern "C" fn board_vr_temp_internal() -> f32 {
+    pub fn board_vr_temp_internal() -> f32 {
         b().vr_temp_internal()
     }
 
     /// 0 vin, 1 iin, 2 pin, 3 vout, 4 iout, 5 pout
-    pub extern "C" fn board_power_value(what: c_int) -> f32 {
+    pub fn board_power_value(what: c_int) -> f32 {
         b().power(what)
     }
 
-    pub extern "C" fn board_request_buck_telemetry() {
+    pub fn board_request_buck_telemetry() {
         b().request_buck_telemetry()
     }
 
-    pub extern "C" fn board_request_chip_temps() {
+    pub fn board_request_chip_temps() {
         b().request_chip_temps()
     }
 
-    pub extern "C" fn board_has_ethernet() -> bool {
+    pub fn board_has_ethernet() -> bool {
         b().has_ethernet()
     }
 
-    pub extern "C" fn board_detect_ethernet() {
+    pub fn board_detect_ethernet() {
         b().detect_ethernet()
     }
 
-    pub extern "C" fn board_has_can_extension() -> bool {
+    pub fn board_has_can_extension() -> bool {
         b().has_can_extension()
     }
 
-    pub extern "C" fn board_is_can_slave() -> bool {
+    pub fn board_is_can_slave() -> bool {
         b().is_can_slave()
     }
 
-    pub extern "C" fn board_can_tx_pin() -> c_int {
+    pub fn board_can_tx_pin() -> c_int {
         b().can_pins().0
     }
 
-    pub extern "C" fn board_can_rx_pin() -> c_int {
+    pub fn board_can_rx_pin() -> c_int {
         b().can_pins().1
     }
 
-    /// `board_info_t`: the constants and settings the getters read.
-    #[repr(C)]
+    /// The constants and settings the getters read.
     pub struct Info {
-        pub device_model: *const c_char,
-        pub mining_agent: *const c_char,
-        pub asic_model: *const c_char,
-        pub swarm_color: *const c_char,
-        pub default_theme: *const c_char,
-        pub fan_labels: [*const c_char; 2],
+        pub device_model: &'static CStr,
+        pub mining_agent: &'static CStr,
+        pub asic_model: &'static CStr,
+        pub swarm_color: &'static CStr,
+        pub default_theme: &'static CStr,
+        pub fan_labels: [&'static CStr; 2],
         pub version: c_int,
         pub asic_count: c_int,
         pub chips_detected: c_int,
@@ -1689,18 +1665,8 @@ pub(crate) mod ffi {
         pub initialized: bool,
         pub buck_initialized: bool,
         pub shutdown: bool,
-        pub frequencies: *const u32,
-        pub frequency_count: usize,
-        pub voltages: *const u32,
-        pub voltage_count: usize,
-    }
-
-    /// A snapshot of the board's values.
-    ///
-    /// # Safety
-    /// `out` writable.
-    pub unsafe extern "C" fn board_info(out: *mut Info) {
-        *out = info();
+        pub frequencies: &'static [u32],
+        pub voltages: &'static [u32],
     }
 
     /// A snapshot of the board's values.
@@ -1708,12 +1674,12 @@ pub(crate) mod ffi {
         let s = b().state();
         let p = &s.p;
         Info {
-            device_model: text(p.device_model),
-            mining_agent: text(p.mining_agent),
-            asic_model: text(p.asic_model),
-            swarm_color: text(p.swarm_color),
-            default_theme: text(p.default_theme),
-            fan_labels: [text(p.fan_labels[0]), text(p.fan_labels[1])],
+            device_model: p.device_model,
+            mining_agent: p.mining_agent,
+            asic_model: p.asic_model,
+            swarm_color: p.swarm_color,
+            default_theme: p.default_theme,
+            fan_labels: p.fan_labels,
             version: p.version,
             asic_count: p.asic_count,
             chips_detected: s.chips_detected,
@@ -1751,17 +1717,15 @@ pub(crate) mod ffi {
             buck_initialized: s.buck_initialized,
             shutdown: s.shutdown,
             frequencies: p.frequencies,
-            frequency_count: p.frequency_count,
             voltages: p.voltages,
-            voltage_count: p.voltage_count,
         }
     }
 
-    pub extern "C" fn board_is_initialized() -> bool {
+    pub fn board_is_initialized() -> bool {
         BOARD.get().is_some_and(|b| b.state().initialized)
     }
 
-    pub extern "C" fn board_is_axe() -> bool {
+    pub fn board_is_axe() -> bool {
         is_axe(b().id())
     }
 }
@@ -1790,8 +1754,8 @@ mod tests {
         let mut s = b.state();
         s.apply_rev7();
         assert_eq!(s.p.version, 502);
-        assert_eq!(s.p.frequency_count, 23);
-        assert_eq!(s.p.voltage_count, 19);
+        assert_eq!(s.p.frequencies.len(), 23);
+        assert_eq!(s.p.voltages.len(), 19);
         assert_eq!(s.asic_voltage_mv, 1200);
         assert_eq!(s.p.abs_max_frequency, 1000);
     }

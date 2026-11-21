@@ -735,7 +735,7 @@ fn init_panel() -> Option<()> {
         raw::esp_lcd_new_panel_st7789(io, &panel_config, &mut panel)
     })?;
 
-    let flip = crate::board::ffi::info().flip_screen;
+    let flip = crate::board::api::info().flip_screen;
     // SAFETY: the panel from above
     unsafe {
         raw::esp_lcd_panel_reset(panel);

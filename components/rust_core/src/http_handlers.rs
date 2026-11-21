@@ -137,22 +137,16 @@ fn shutdown(req: &mut Request) -> EspErr {
 // ---------------------------------------------------------------------------
 // v2 identify and system
 
-fn board_info() -> crate::board::ffi::Info {
-    let mut i = core::mem::MaybeUninit::uninit();
-    // SAFETY: board_info() writes a complete plain-data Info to the pointer,
-    // so it is initialized afterwards
-    unsafe {
-        crate::board::ffi::board_info(i.as_mut_ptr());
-        i.assume_init()
-    }
+fn board_info() -> crate::board::api::Info {
+    crate::board::api::info()
 }
 
 fn v2_identify(req: &mut Request) -> EspErr {
     set_json(req);
     let b = board_info();
     let v = http_json::V2Identify {
-        device_model: b.device_model,
-        default_theme: b.default_theme,
+        device_model: b.device_model.as_ptr(),
+        default_theme: b.default_theme.as_ptr(),
         otp: cfg_flag(b"otp_enabled", 0),
         ap_active: crate::netmgr::ap_active(),
         core_dump_download: k::ESP_COREDUMP_ENABLE_TO_FLASH,
@@ -171,8 +165,8 @@ fn v2_system(req: &mut Request) -> EspErr {
     let ip = crate::system::ip();
     let wifi_status = crate::system::wifi_status();
     let v = http_json::V2System {
-        device_model: b.device_model,
-        asic_model: b.asic_model,
+        device_model: b.device_model.as_ptr(),
+        asic_model: b.asic_model.as_ptr(),
         version: version.as_ptr(),
         uptime_seconds: (crate::cutil::now_us() - crate::system::start_us()) / 1_000_000,
         last_reset_reason: crate::system::reset_reason().as_ptr(),

@@ -11,7 +11,7 @@
 //! (register 0x15a4) that the NerdQAxe+ constructor set before they replaced
 //! the ASIC driver; the profile keeps it explicitly.
 
-use core::ffi::{c_char, c_int, CStr};
+use core::ffi::{c_int, CStr};
 
 use crate::asic::Chip;
 
@@ -38,20 +38,17 @@ const fn pid(target_temp: u16) -> Pid {
     }
 }
 
-/// `board_profile_t`
-#[repr(C)]
+/// The constants of a board.
 #[derive(Clone, Copy, Debug)]
 pub struct Profile {
-    pub device_model: *const c_char,
-    pub mining_agent: *const c_char,
+    pub device_model: &'static CStr,
+    pub mining_agent: &'static CStr,
     pub version: c_int,
-    pub asic_model: *const c_char,
+    pub asic_model: &'static CStr,
     pub asic_count: c_int,
     pub job_interval_ms: c_int,
-    pub frequencies: *const u32,
-    pub frequency_count: usize,
-    pub voltages: *const u32,
-    pub voltage_count: usize,
+    pub frequencies: &'static [u32],
+    pub voltages: &'static [u32],
     pub default_frequency: c_int,
     pub default_voltage_mv: c_int,
     pub abs_max_frequency: c_int,
@@ -72,7 +69,7 @@ pub struct Profile {
     /// -1: the Kconfig default
     pub fan_mode0: c_int,
     pub num_fans: c_int,
-    pub fan_labels: [*const c_char; 2],
+    pub fan_labels: [&'static CStr; 2],
     pub max_pin: f32,
     pub min_pin: f32,
     pub max_vin: f32,
@@ -82,8 +79,8 @@ pub struct Profile {
     pub max_difficulty: u32,
     pub min_difficulty: u32,
     pub min_difficulty_dual_pool: u32,
-    pub swarm_color: *const c_char,
-    pub default_theme: *const c_char,
+    pub swarm_color: &'static CStr,
+    pub default_theme: &'static CStr,
     pub vr_frequency: u32,
     pub has_hash_counter: bool,
     /// a TPS53667 instead of the TPS53647 (Q1373, NerdOCTAXE-γ, NerdEKO)
@@ -138,12 +135,8 @@ pub struct Detect {
     pub six_phase: bool,
 }
 
-fn s(c: &'static CStr) -> *const c_char {
-    c.as_ptr()
-}
-
-fn list(l: &'static [u32]) -> (*const u32, usize) {
-    (l.as_ptr(), l.len())
+fn s(c: &'static CStr) -> &'static CStr {
+    c
 }
 
 static F_NQP: [u32; 9] = [400, 425, 450, 475, 490, 500, 525, 550, 575];
@@ -198,8 +191,7 @@ fn nqx_abs_max_voltage(imax: c_int) -> c_int {
 
 /// The NerdQAxe+ profile, the base of its family.
 fn nerdqaxeplus() -> Profile {
-    let (f, fc) = list(&F_NQP);
-    let (v, vc) = list(&V_NQP);
+    let (f, v): (&'static [u32], &'static [u32]) = (&F_NQP, &V_NQP);
     Profile {
         device_model: s(c"NerdQAxe+"),
         mining_agent: s(c"NerdQAxe+"),
@@ -208,9 +200,7 @@ fn nerdqaxeplus() -> Profile {
         asic_count: 4,
         job_interval_ms: 1200,
         frequencies: f,
-        frequency_count: fc,
         voltages: v,
-        voltage_count: vc,
         default_frequency: 490,
         default_voltage_mv: 1250,
         abs_max_frequency: 800,
@@ -250,8 +240,7 @@ fn nerdqaxeplus() -> Profile {
 
 /// The NerdQAxe++ profile (BM1370), the base of the later boards.
 fn nerdqaxeplus2() -> Profile {
-    let (f, fc) = list(&F_BM1370);
-    let (v, vc) = list(&V_BM1370);
+    let (f, v): (&'static [u32], &'static [u32]) = (&F_BM1370, &V_BM1370);
     Profile {
         device_model: s(c"NerdQAxe++"),
         mining_agent: s(c"NerdQAxe++"),
@@ -262,9 +251,7 @@ fn nerdqaxeplus2() -> Profile {
         ifault: 95.0,
         job_interval_ms: 500,
         frequencies: f,
-        frequency_count: fc,
         voltages: v,
-        voltage_count: vc,
         default_frequency: 600,
         default_voltage_mv: 1150,
         abs_max_frequency: 800,
@@ -286,8 +273,7 @@ fn nerdqaxeplus2() -> Profile {
 }
 
 fn nerdaxe() -> Profile {
-    let (f, fc) = list(&F_AXE);
-    let (v, vc) = list(&V_AXE);
+    let (f, v): (&'static [u32], &'static [u32]) = (&F_AXE, &V_AXE);
     Profile {
         device_model: s(c"NerdAxe"),
         mining_agent: s(c"NerdAxe"),
@@ -296,9 +282,7 @@ fn nerdaxe() -> Profile {
         asic_count: 1,
         job_interval_ms: 1500,
         frequencies: f,
-        frequency_count: fc,
         voltages: v,
-        voltage_count: vc,
         default_frequency: 485,
         default_voltage_mv: 1200,
         abs_max_frequency: 0,
@@ -350,17 +334,14 @@ pub fn profile(board: BoardId, d: &Detect) -> Profile {
     match board {
         NerdAxe => nerdaxe(),
         NerdAxeGamma => {
-            let (f, fc) = list(&F_GAMMA);
-            let (v, vc) = list(&V_BM1370);
+            let (f, v): (&'static [u32], &'static [u32]) = (&F_GAMMA, &V_BM1370);
             Profile {
                 device_model: s(c"NerdAxeGamma"),
                 mining_agent: s(c"NerdAxe"),
                 asic_model: s(c"BM1370"),
                 version: 200,
                 frequencies: f,
-                frequency_count: fc,
                 voltages: v,
-                voltage_count: vc,
                 default_frequency: 515,
                 default_voltage_mv: 1150,
                 init_voltage_mv: 1150,
@@ -376,17 +357,14 @@ pub fn profile(board: BoardId, d: &Detect) -> Profile {
             }
         }
         NerdAxeGaia => {
-            let (f, fc) = list(&F_GAIA);
-            let (v, vc) = list(&V_GAIA);
+            let (f, v): (&'static [u32], &'static [u32]) = (&F_GAIA, &V_GAIA);
             Profile {
                 device_model: s(c"NerdAxeGaia"),
                 mining_agent: s(c"NerdAxe"),
                 asic_model: s(c"BM1373"),
                 version: 200,
                 frequencies: f,
-                frequency_count: fc,
                 voltages: v,
-                voltage_count: vc,
                 default_frequency: 350,
                 default_voltage_mv: 940,
                 abs_min_voltage_mv: 800,
@@ -430,8 +408,7 @@ pub fn profile(board: BoardId, d: &Detect) -> Profile {
         },
         NerdQAxePlus2 => nerdqaxeplus2(),
         NerdQX => {
-            let (f, fc) = list(&F_NQX);
-            let (v, vc) = list(&V_NQX);
+            let (f, v): (&'static [u32], &'static [u32]) = (&F_NQX, &V_NQX);
             let imax = 90;
             Profile {
                 device_model: s(c"NerdQX"),
@@ -440,9 +417,7 @@ pub fn profile(board: BoardId, d: &Detect) -> Profile {
                 imax,
                 ifault: nqx_ifault(3) as f32,
                 frequencies: f,
-                frequency_count: fc,
                 voltages: v,
-                voltage_count: vc,
                 abs_max_frequency: nqx_abs_max_frequency(imax),
                 default_frequency: 777,
                 default_voltage_mv: 1200,
@@ -518,8 +493,7 @@ pub fn profile(board: BoardId, d: &Detect) -> Profile {
             };
             if d.tps53667 {
                 // 6 phases, 24.9 kOhm: 240 A
-                let (f, fc) = list(&F_NOG_6PH);
-                let (v, vc) = list(&V_NOG_6PH);
+                let (f, v): (&'static [u32], &'static [u32]) = (&F_NOG_6PH, &V_NOG_6PH);
                 Profile {
                     num_phases: 6,
                     imax: 240,
@@ -529,10 +503,8 @@ pub fn profile(board: BoardId, d: &Detect) -> Profile {
                     max_current_a: 25.0,
                     tps53667: true,
                     frequencies: f,
-                    frequency_count: fc,
                     abs_max_frequency: 850,
                     voltages: v,
-                    voltage_count: vc,
                     default_frequency: 700,
                     default_voltage_mv: 1210,
                     ..base
@@ -552,8 +524,7 @@ pub fn profile(board: BoardId, d: &Detect) -> Profile {
         }
         Q1370 => q1370(),
         Q1373 => {
-            let (f, fc) = list(&F_Q1373);
-            let (v, vc) = list(&V_Q1373);
+            let (f, v): (&'static [u32], &'static [u32]) = (&F_Q1373, &V_Q1373);
             let base = Profile {
                 device_model: s(c"Q1373"),
                 mining_agent: s(c"Q1373"),
@@ -567,9 +538,7 @@ pub fn profile(board: BoardId, d: &Detect) -> Profile {
                 min_pin: 50.0,
                 max_current_a: 15.0,
                 frequencies: f,
-                frequency_count: fc,
                 voltages: v,
-                voltage_count: vc,
                 default_frequency: 425,
                 default_voltage_mv: 1010,
                 abs_max_frequency: 730,
@@ -630,13 +599,10 @@ fn q1370() -> Profile {
         // (the NerdQAxe+ constructor's BM1368 value, see the module doc)
         vr_frequency: Chip::Bm1368.default_vr_frequency(),
         ..{
-            let (f, fc) = list(&F_BM1370);
-            let (v, vc) = list(&V_BM1370);
+            let (f, v): (&'static [u32], &'static [u32]) = (&F_BM1370, &V_BM1370);
             Profile {
                 frequencies: f,
-                frequency_count: fc,
                 voltages: v,
-                voltage_count: vc,
                 ..nerdqaxeplus()
             }
         }

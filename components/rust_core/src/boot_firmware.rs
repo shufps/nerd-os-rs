@@ -4,8 +4,7 @@
 //! created in `main/main.cpp`).
 
 use crate::idf::idf_const;
-use core::ffi::{c_char, c_int, c_void, CStr};
-use std::ffi::CString;
+use core::ffi::{c_int, c_void, CStr};
 use std::time::Duration;
 
 use crate::boot::{Hooks, PoolMode};
@@ -134,19 +133,12 @@ fn board_id() -> Option<crate::board_profile::BoardId> {
 }
 
 /// A profile string of the board info.
-fn info_text(p: *const c_char) -> std::borrow::Cow<'static, str> {
-    // SAFETY: the profile's strings are c"..." literals (or NULL)
-    unsafe { crate::board::ffi::static_text(p) }.to_string_lossy()
+fn info_text(p: &'static CStr) -> std::borrow::Cow<'static, str> {
+    p.to_string_lossy()
 }
 
-fn board_info() -> crate::board::ffi::Info {
-    let mut i = core::mem::MaybeUninit::uninit();
-    // SAFETY: board_info() writes a complete Info through the pointer, so it is initialised
-    // afterwards
-    unsafe {
-        crate::board::ffi::board_info(i.as_mut_ptr());
-        i.assume_init()
-    }
+fn board_info() -> crate::board::api::Info {
+    crate::board::api::info()
 }
 
 fn task(code: TaskFn, name: &'static CStr, stack: u32, prio: u32) {
@@ -225,7 +217,7 @@ impl Hooks for Firmware {
 
     fn board_create(&mut self) {
         let id = board_id();
-        if !id.is_some_and(|id| crate::board::ffi::board_create(id as c_int)) {
+        if !id.is_some_and(|id| crate::board::api::board_create(id as c_int)) {
             log!(Error, c"board", "no board {}", crate::sdkconfig::BOARD);
             std::process::abort();
         }
@@ -234,7 +226,7 @@ impl Hooks for Firmware {
     /// The W5500 if the board has Ethernet; before and after the board init,
     /// set up (or attempted) once.
     fn eth_init(&mut self) {
-        if self.eth_started || !crate::board::ffi::board_has_ethernet() {
+        if self.eth_started || !crate::board::api::board_has_ethernet() {
             return;
         }
         self.eth_started = true;
@@ -254,15 +246,15 @@ impl Hooks for Firmware {
     }
 
     fn board_load_settings(&mut self) {
-        crate::board::ffi::board_load_settings()
+        crate::board::api::board_load_settings()
     }
 
     fn board_init(&mut self) {
-        crate::board::ffi::board_init();
+        crate::board::api::board_init();
     }
 
     fn board_detect_eth(&mut self) {
-        crate::board::ffi::board_detect_ethernet()
+        crate::board::api::board_detect_ethernet()
     }
 
     fn system_set_board(&mut self) {
@@ -290,7 +282,7 @@ impl Hooks for Firmware {
     /// Powers the ASICs and shows on the display whether all were found
     /// (checks the soldering, not the hashrate); formerly `Board::selfTest()`.
     fn self_test(&mut self) {
-        use crate::board::ffi::{board_init_asics, board_is_axe, board_power_value};
+        use crate::board::api::{board_init_asics, board_is_axe, board_power_value};
         // the NerdAxe family's core voltage is lower
         let (vmin, vmax) = if board_is_axe() {
             (1.0, 1.35)
@@ -339,7 +331,7 @@ impl Hooks for Firmware {
     }
 
     fn is_can_slave(&mut self) -> bool {
-        crate::board::ffi::board_is_can_slave()
+        crate::board::api::board_is_can_slave()
     }
 
     fn log_can_slave(&mut self) {
@@ -364,22 +356,15 @@ impl Hooks for Firmware {
 
     fn can_init(&mut self) {
         crate::can::init(
-            crate::board::ffi::board_can_tx_pin(),
-            crate::board::ffi::board_can_rx_pin(),
+            crate::board::api::board_can_tx_pin(),
+            crate::board::api::board_can_rx_pin(),
         );
     }
 
     fn init_asics(&mut self) {
         crate::power_mgmt::lock();
-        if !crate::board::ffi::board_init_asics() {
-            let model = board_info().device_model;
-            let model = if model.is_null() {
-                "".into()
-            } else {
-                // SAFETY: board_info() strings are non-null here (checked) static C string literals
-                // of the profile
-                unsafe { CStr::from_ptr(model) }.to_string_lossy()
-            };
+        if !crate::board::api::board_init_asics() {
+            let model = info_text(board_info().device_model);
             log!(Error, TAG, "error initializing board {model}");
         }
         crate::power_mgmt::unlock();
@@ -425,7 +410,7 @@ impl Hooks for Firmware {
         crate::system::set_ssid(&ssid);
 
         crate::network::ffi::network_set_hook_preferred_changed(Some(on_preferred_changed));
-        let has_eth = crate::board::ffi::board_has_ethernet();
+        let has_eth = crate::board::api::board_has_ethernet();
         check(
             crate::network::start(&ssid, &pass, &hostname, has_eth),
             "network start",
@@ -445,15 +430,7 @@ impl Hooks for Firmware {
                     crate::system::set_wifi_status(b"WiFi Connected!");
                 }
                 let b = board_info();
-                let s = |p: *const c_char| {
-                    if p.is_null() {
-                        String::new()
-                    } else {
-                        // SAFETY: p is non-null (checked) and a static C string literal of the
-                        // board profile
-                        unsafe { CStr::from_ptr(p) }.to_string_lossy().into_owned()
-                    }
-                };
+                let s = |p: &CStr| p.to_string_lossy().into_owned();
                 crate::mdns::start(
                     &hostname.to_string_lossy(),
                     b.version,
@@ -485,17 +462,10 @@ impl Hooks for Firmware {
     }
 
     fn otp_init(&mut self) {
-        let model = board_info().device_model;
-        let hostname = CString::new(crate::system::hostname().to_bytes()).unwrap_or_default();
-        // SAFETY: hostname is a live CString, the MAC string is NUL-terminated (network_mac_addr)
-        // and model a static profile string
-        unsafe {
-            crate::otp_device::ffi::otp_dev_init(
-                hostname.as_ptr(),
-                crate::network::ffi::network_mac_addr(),
-                model,
-            )
-        };
+        let model = info_text(board_info().device_model);
+        let hostname = crate::system::hostname().to_string_lossy().into_owned();
+        let mac = crate::network::mac_addr().to_string_lossy().into_owned();
+        crate::otp_device::init(&hostname, &mac, &model);
     }
 
     fn sntp_start(&mut self) {
@@ -521,7 +491,7 @@ impl Hooks for Firmware {
     }
 
     fn can_master_wanted(&mut self) -> bool {
-        crate::cfg::can_enabled() && crate::board::ffi::board_has_can_extension()
+        crate::cfg::can_enabled() && crate::board::api::board_has_can_extension()
     }
 
     fn start_can_master(&mut self) {

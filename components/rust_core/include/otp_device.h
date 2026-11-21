@@ -1,7 +1,7 @@
 /*
  * OTP of the device (implemented in Rust, components/rust_core/src/
- * otp_device.rs and otp.rs): identity, enrollment QR code (qrcodegen
- * format), the request and login checks with the wall clock.
+ * otp_device.rs and otp.rs): identity, enrollment QR code, the request
+ * and login checks with the wall clock.
  */
 
 #ifndef OTP_DEVICE_H
@@ -21,8 +21,6 @@ extern "C" {
 void otp_dev_init(const char *hostname, const char *mac, const char *model);
 /* a new secret and its QR code: ESP_OK, ESP_ERR_NOT_FINISHED (active), ESP_FAIL */
 int otp_dev_start_enrollment(void);
-/* the QR code and its modules per side; NULL without one */
-const uint8_t *otp_dev_qr(int *size);
 /* 0 ok, 1 blocked, 2 failed (headers X-OTP-Session / X-TOTP, NULL if absent) */
 int otp_dev_request_check(const char *session, const char *totp, bool force);
 int otp_dev_login_check(const char *totp);

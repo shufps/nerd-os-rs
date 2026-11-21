@@ -12,11 +12,12 @@
 //!   "Connecting..." label of the second splash screen keeps none;
 //! - the network icon is changed under the LVGL lock.
 
-use core::ffi::{c_char, c_int, CStr};
+use core::ffi::{c_int, CStr};
 
 use crate::display_text as text;
 use crate::idf::raw;
 use crate::lvgl::{self as lv, color, Canvas, Font, Image, Lvgl, Obj};
+use qrcodegen::{QrCode, QrCodeEcc, QrSegment, Version};
 
 /// Where the display code links the converted assets (C arrays).
 macro_rules! asset {
@@ -523,10 +524,9 @@ fn generic_splash2(l: &Lvgl, splash2: &Obj) {
         .font(l, f45());
     d.align(l, lv::LEFT_MID, 8, -15);
 
-    let Some(buf) = encode_qr(DONATE_ADDR, 6) else {
+    let Some(qr) = encode_qr(DONATE_ADDR, 6) else {
         return;
     };
-    let qr = Qr(&buf);
     let n = qr.size();
     const QUIET: i32 = 3;
     let scale = (100 / (n + 2 * QUIET)).max(2);
@@ -539,69 +539,27 @@ fn generic_splash2(l: &Lvgl, splash2: &Obj) {
     // the canvas lives with its screen (its buffer is never freed)
 }
 
-/// A QR code in `qrcodegen`'s buffer format.
-struct Qr<'a>(&'a [u8]);
-
-impl Qr<'_> {
-    fn size(&self) -> i32 {
-        // SAFETY: a qrcodegen buffer (the encoder's output)
-        unsafe { qrcodegen_getSize(self.0.as_ptr()) }
-    }
-    fn module(&self, x: i32, y: i32) -> bool {
-        // SAFETY: as size(); the library checks the coordinates
-        unsafe { qrcodegen_getModule(self.0.as_ptr(), x, y) }
-    }
-}
-
-extern "C" {
-    fn qrcodegen_getSize(qrcode: *const u8) -> c_int;
-    fn qrcodegen_getModule(qrcode: *const u8, x: c_int, y: c_int) -> bool;
-    #[allow(clippy::too_many_arguments)]
-    fn qrcodegen_encodeText(
-        text: *const c_char,
-        temp: *mut u8,
-        qrcode: *mut u8,
-        ecl: c_int,
-        min_version: c_int,
-        max_version: c_int,
-        mask: c_int,
-        boost_ecl: bool,
-    ) -> bool;
-}
-
-/// `text` as a QR code (qrcodegen buffer) of at most `max_version`
-/// (medium error correction).
-fn encode_qr(text: &CStr, max_version: i32) -> Option<Vec<u8>> {
-    // qrcodegen_BUFFER_LEN_FOR_VERSION(n) = ((n*4+17)^2 + 7) / 8 + 1
-    let side = (max_version * 4 + 17) as usize;
-    let len = (side * side).div_ceil(8) + 1;
-    let mut tmp = vec![0u8; len];
-    let mut qr = vec![0u8; len];
-    // SAFETY: both buffers hold the length for `max_version`; `text` is
-    // NUL-terminated. ECC medium = 1, VERSION_MIN = 1, MASK_AUTO = -1
-    let ok = unsafe {
-        qrcodegen_encodeText(
-            text.as_ptr(),
-            tmp.as_mut_ptr(),
-            qr.as_mut_ptr(),
-            1,
-            1,
-            max_version,
-            -1,
-            true,
-        )
-    };
-    ok.then_some(qr)
+/// `text` as a QR code of at most `max_version` (medium error correction).
+fn encode_qr(text: &CStr, max_version: u8) -> Option<QrCode> {
+    QrCode::encode_segments_advanced(
+        &QrSegment::make_segments(&text.to_string_lossy()),
+        QrCodeEcc::Medium,
+        Version::MIN,
+        Version::new(max_version),
+        None,
+        true,
+    )
+    .ok()
 }
 
 /// White background, black modules with a quiet zone of `quiet` modules.
-fn draw_qr(l: &Lvgl, c: &mut Canvas, qr: &Qr<'_>, quiet: i32, scale: i32) {
+fn draw_qr(l: &Lvgl, c: &mut Canvas, qr: &QrCode, quiet: i32, scale: i32) {
     let w = c.width();
     c.rect(l, 0, 0, w, w, lv::WHITE);
     let n = qr.size();
     for y in 0..n {
         for x in 0..n {
-            if qr.module(x, y) {
+            if qr.get_module(x, y) {
                 let (px, py) = ((quiet + x) * scale, (quiet + y) * scale);
                 c.rect(
                     l,
@@ -1278,7 +1236,7 @@ impl Ui {
     }
 
     /// The OTP enrollment QR screen; false if it could not be made.
-    fn qr(&mut self, l: &Lvgl, qr: Qr<'_>) -> bool {
+    fn qr(&mut self, l: &Lvgl, qr: &QrCode) -> bool {
         const QUIET: i32 = 4;
         let n = qr.size();
         if n <= 0 {
@@ -1312,7 +1270,7 @@ impl Ui {
             self.qr = Some((s, canvas));
         }
         let (_, canvas) = self.qr.as_mut().expect("set above");
-        draw_qr(l, canvas, &qr, QUIET, scale);
+        draw_qr(l, canvas, qr, QUIET, scale);
         true
     }
 }
@@ -1388,13 +1346,13 @@ impl Ui {
         self.show_image(l, asset!(ui_img_found_block_png))
     }
 
-    /// The OTP QR screen from a qrcodegen buffer; false without it.
-    pub(crate) fn create_qr(&mut self, l: &Lvgl, qr: &[u8]) -> bool {
-        if qr.is_empty() {
+    /// The OTP QR screen; false without a code.
+    pub(crate) fn create_qr(&mut self, l: &Lvgl, qr: Option<&QrCode>) -> bool {
+        let Some(qr) = qr else {
             crate::log::log!(Error, c"ui", "No QR to draw");
             return false;
-        }
-        self.qr(l, Qr(qr))
+        };
+        self.qr(l, qr)
     }
 }
 

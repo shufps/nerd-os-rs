@@ -551,19 +551,8 @@ impl Driver {
                     log!(Error, TAG, "no otp enrollment active");
                     return;
                 }
-                let mut size = 0;
-                // SAFETY: `size` is a live local the function writes
-                let qr = unsafe { crate::otp_device::ffi::otp_dev_qr(&mut size) };
-                let buf = if qr.is_null() || size <= 0 {
-                    &[][..]
-                } else {
-                    // qrcodegen buffer length for the code's version
-                    let len = ((size * size) as usize).div_ceil(8) + 1;
-                    // SAFETY: the enrollment's qrcodegen buffer of a `size`
-                    // modules code, alive while the enrollment is active
-                    unsafe { core::slice::from_raw_parts(qr, len) }
-                };
-                if self.ui.create_qr(&self.l, buf) {
+                let qr = crate::otp_device::qr();
+                if self.ui.create_qr(&self.l, qr.as_ref()) {
                     self.enter(State::ShowQr, now);
                 }
                 self.overlay = true;

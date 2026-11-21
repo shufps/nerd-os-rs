@@ -20,11 +20,13 @@ This document covers data formats, flows, HTTP API, persistence, and security co
 
 ## Components & Files
 
-- otp.cpp/.h: TOTP, Base32, HMAC, session token mint/verify, QR generation, settings.
-- http_utils.*: HTTP helpers, JSON, rate limiting, header parsing, OTP/session validation.
-- handler_otp.*: HTTP endpoints for enrollment, status, session token issuance.
-- qrcodegen.*: QR code generation for the otpauth URI.
-- nvs_config.* / Config::*: Persistence (NVS).
+All in `components/rust_core/src/`:
+
+- otp.rs: OTP state, TOTP check with replay protection, session tokens, the otpauth URI.
+- http_auth.rs: Base32, HMAC, TOTP and token algorithms.
+- otp_device.rs: device identity, enrollment QR code (`qrcodegen` crate), checks with the wall clock.
+- http_handlers.rs: HTTP endpoints for enrollment, status, session token issuance; rate limiting and header checks.
+- config.rs / config_nvs.rs: persistence (NVS).
 
 ---
 

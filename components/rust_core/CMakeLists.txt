@@ -59,8 +59,7 @@ add_prebuilt_library(rust_core_lib ${RUST_LIB}
     REQUIRES newlib pthread vfs mbedtls libsecp256k1 tcp_transport log esp_hw_support espressif__mdns esp_driver_gpio esp_http_server app_update spiffs esp_eth esp_driver_spi)
 add_dependencies(${COMPONENT_LIB} rust_core_cargo)
 target_link_libraries(${COMPONENT_LIB} INTERFACE rust_core_lib)
-# the display (src/ui.rs) uses LVGL and the fonts, images and qrcodegen of
-# main; main references rust_core too, the static libraries are cyclic
+# the display (src/ui.rs) uses LVGL and the fonts and images of main; main references rust_core too, the static libraries are cyclic
 # (the IDF names of the component libraries; main cannot be required)
 target_link_libraries(rust_core_lib INTERFACE __idf_lvgl__lvgl __idf_main)
 

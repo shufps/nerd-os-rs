@@ -1,11 +1,13 @@
 //! OTP glue of the device (port of `main/otp/otp.cpp`): the device identity
-//! for the otpauth URI, the QR code of an enrollment (qrcodegen, version
-//! 1..10, ECC medium, for the 170 px display), and the checks with the
+//! for the otpauth URI, the QR code of an enrollment (the `qrcodegen`
+//! crate, version 1..10, ECC medium, for the 170 px display), and the checks with the
 //! wall clock. The OTP state itself is in `otp.rs`. C API: `otp_device.h`.
 
 use crate::idf::idf_const;
 use core::ffi::{c_char, c_int, CStr};
 use std::sync::Mutex;
+
+use qrcodegen::{QrCode, QrCodeEcc, QrSegment, Version};
 
 use crate::log::log;
 use crate::otp::{self, Enrollment};
@@ -24,59 +26,9 @@ idf_const!(
 
 /// The longest otpauth URI (the former 256-byte buffer).
 const URI_CAP: usize = 256;
-/// QR versions (qrcodegen_VERSION_MIN, the display's limit)
-const QR_MIN_VERSION: c_int = 1;
-const QR_MAX_VERSION: c_int = 10;
-/// `qrcodegen_Ecc_MEDIUM`, `qrcodegen_Mask_AUTO`
-const QR_ECC_MEDIUM: c_int = 1;
-const QR_MASK_AUTO: c_int = -1;
-
-/// `qrcodegen_BUFFER_LEN_FOR_VERSION(n)`
-pub const fn qr_buffer_len(version: usize) -> usize {
-    let side = version * 4 + 17;
-    (side * side).div_ceil(8) + 1
-}
-
-#[cfg(target_os = "espidf")]
-mod sys {
-    use super::*;
-    extern "C" {
-        #[allow(clippy::too_many_arguments)]
-        pub fn qrcodegen_encodeText(
-            text: *const c_char,
-            temp: *mut u8,
-            qrcode: *mut u8,
-            ecl: c_int,
-            min_version: c_int,
-            max_version: c_int,
-            mask: c_int,
-            boost_ecl: bool,
-        ) -> bool;
-        pub fn qrcodegen_getSize(qrcode: *const u8) -> c_int;
-    }
-}
-
-/// On the host there is no QR encoder.
-#[cfg(not(target_os = "espidf"))]
-#[allow(non_snake_case, clippy::too_many_arguments)]
-mod sys {
-    use super::*;
-    pub unsafe fn qrcodegen_encodeText(
-        _: *const c_char,
-        _: *mut u8,
-        _: *mut u8,
-        _: c_int,
-        _: c_int,
-        _: c_int,
-        _: c_int,
-        _: bool,
-    ) -> bool {
-        false
-    }
-    pub unsafe fn qrcodegen_getSize(_: *const u8) -> c_int {
-        0
-    }
-}
+/// QR versions (the smallest, the display's limit)
+const QR_MIN_VERSION: u8 = 1;
+const QR_MAX_VERSION: u8 = 10;
 
 struct Device {
     hostname: String,
@@ -90,35 +42,26 @@ static DEVICE: Mutex<Device> = Mutex::new(Device {
     model: String::new(),
 });
 
-/// The QR code of the enrollment and its modules per side.
-static QR: Mutex<Option<(Vec<u8>, c_int)>> = Mutex::new(None);
+/// The QR code of the enrollment.
+static QR: Mutex<Option<QrCode>> = Mutex::new(None);
 
-/// The QR code of `uri`; None if it does not fit version 10.
-fn encode_qr(uri: &str) -> Option<(Vec<u8>, c_int)> {
-    let need = qr_buffer_len(QR_MAX_VERSION as usize);
-    let mut tmp = vec![0u8; need];
-    let mut qr = vec![0u8; need];
-    let Ok(text) = std::ffi::CString::new(uri) else {
-        return None;
-    };
-    // SAFETY: `text` is NUL-terminated; `tmp` and `qr` both hold
-    // qr_buffer_len(QR_MAX_VERSION) bytes, the most a version-10 code needs
-    let size = unsafe {
-        if !sys::qrcodegen_encodeText(
-            text.as_ptr(),
-            tmp.as_mut_ptr(),
-            qr.as_mut_ptr(),
-            QR_ECC_MEDIUM,
-            QR_MIN_VERSION,
-            QR_MAX_VERSION,
-            QR_MASK_AUTO,
-            true,
-        ) {
-            return None;
-        }
-        sys::qrcodegen_getSize(qr.as_ptr())
-    };
-    Some((qr, size))
+/// The QR code of `uri` (medium error correction, raised if it still fits,
+/// automatic mask); None if it does not fit version 10.
+fn encode_qr(uri: &str) -> Option<QrCode> {
+    QrCode::encode_segments_advanced(
+        &QrSegment::make_segments(uri),
+        QrCodeEcc::Medium,
+        Version::new(QR_MIN_VERSION),
+        Version::new(QR_MAX_VERSION),
+        None,
+        true,
+    )
+    .ok()
+}
+
+/// The QR code of the active enrollment.
+pub fn qr() -> Option<QrCode> {
+    QR.lock().unwrap_or_else(|e| e.into_inner()).clone()
 }
 
 /// The device identity (and the saved OTP state).
@@ -147,16 +90,16 @@ pub fn start_enrollment() -> c_int {
         }
     };
     match encode_qr(&uri) {
-        Some((qr, size)) => {
-            log!(Info, TAG, "QR ready: size={size} modules");
-            *QR.lock().unwrap_or_else(|e| e.into_inner()) = Some((qr, size));
+        Some(qr) => {
+            log!(Info, TAG, "QR ready: size={} modules", qr.size());
+            *QR.lock().unwrap_or_else(|e| e.into_inner()) = Some(qr);
             ESP_OK
         }
         None => {
             log!(
                 Error,
                 TAG,
-                "qrcodegen_encodeText failed (URI too long for maxVer={QR_MAX_VERSION}?)"
+                "QR encoding failed (URI too long for version {QR_MAX_VERSION}?)"
             );
             log!(Error, TAG, "qr code couldn't be generated");
             ESP_FAIL
@@ -195,25 +138,6 @@ pub(crate) mod ffi {
     pub extern "C" fn otp_dev_start_enrollment() -> c_int {
         start_enrollment()
     }
-
-    /// The QR code (`qrcodegen` format) and its size; NULL without one.
-    /// Valid until the next enrollment or `otp_dev_destroy_qr()`.
-    ///
-    /// # Safety
-    /// `size` writable.
-    #[no_mangle]
-    pub unsafe extern "C" fn otp_dev_qr(size: *mut c_int) -> *const u8 {
-        match &*QR.lock().unwrap_or_else(|e| e.into_inner()) {
-            Some((qr, n)) => {
-                *size = *n;
-                qr.as_ptr()
-            }
-            None => {
-                *size = 0;
-                core::ptr::null()
-            }
-        }
-    }
 }
 
 #[cfg(test)]
@@ -221,9 +145,10 @@ mod tests {
     use super::*;
 
     #[test]
-    fn buffer_len_matches_qrcodegen() {
-        // ((n*4+17)^2 + 7) / 8 + 1
-        assert_eq!(qr_buffer_len(1), (21 * 21 + 7) / 8 + 1);
-        assert_eq!(qr_buffer_len(10), 408);
+    fn an_otpauth_uri_fits_the_display() {
+        let uri = "otpauth://totp/NerdQAxe%2B%2B:nerdqaxe-AABBCCDDEEFF?secret=JBSWY3DPEHPK3PXPJBSWY3DPEHPK3PXP&issuer=NerdQAxe%2B%2B&algorithm=SHA1&digits=6&period=30";
+        let qr = encode_qr(uri).expect("fits version 10");
+        assert!(qr.size() >= 21 && qr.size() <= 57);
+        assert!(encode_qr(&"x".repeat(400)).is_none());
     }
 }

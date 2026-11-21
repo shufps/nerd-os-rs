@@ -1,9 +1,8 @@
 //! The boot steps of the firmware (port of the hooks of `main/main.cpp`):
 //! the IDF setup, the board, the tasks, the network setup, all reached
-//! directly. Only what needs the C++ objects of the display stays in C++
-//! (`boot_cpp_hooks()`, main.cpp): the `Board` with its theme and self
-//! test, the `System` module with the display, and the `StratumManager`
-//! the display reads.
+//! directly, with the display and its self test. Only the creation of the
+//! remaining C++ objects stays in C++ (`boot_cpp_hooks()`, main.cpp): the
+//! `Board`, the `System` module and the `StratumManager`.
 
 use crate::idf::idf_const;
 use core::ffi::{c_char, c_int, c_void, CStr};
@@ -33,8 +32,6 @@ pub use crate::idf::raw::boot_cpp_hooks_t as CppHooks;
 pub struct CppHooks {
     pub board_create: Option<unsafe extern "C" fn()>,
     pub system_set_board: Option<unsafe extern "C" fn()>,
-    pub self_test: Option<unsafe extern "C" fn()>,
-    pub system_init: Option<unsafe extern "C" fn()>,
     pub create_stratum_manager: Option<unsafe extern "C" fn(dual: bool)>,
 }
 
@@ -272,8 +269,52 @@ impl Hooks for Firmware {
         crate::config::get_u64(b"bestdiff", 0)
     }
 
+    /// Powers the ASICs and shows on the display whether all were found
+    /// (checks the soldering, not the hashrate); formerly `Board::selfTest()`.
     fn self_test(&mut self) {
-        call(self.cpp.self_test)
+        use crate::board::ffi::{board_init_asics, board_is_axe, board_power_value, static_text};
+        // the NerdAxe family's core voltage is lower
+        let (vmin, vmax) = if board_is_axe() {
+            (1.0, 1.35)
+        } else {
+            (1.1, 1.4)
+        };
+        crate::display::init();
+        // SAFETY: a profile string of the board info (a c"..." literal)
+        let model = unsafe { static_text(board_info().asic_model) }.to_string_lossy();
+        crate::display::log(&format!(
+            "\nSelfTest initiated, wait...\r\nTesting chip: {model}\n\n\n\n\n\
+             [Warning] Only checks soldering\nHashrate not checked"
+        ));
+
+        board_init_asics();
+        let power = board_power_value(2);
+        let vout = board_power_value(3);
+        let i = board_info();
+        let power_ok = power > i.min_pin && power < i.max_pin;
+        let vr_ok = vout > vmin && vout < vmax;
+        let all = i.chips_detected == i.asic_count;
+        let ok = |b: bool| if b { "OK" } else { "Warning" };
+        crate::display::log(&format!(
+            "\nTest result [{model}]:\r\n- Asics detected [{}/{}]\n\
+             - Power status: {} ({power:.2} W)\n- Asic voltage: {} ({vout:.2} V)\r\n\n{}",
+            i.chips_detected,
+            i.asic_count,
+            ok(power_ok),
+            ok(vr_ok),
+            if all {
+                "OOOOOOOO TEST OK!!! OOOOOOO"
+            } else {
+                "XXXXXXXXX TEST KO XXXXXXXXX"
+            }
+        ));
+        if all {
+            crate::config::set(
+                b"selftest",
+                crate::ajson::Json::Num(crate::ajson::Num::U(0)),
+            );
+            crate::config_nvs::request_flush();
+        }
     }
 
     fn delay_ms(&mut self, ms: u32) {
@@ -289,7 +330,8 @@ impl Hooks for Firmware {
     }
 
     fn system_init(&mut self) {
-        call(self.cpp.system_init)
+        crate::system::init(board_info().asic_count);
+        crate::display::init();
     }
 
     fn start_system_tasks(&mut self) {

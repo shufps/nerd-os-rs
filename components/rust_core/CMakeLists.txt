@@ -71,6 +71,3 @@ target_link_libraries(${COMPONENT_LIB} INTERFACE "-u chmod")
 target_link_libraries(${COMPONENT_LIB} INTERFACE "-u app_main" "-u boot_cpp_hooks")
 # the websocket log hook (ws_log.c), referenced only by the Rust library
 target_link_libraries(${COMPONENT_LIB} INTERFACE "-u ws_log_install" "-u ws_log_uninstall")
-# the display bridge (main/displays/display_api.cpp), referenced only by the
-# Rust system task
-target_link_libraries(${COMPONENT_LIB} INTERFACE "-u disp_update")

@@ -155,3 +155,15 @@ Tested on a Q1373 (screenshots compared with the C++ screens): splash with donat
 Still to test:
 - the boards with their own theme (every board except Q1370/Q1373): the backgrounds and the label positions;
 - the portal screen (AP mode with SSID), the error overlay, the "found block" overlay, the power-off screen, the OTP enrollment QR code, the self test screen.
+
+## Display driver in Rust
+
+The display driver (formerly `main/displays/displayDriver.cpp`, buttons, UI messages) is in Rust (`src/display_driver.rs`, `src/display.rs`, `src/display_button.rs`), and so is the self test (`boot_firmware.rs`).
+
+Tested on a Q1373: panel init, splash sequence, screen cycle with button 1 (simulated), OTP QR screen with cancel by button, auto screen off (countdown, off, on by button).
+
+Still to test:
+- the real buttons: short presses, button 2 toggling the screen, the shutdown countdown (both held) and the power-off screen;
+- identify (CAN command), the found-block image and its close by a button, the error overlay;
+- the self test (`selftest` set, best difficulty 0) with its two log screens;
+- a board with `flip_screen` (mirrored panel).

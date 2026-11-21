@@ -56,9 +56,6 @@ idf_const!(CAP_INTERNAL: u32 = MALLOC_CAP_INTERNAL, 1 << 11);
 #[cfg(target_os = "espidf")]
 mod sys {
     pub use crate::idf::raw::esp_read_mac;
-    extern "C" {
-        pub fn ui_send_identify(duration_ms: u32) -> bool;
-    }
 }
 
 #[cfg(not(target_os = "espidf"))]
@@ -66,9 +63,6 @@ mod sys {
     use super::*;
     pub unsafe fn esp_read_mac(_: *mut u8, _: u32) -> EspErr {
         crate::idf::ESP_FAIL
-    }
-    pub unsafe fn ui_send_identify(_: u32) -> bool {
-        false
     }
 }
 
@@ -620,8 +614,7 @@ fn handle_settings_cmd(p: &[u8]) {
         CMD_IDENTIFY => {
             log!(Info, TAG_SLAVE, "CMD IDENTIFY → blink display 60s");
             // 0: the default 60 s
-            // SAFETY: a C++ entry point (ui_ipc.cpp) taking a plain duration
-            unsafe { sys::ui_send_identify(0) };
+            crate::display::send_identify(0);
         }
         CMD_RESTART => {
             log!(Info, TAG_SLAVE, "CMD RESTART → restarting");

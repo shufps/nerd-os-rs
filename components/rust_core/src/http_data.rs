@@ -47,16 +47,12 @@ pub struct Partition {
 #[cfg(target_os = "espidf")]
 mod sys {
     pub use crate::idf::raw::esp_ota_get_running_partition;
-    extern "C" {
-        pub fn disp_load_settings();
-    }
 }
 
 #[cfg(not(target_os = "espidf"))]
 #[allow(non_snake_case)]
 mod sys {
     use super::*;
-    pub unsafe fn disp_load_settings() {}
     pub unsafe fn esp_ota_get_running_partition() -> *const Partition {
         core::ptr::null()
     }
@@ -158,8 +154,7 @@ fn running_partition() -> CString {
 pub(crate) fn reload_settings() {
     crate::board::ffi::board_load_settings();
     crate::power_mgmt::fan_load_settings();
-    // SAFETY: the display's C++ entry point, no arguments
-    unsafe { sys::disp_load_settings() };
+    crate::display::load_settings();
     crate::pool_manager::ffi::pool_mgr_load_settings();
 }
 

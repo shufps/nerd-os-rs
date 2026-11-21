@@ -1,13 +1,7 @@
 idf_component_register(
 SRCS
     "main.cpp"
-    "displays/display_api.cpp"
     "boards/board.cpp"
-    "./self_test/self_test.cpp"
-    "./displays/displayDriver.cpp"
-    "./displays/ui_ipc.cpp"
-    "./displays/button.cpp"
-    "./displays/ui_helpers.cpp"
     "./displays/images/ui_font_DigitalNumbers16.c"
     "./displays/images/ui_font_DigitalNumbers28.c"
     "./displays/images/ui_font_DigitalNumbers16.c"

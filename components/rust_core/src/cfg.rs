@@ -135,6 +135,9 @@ pub fn invert_screen() -> bool {
 pub fn auto_screen_off() -> bool {
     flag(b"autoscreenoff", k::AUTO_SCREEN_OFF_VALUE)
 }
+pub fn show_block_found() -> bool {
+    flag(b"block_found_en", k::SHOW_BLOCK_FOUND_ENABLE_VALUE)
+}
 pub fn otp_enabled() -> bool {
     flag(b"otp_enabled", 0)
 }

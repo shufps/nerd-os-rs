@@ -36,6 +36,10 @@ pub mod crt_bundle;
 pub mod crypto;
 pub mod cutil;
 pub mod discord;
+pub mod display;
+pub mod display_button;
+#[cfg(target_os = "espidf")]
+pub mod display_driver;
 pub mod display_shot;
 pub mod display_text;
 pub mod dns;

@@ -97,34 +97,30 @@ mod imp {
 #[cfg(feature = "screenshot")]
 pub use imp::{handler, press};
 
-pub(crate) mod ffi {
-    /// The simulated presses since the last call (bit 0: button 1, bit 1:
-    /// button 2); always 0 without the feature.
-    #[no_mangle]
-    pub extern "C" fn disp_debug_take_press() -> u32 {
-        #[cfg(feature = "screenshot")]
-        return super::imp::PRESSES.swap(0, std::sync::atomic::Ordering::AcqRel);
-        #[cfg(not(feature = "screenshot"))]
-        0
-    }
+/// The simulated presses since the last call (bit 0: button 1, bit 1:
+/// button 2); always 0 without the feature.
+pub fn take_press() -> u32 {
+    #[cfg(feature = "screenshot")]
+    return imp::PRESSES.swap(0, std::sync::atomic::Ordering::AcqRel);
+    #[cfg(not(feature = "screenshot"))]
+    0
+}
 
-    /// Every area LVGL flushes to the panel (`px`: (x2-x1+1)*(y2-y1+1)
-    /// pixels).
-    ///
-    /// # Safety
-    /// `px` holds the area's pixels (or is NULL).
-    #[no_mangle]
-    pub unsafe extern "C" fn disp_shadow_flush(x1: i32, y1: i32, x2: i32, y2: i32, px: *const u16) {
-        #[cfg(feature = "screenshot")]
-        if !px.is_null() && x2 >= x1 && y2 >= y1 {
-            let n = ((x2 - x1 + 1) * (y2 - y1 + 1)) as usize;
-            // SAFETY: the area's pixels (caller contract)
-            let px = unsafe { core::slice::from_raw_parts(px, n) };
-            super::imp::copy(x1, y1, x2, y2, px);
-        }
-        #[cfg(not(feature = "screenshot"))]
-        let _ = (x1, y1, x2, y2, px);
+/// Every area LVGL flushes to the panel (`px`: (x2-x1+1)*(y2-y1+1)
+/// pixels).
+///
+/// # Safety
+/// `px` holds the area's pixels (or is NULL).
+pub unsafe fn shadow_flush(x1: i32, y1: i32, x2: i32, y2: i32, px: *const u16) {
+    #[cfg(feature = "screenshot")]
+    if !px.is_null() && x2 >= x1 && y2 >= y1 {
+        let n = ((x2 - x1 + 1) * (y2 - y1 + 1)) as usize;
+        // SAFETY: the area's pixels (caller contract)
+        let px = unsafe { core::slice::from_raw_parts(px, n) };
+        imp::copy(x1, y1, x2, y2, px);
     }
+    #[cfg(not(feature = "screenshot"))]
+    let _ = (x1, y1, x2, y2, px);
 }
 
 #[cfg(all(test, feature = "screenshot"))]

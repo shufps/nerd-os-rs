@@ -30,28 +30,6 @@ idf_const!(CAP_INTERNAL: u32 = MALLOC_CAP_INTERNAL, 1 << 11);
 /// the OTP session lifetime
 const SESSION_TTL_S: u32 = 24 * 3600;
 
-#[cfg(target_os = "espidf")]
-mod sys {
-
-    extern "C" {
-        pub fn ui_send_show_qr() -> bool;
-        pub fn ui_send_hide_qr() -> bool;
-        pub fn disp_load_settings();
-    }
-}
-
-#[cfg(not(target_os = "espidf"))]
-#[allow(non_snake_case)]
-mod sys {
-    pub unsafe fn ui_send_show_qr() -> bool {
-        false
-    }
-    pub unsafe fn ui_send_hide_qr() -> bool {
-        false
-    }
-    pub unsafe fn disp_load_settings() {}
-}
-
 /// The Rust handler of `h`, if it is one.
 pub fn handler(h: Handler) -> Option<HandlerFn> {
     Some(match h {
@@ -272,8 +250,7 @@ fn alert_patch(req: &mut Request) -> EspErr {
     end_chunks(req);
     // the alerter's and the display's settings
     crate::discord::load_config();
-    // SAFETY: the display's C++ entry point
-    unsafe { sys::disp_load_settings() };
+    crate::display::load_settings();
     ESP_OK
 }
 
@@ -310,8 +287,8 @@ fn otp_create(req: &mut Request) -> EspErr {
             );
         }
     }
-    // the QR on the display (SAFETY: the display's C++ entry point)
-    unsafe { sys::ui_send_show_qr() };
+    // the QR on the display
+    crate::display::send_show_qr();
     end_chunks(req);
     ESP_OK
 }
@@ -320,8 +297,7 @@ fn otp_patch(req: &mut Request) -> EspErr {
     use crate::otp::ffi::{otp_disable_enrollment, otp_save, otp_set_enabled};
     // stops an enrollment (if one runs), hides the QR in any case
     otp_disable_enrollment();
-    // SAFETY: the display's C++ entry point
-    unsafe { sys::ui_send_hide_qr() };
+    crate::display::send_hide_qr();
     let body = match read_body(req) {
         Ok(b) => b,
         Err(e) => return e,

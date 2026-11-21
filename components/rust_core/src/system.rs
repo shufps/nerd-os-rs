@@ -3,8 +3,8 @@
 //! state, host name, IP address, reset reason, board error), the current
 //! hashrate, and the system task: every 5 s it updates the display (IP,
 //! found block overlay, error overlay, values) and pushes a history sample.
-//! The display is C++ (LVGL) and reached through `display_api.h`, the board
-//! through `board_api.rs`. C API: `system_state.h`, wrapped by the inline
+//! The display is reached through [`crate::display`], the board through
+//! `board_api.rs`. C API: `system_state.h`, wrapped by the inline
 //! class in `main/system.h`.
 //!
 //! The strings that change at runtime (WiFi status, SSID, IP address) are
@@ -85,21 +85,8 @@ pub fn reset_reason_text(reason: c_int) -> &'static CStr {
 
 #[cfg(target_os = "espidf")]
 mod sys {
-    use super::*;
     pub use crate::board_api::*;
     pub use crate::idf::raw::esp_reset_reason;
-    extern "C" {
-        pub fn disp_wait_for_splashs();
-        pub fn disp_portal_screen(ssid: *const c_char);
-        pub fn disp_update_ip(ip: *const c_char);
-        pub fn disp_set_network_icon(eth: bool);
-        pub fn disp_set_can_icon();
-        pub fn disp_mining_screen();
-        pub fn disp_show_found_block();
-        pub fn disp_show_error(text: *const c_char, code: u32);
-        pub fn disp_hide_error();
-        pub fn disp_update(toggle: c_int);
-    }
 }
 
 /// On the host: no display, no board.
@@ -116,16 +103,6 @@ mod sys {
     pub fn bapi_has_hashrate_counter() -> bool {
         false
     }
-    pub unsafe fn disp_wait_for_splashs() {}
-    pub unsafe fn disp_portal_screen(_: *const c_char) {}
-    pub unsafe fn disp_update_ip(_: *const c_char) {}
-    pub unsafe fn disp_set_network_icon(_: bool) {}
-    pub unsafe fn disp_set_can_icon() {}
-    pub unsafe fn disp_mining_screen() {}
-    pub unsafe fn disp_show_found_block() {}
-    pub unsafe fn disp_show_error(_: *const c_char, _: u32) {}
-    pub unsafe fn disp_hide_error() {}
-    pub unsafe fn disp_update(_: c_int) {}
 }
 
 struct State {
@@ -342,8 +319,7 @@ impl Overlay {
         if self.shown && self.code != 0 {
             return;
         }
-        // SAFETY: text is a valid NUL-terminated C string; the display copies it into its overlay
-        unsafe { sys::disp_show_error(text.as_ptr(), code) };
+        crate::display::show_error(text, code);
         self.shown = true;
         self.code = code;
     }
@@ -355,8 +331,7 @@ impl Overlay {
         if !self.shown {
             return;
         }
-        // SAFETY: a C++ display entry point (display_api.cpp) without arguments
-        unsafe { sys::disp_hide_error() };
+        crate::display::hide_error();
         self.shown = false;
         self.code = 0;
     }
@@ -370,8 +345,7 @@ pub fn run() -> ! {
     let mut next = start + PERIOD_US;
     log!(Info, TAG, "SYSTEM_task started");
 
-    // SAFETY: a C++ display entry point (display_api.cpp) without arguments
-    unsafe { sys::disp_wait_for_splashs() };
+    crate::display::wait_for_splashs();
     let can_slave = sys::bapi_is_can_slave();
 
     if !can_slave {
@@ -383,20 +357,15 @@ pub fn run() -> ! {
             }
             // not connected yet: show the access point
             let ssid = CString::new(crate::network::ap_ssid()).unwrap_or_default();
-            // SAFETY: ssid is a live CString for the call; portalScreen copies it (strlcpy)
-            unsafe { sys::disp_portal_screen(ssid.as_ptr()) };
+            crate::display::portal_screen(&ssid);
             std::thread::sleep(Duration::from_secs(5));
         }
-        // SAFETY: the temporary CString lives until the end of the statement; lv_label_set_text
-        // copies it
-        unsafe { sys::disp_update_ip(ip().as_ptr()) };
+        crate::display::update_ip(&ip());
     }
 
-    // SAFETY: a C++ display entry point (display_api.cpp) without arguments
-    unsafe { sys::disp_mining_screen() };
+    crate::display::mining_screen();
     if can_slave {
-        // SAFETY: a C++ display entry point (display_api.cpp) without arguments
-        unsafe { sys::disp_set_can_icon() };
+        crate::display::set_can_icon();
     }
 
     let mut last_label = CString::default();
@@ -427,8 +396,7 @@ pub fn run() -> ! {
                 CString::new(format!("CAN ID: {id}")).unwrap_or_default()
             };
             if label != last_label {
-                // SAFETY: label is a live CString for the call; lv_label_set_text copies it
-                unsafe { sys::disp_update_ip(label.as_ptr()) };
+                crate::display::update_ip(&label);
                 last_label = label;
             }
         } else {
@@ -437,20 +405,15 @@ pub fn run() -> ! {
             if has_ip {
                 if ip != last_label {
                     log!(Info, TAG, "ip address: {}", ip.to_string_lossy());
-                    // SAFETY: ip is a live CString for the call (copied by lv_label_set_text); the
-                    // icon call takes a bool
-                    unsafe {
-                        sys::disp_update_ip(ip.as_ptr());
-                        sys::disp_set_network_icon(eth);
-                    }
+                    crate::display::update_ip(&ip);
+                    crate::display::set_network_icon(eth);
                 }
                 last_label = ip;
             }
 
             let found = crate::pool_manager::get().map_or(0, |m| m.found_blocks());
             if found > last_found {
-                // SAFETY: a C++ display entry point (display_api.cpp) without arguments
-                unsafe { sys::disp_show_found_block() };
+                crate::display::show_found_block();
             }
             last_found = found;
         }
@@ -463,8 +426,7 @@ pub fn run() -> ! {
         }
 
         toggle = 1 - toggle;
-        // SAFETY: a C++ display entry point (display_api.cpp) taking an int
-        unsafe { sys::disp_update(toggle) };
+        crate::display::update(toggle);
 
         // a history sample with the filtered temperatures
         let timestamp_ms = (crate::cutil::now_us() / 1000) as u64;

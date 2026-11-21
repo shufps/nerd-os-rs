@@ -84,7 +84,7 @@ impl Obj {
         self.0.as_ptr()
     }
 
-    /// The raw object, for the C++ display driver (screen changes).
+    /// The raw object.
     pub fn as_ptr(&self) -> *mut raw::lv_obj_t {
         self.p()
     }
@@ -294,6 +294,18 @@ impl Obj {
         }
     }
 
+    /// Loads this screen with an animation (`lv_scr_load_anim()`); the old
+    /// screen is kept.
+    pub fn load(&self, _: &Lvgl, anim: Anim, time: u32, delay: u32) {
+        let a = match anim {
+            Anim::None => raw::lv_scr_load_anim_t_LV_SCR_LOAD_ANIM_NONE,
+            Anim::FadeOn => raw::lv_scr_load_anim_t_LV_SCR_LOAD_ANIM_FADE_ON,
+            Anim::MoveLeft => raw::lv_scr_load_anim_t_LV_SCR_LOAD_ANIM_MOVE_LEFT,
+        };
+        // SAFETY: lock held; a live screen, not deleted afterwards
+        unsafe { raw::lv_scr_load_anim(self.p(), a, time, delay, false) };
+    }
+
     // --- events
 
     /// `cb` for `LV_EVENT_SCREEN_LOADED` of this screen.
@@ -308,6 +320,14 @@ impl Obj {
             )
         };
     }
+}
+
+/// The screen load animations the display uses.
+#[derive(Clone, Copy)]
+pub enum Anim {
+    None,
+    FadeOn,
+    MoveLeft,
 }
 
 /// A borrowed handle to an object this code does not own (the active

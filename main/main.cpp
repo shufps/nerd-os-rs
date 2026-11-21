@@ -1,4 +1,4 @@
-// The C++ objects the display uses, and the boot steps on them. The boot
+// The remaining C++ objects, and the boot steps on them. The boot
 // itself and app_main() are Rust (components/rust_core/src/boot.rs,
 // boot_firmware.rs); it calls these through boot_cpp_hooks() (boot.h).
 #include "esp_log.h"
@@ -70,14 +70,6 @@ static void system_set_board()
     ESP_LOGI(TAG, "Found Board Version: %d", s_board->getVersion());
 }
 
-static void self_test() { s_board->selfTest(); }
-
-static void system_init()
-{
-    SYSTEM_MODULE.init();
-    SYSTEM_MODULE.initDisplay();
-}
-
 static void create_stratum_manager(bool dual)
 {
     STRATUM_MANAGER = new StratumManager(dual ? StratumManager::PoolMode::DUAL : StratumManager::PoolMode::FAILOVER);
@@ -91,8 +83,6 @@ extern "C" const boot_cpp_hooks_t *boot_cpp_hooks(void)
     static const boot_cpp_hooks_t hooks = {
         .board_create = create_board,
         .system_set_board = system_set_board,
-        .self_test = self_test,
-        .system_init = system_init,
         .create_stratum_manager = create_stratum_manager,
     };
     return &hooks;

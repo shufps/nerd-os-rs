@@ -8,7 +8,6 @@
 
 #include "boards/board.h"
 #include "network/network_manager.h"
-#include "displays/displayDriver.h"
 #include "history.h"
 #include "system_state.h"
 
@@ -19,25 +18,13 @@
 
 // The system module: state, board error and the system task are in Rust
 // (system_state.h); this class keeps the C++ call sites and owns the board
-// and the display objects.
+// object.
 class System {
   protected:
     Board *m_board = nullptr;
-    DisplayDriver *m_display = nullptr;
     History m_history;
 
   public:
-    void init()
-    {
-        m_display = new DisplayDriver();
-        m_display->loadSettings();
-        system_init(m_board->getAsicCount());
-    }
-
-    void initDisplay() { m_display->init(m_board); }
-
-    DisplayDriver *getDisplay() { return m_display; }
-
     // Task wrapper for FreeRTOS task creation
     static void taskWrapper(void *pvParameters) { system_task(pvParameters); }
 
@@ -87,13 +74,6 @@ class System {
     const char *getLastResetReason() { return system_reset_reason(); }
 
     const char *getHostname() { return system_hostname(); }
-
-    void loadSettings()
-    {
-        if (m_display) {
-            m_display->loadSettings();
-        }
-    }
 
     void pushShare(int nr) { m_history.pushShare(nr); }
 };

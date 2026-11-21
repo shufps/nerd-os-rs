@@ -2,18 +2,17 @@
 //! functions of `displayDriver.cpp`): the splash, portal, mining, settings,
 //! BTC and global stats screens, the log, QR and power-off screens, the
 //! error and image overlays, and the values shown on them, read directly
-//! from the Rust modules. The display driver (C++: panel, LVGL task, state
-//! machine, buttons) calls in through `ui_rs.h`, always with its LVGL lock
-//! held, and loads the screens it gets from here.
+//! from the Rust modules. The display driver (`display_driver.rs`: panel,
+//! LVGL task, state machine, buttons) owns the [`Ui`] under its LVGL lock and
+//! loads the screens it gets from here.
 //!
 //! Differences to the C++ code:
-//! - the handles of objects that are deleted with their screen (the
-//!   "Connecting..." label of the second splash screen, an overlay on a
-//!   splash screen) are dropped with it instead of dangling;
+//! - the handles of objects that are deleted with their screen (an overlay
+//!   on a splash screen) are dropped with it instead of dangling, and the
+//!   "Connecting..." label of the second splash screen keeps none;
 //! - the network icon is changed under the LVGL lock.
 
 use core::ffi::{c_char, c_int, CStr};
-use std::sync::Mutex;
 
 use crate::display_text as text;
 use crate::idf::raw;
@@ -327,22 +326,9 @@ fn uncache(_: &Lvgl, img: &'static Image) {
     unsafe { raw::lv_img_cache_invalidate_src(img as *const Image as *const core::ffi::c_void) };
 }
 
-extern "C" {
-    /// the display driver: a screen load animation ended (display_api.cpp)
-    fn disp_screen_loaded(driver: *mut core::ffi::c_void);
-}
-
-/// The display driver that created the screens (`ui_init()`).
-static DRIVER: core::sync::atomic::AtomicPtr<core::ffi::c_void> =
-    core::sync::atomic::AtomicPtr::new(core::ptr::null_mut());
-
+/// A screen load animation ended (LVGL event, in the LVGL task).
 unsafe extern "C" fn on_screen_loaded(_: *mut raw::lv_event_t) {
-    let d = DRIVER.load(core::sync::atomic::Ordering::Acquire);
-    if !d.is_null() {
-        // SAFETY: the driver that created the screens (it is never freed);
-        // runs in the LVGL task, under its lock
-        unsafe { disp_screen_loaded(d) };
-    }
+    crate::display_driver::screen_loaded();
 }
 
 struct Mining {
@@ -391,12 +377,10 @@ struct Global {
 }
 
 /// The screens and the objects whose values change.
-struct Ui {
+pub(crate) struct Ui {
     theme: Theme,
     splash1: Option<Obj>,
     splash2: Option<Obj>,
-    /// "Connecting..." on the second splash screen
-    connect: Option<Obj>,
     portal: Obj,
     ssid: Obj,
     mining_scr: Obj,
@@ -417,8 +401,6 @@ struct Ui {
     /// as `btc_price` (`m_blockHeight`)
     block_height: u32,
 }
-
-static UI: Mutex<Option<Ui>> = Mutex::new(None);
 
 fn f13() -> &'static Font {
     asset!(ui_font_OpenSansBold13)
@@ -465,7 +447,8 @@ impl Ui {
         // the second splash screen
         let splash2 = Obj::screen(l);
         background(l, &splash2, theme.splash);
-        let connect = label(
+        // a fixed text (no handle kept: it goes with the splash screen)
+        label(
             l,
             &splash2,
             &L {
@@ -511,7 +494,6 @@ impl Ui {
             theme,
             splash1: Some(splash1),
             splash2: Some(splash2),
-            connect: Some(connect),
             portal,
             ssid,
             mining_scr,
@@ -1039,7 +1021,7 @@ impl Ui {
     /// `updateGlobalState()`: the values of all screens; the BTC price and
     /// the global stats only while their screen is shown (and once at the
     /// start).
-    fn update(&mut self, l: &Lvgl, pool: c_int, btc_shown: bool, global_shown: bool) {
+    pub(crate) fn update(&mut self, l: &Lvgl, pool: c_int, btc_shown: bool, global_shown: bool) {
         use crate::power_mgmt;
         let temp = text::degrees(power_mgmt::get(3));
         self.mining.temp.set_text_str(l, &temp);
@@ -1127,7 +1109,7 @@ impl Ui {
     }
 
     /// `updateCurrentSettings()`: pool, frequency, voltage and fan setting.
-    fn update_settings(&mut self, l: &Lvgl, pool: c_int) {
+    pub(crate) fn update_settings(&mut self, l: &Lvgl, pool: c_int) {
         let Some(m) = crate::pool_manager::get() else {
             return;
         };
@@ -1154,20 +1136,20 @@ impl Ui {
         );
     }
 
-    fn set_ip(&mut self, l: &Lvgl, ip: &CStr) {
+    pub(crate) fn set_ip(&mut self, l: &Lvgl, ip: &CStr) {
         self.mining.ip.set_text(l, ip);
         self.settings.ip.set_text(l, ip);
     }
 
     // --- overlays
 
-    fn hide_error(&mut self, l: &Lvgl) {
+    pub(crate) fn hide_error(&mut self, l: &Lvgl) {
         if let Some(o) = self.err_overlay.take() {
             o.delete(l);
         }
     }
 
-    fn show_error(&mut self, l: &Lvgl, msg: &CStr, code: u32) {
+    pub(crate) fn show_error(&mut self, l: &Lvgl, msg: &CStr, code: u32) {
         self.hide_error(l);
         let Some(scr) = Obj::active_screen(l) else {
             return;
@@ -1200,7 +1182,7 @@ impl Ui {
         self.err_overlay = Some(c);
     }
 
-    fn hide_image(&mut self, l: &Lvgl) {
+    pub(crate) fn hide_image(&mut self, l: &Lvgl) {
         if let Some(o) = self.image_overlay.take() {
             o.delete(l);
         }
@@ -1223,13 +1205,10 @@ impl Ui {
 
     /// Empties a splash screen (its children are deleted): the handles of
     /// objects on it go first.
-    fn drop_splash(&mut self, l: &Lvgl, which: c_int) {
+    pub(crate) fn drop_splash(&mut self, l: &Lvgl, which: Screen) {
         let scr = match which {
-            SCREEN_SPLASH1 => self.splash1.take(),
-            SCREEN_SPLASH2 => {
-                self.connect = None;
-                self.splash2.take()
-            }
+            Screen::Splash1 => self.splash1.take(),
+            Screen::Splash2 => self.splash2.take(),
             _ => None,
         };
         let Some(scr) = scr else {
@@ -1254,23 +1233,22 @@ impl Ui {
         // handle does not delete it)
     }
 
-    fn screen(&self, which: c_int) -> Option<&Obj> {
+    pub(crate) fn screen(&self, which: Screen) -> Option<&Obj> {
         Some(match which {
-            SCREEN_SPLASH1 => self.splash1.as_ref()?,
-            SCREEN_SPLASH2 => self.splash2.as_ref()?,
-            SCREEN_PORTAL => &self.portal,
-            SCREEN_MINING => &self.mining_scr,
-            SCREEN_SETTINGS => &self.settings_scr,
-            SCREEN_BTC => &self.btc_scr,
-            SCREEN_GLOBAL => &self.global_scr,
-            SCREEN_LOG => &self.log.as_ref()?.0,
-            SCREEN_QR => &self.qr.as_ref()?.0,
-            SCREEN_POWER_OFF => self.power_off.as_ref()?,
-            _ => return None,
+            Screen::Splash1 => self.splash1.as_ref()?,
+            Screen::Splash2 => self.splash2.as_ref()?,
+            Screen::Portal => &self.portal,
+            Screen::Mining => &self.mining_scr,
+            Screen::Settings => &self.settings_scr,
+            Screen::Btc => &self.btc_scr,
+            Screen::Global => &self.global_scr,
+            Screen::Log => &self.log.as_ref()?.0,
+            Screen::Qr => &self.qr.as_ref()?.0,
+            Screen::PowerOff => self.power_off.as_ref()?,
         })
     }
 
-    fn power_off(&mut self, l: &Lvgl) {
+    pub(crate) fn power_off(&mut self, l: &Lvgl) {
         if self.power_off.is_some() {
             return;
         }
@@ -1283,7 +1261,7 @@ impl Ui {
         self.power_off = Some(s);
     }
 
-    fn log(&mut self, l: &Lvgl, msg: &CStr) {
+    pub(crate) fn log(&mut self, l: &Lvgl, msg: &CStr) {
         let (_, label) = self.log.get_or_insert_with(|| {
             let s = Obj::screen(l);
             s.bg_color(l, lv::BLACK).bg_opa(l, 255);
@@ -1339,49 +1317,25 @@ impl Ui {
     }
 }
 
-// the screens of ui_screen() (ui_rs.h)
-const SCREEN_SPLASH1: c_int = 0;
-const SCREEN_SPLASH2: c_int = 1;
-const SCREEN_PORTAL: c_int = 2;
-const SCREEN_MINING: c_int = 3;
-const SCREEN_SETTINGS: c_int = 4;
-const SCREEN_BTC: c_int = 5;
-const SCREEN_GLOBAL: c_int = 6;
-const SCREEN_LOG: c_int = 7;
-const SCREEN_QR: c_int = 8;
-const SCREEN_POWER_OFF: c_int = 9;
-
-/// The UI under its own lock, with the LVGL lock the caller holds.
-fn with_ui<T: Default>(f: impl FnOnce(&mut Ui, &Lvgl) -> T) -> T {
-    // SAFETY: every ui_* function is called with the display's LVGL lock
-    // held (ui_rs.h contract); the token does not outlive this call
-    let l = unsafe { Lvgl::assume_locked() };
-    let mut ui = UI.lock().unwrap_or_else(|e| e.into_inner());
-    ui.as_mut().map_or_else(T::default, |ui| f(ui, &l))
+/// The screens the driver loads.
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub(crate) enum Screen {
+    Splash1,
+    Splash2,
+    Portal,
+    Mining,
+    Settings,
+    Btc,
+    Global,
+    Log,
+    Qr,
+    PowerOff,
 }
 
-/// # Safety (all)
-/// Called with the display's LVGL lock held; strings NUL-terminated.
-pub(crate) mod ffi {
-    use super::*;
-
-    fn cstr<'a>(p: *const c_char) -> &'a CStr {
-        if p.is_null() {
-            c""
-        } else {
-            // SAFETY: NUL-terminated (caller contract)
-            unsafe { CStr::from_ptr(p) }
-        }
-    }
-
-    /// Creates the screens and loads the first splash screen; `driver`
-    /// gets the screen load events (`disp_screen_loaded()`).
-    #[no_mangle]
-    pub extern "C" fn ui_init(driver: *mut core::ffi::c_void) {
-        DRIVER.store(driver, core::sync::atomic::Ordering::Release);
-        // SAFETY: called by the driver before its LVGL task runs, or with its
-        // LVGL lock held
-        let l = unsafe { Lvgl::assume_locked() };
+impl Ui {
+    /// Creates the screens (with the default theme) and loads the first
+    /// splash screen.
+    pub(crate) fn new_loaded(l: &Lvgl) -> Ui {
         // SAFETY: lock held (token); the default display exists
         unsafe {
             let d = raw::lv_disp_get_default();
@@ -1394,7 +1348,7 @@ pub(crate) mod ffi {
             );
             raw::lv_disp_set_theme(d, t);
         }
-        let ui = Ui::new(&l);
+        let ui = Ui::new(l);
         // SAFETY: lock held; a live screen
         unsafe { raw::lv_disp_load_scr(ui.splash1.as_ref().expect("new").as_ptr()) };
         if ui.theme.generic {
@@ -1411,124 +1365,43 @@ pub(crate) mod ffi {
             .into_iter()
             .flatten()
             {
-                s.tint_images(&l, tint, 100);
+                s.tint_images(l, tint, 100);
             }
         }
-        *UI.lock().unwrap_or_else(|e| e.into_inner()) = Some(ui);
+        ui
     }
 
-    /// A screen (`UI_SCREEN_*`), NULL if not created.
-    #[no_mangle]
-    pub extern "C" fn ui_screen(which: c_int) -> *mut raw::lv_obj_t {
-        let ui = UI.lock().unwrap_or_else(|e| e.into_inner());
-        ui.as_ref()
-            .and_then(|u| u.screen(which))
-            .map_or(core::ptr::null_mut(), Obj::as_ptr)
+    pub(crate) fn set_ssid(&mut self, l: &Lvgl, ssid: &CStr) {
+        self.ssid.set_text(l, ssid);
     }
 
-    #[no_mangle]
-    pub extern "C" fn ui_drop_splash(which: c_int) {
-        with_ui(|u, l| u.drop_splash(l, which))
+    pub(crate) fn set_net_icon(&mut self, l: &Lvgl, icon: NetIcon) {
+        let img = match icon {
+            NetIcon::Eth => asset!(ui_img_eth_png),
+            NetIcon::Can => asset!(ui_img_can_png),
+            NetIcon::Wifi => asset!(ui_img_wifi_png),
+        };
+        self.mining.net.set_src(l, img);
     }
 
-    /// # Safety
-    /// See the module.
-    #[no_mangle]
-    pub unsafe extern "C" fn ui_set_ssid(ssid: *const c_char) {
-        with_ui(|u, l| {
-            u.ssid.set_text(l, cstr(ssid));
-        })
-    }
-
-    /// # Safety
-    /// See the module.
-    #[no_mangle]
-    pub unsafe extern "C" fn ui_set_connect(msg: *const c_char) {
-        with_ui(|u, l| {
-            if let Some(c) = &u.connect {
-                c.set_text(l, cstr(msg));
-            }
-        })
-    }
-
-    #[no_mangle]
-    pub extern "C" fn ui_update(pool: c_int, btc_shown: bool, global_shown: bool) {
-        with_ui(|u, l| u.update(l, pool, btc_shown, global_shown))
-    }
-
-    #[no_mangle]
-    pub extern "C" fn ui_update_settings(pool: c_int) {
-        with_ui(|u, l| u.update_settings(l, pool))
-    }
-
-    /// # Safety
-    /// See the module.
-    #[no_mangle]
-    pub unsafe extern "C" fn ui_set_ip(ip: *const c_char) {
-        with_ui(|u, l| u.set_ip(l, cstr(ip)))
-    }
-
-    /// 0 WiFi, 1 Ethernet, 2 CAN
-    #[no_mangle]
-    pub extern "C" fn ui_set_net_icon(kind: c_int) {
-        with_ui(|u, l| {
-            let img = match kind {
-                1 => asset!(ui_img_eth_png),
-                2 => asset!(ui_img_can_png),
-                _ => asset!(ui_img_wifi_png),
-            };
-            u.mining.net.set_src(l, img);
-        })
-    }
-
-    /// # Safety
-    /// See the module.
-    #[no_mangle]
-    pub unsafe extern "C" fn ui_show_error(msg: *const c_char, code: u32) {
-        with_ui(|u, l| u.show_error(l, cstr(msg), code))
-    }
-
-    #[no_mangle]
-    pub extern "C" fn ui_hide_error() {
-        with_ui(|u, l| u.hide_error(l))
-    }
-
-    #[no_mangle]
-    pub extern "C" fn ui_show_found_block() {
-        with_ui(|u, l| u.show_image(l, asset!(ui_img_found_block_png)))
-    }
-
-    #[no_mangle]
-    pub extern "C" fn ui_hide_image_overlay() {
-        with_ui(|u, l| u.hide_image(l))
-    }
-
-    #[no_mangle]
-    pub extern "C" fn ui_power_off_init() {
-        with_ui(|u, l| u.power_off(l))
-    }
-
-    /// # Safety
-    /// See the module.
-    #[no_mangle]
-    pub unsafe extern "C" fn ui_log(msg: *const c_char) {
-        with_ui(|u, l| u.log(l, cstr(msg)))
+    pub(crate) fn show_found_block(&mut self, l: &Lvgl) {
+        self.show_image(l, asset!(ui_img_found_block_png))
     }
 
     /// The OTP QR screen from a qrcodegen buffer; false without it.
-    ///
-    /// # Safety
-    /// `qr` NULL or a qrcodegen buffer; see the module.
-    #[no_mangle]
-    pub unsafe extern "C" fn ui_create_qr(qr: *const u8, size: c_int) -> bool {
-        if qr.is_null() || size <= 0 {
+    pub(crate) fn create_qr(&mut self, l: &Lvgl, qr: &[u8]) -> bool {
+        if qr.is_empty() {
             crate::log::log!(Error, c"ui", "No QR to draw");
             return false;
         }
-        // qrcodegen buffer length for the code's version
-        let len = ((size * size) as usize).div_ceil(8) + 1;
-        // SAFETY: a qrcodegen buffer of a `size` modules code (caller contract)
-        let buf = unsafe { core::slice::from_raw_parts(qr, len) };
-        with_ui(|u, l| u.qr(l, Qr(buf)))
+        self.qr(l, Qr(qr))
     }
+}
+
+/// The network icon of the mining screen.
+#[derive(Clone, Copy)]
+pub(crate) enum NetIcon {
+    Wifi,
+    Eth,
+    Can,
 }

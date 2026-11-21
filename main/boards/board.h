@@ -16,8 +16,7 @@ struct EthPins {
 };
 
 // The board: constants, settings and hardware are in Rust (board_rs.h); this
-// class keeps the C++ call sites and owns the display theme and the ASIC
-// object (main/boards/board.cpp, with the self test).
+// class keeps the C++ call sites.
 class Board {
 public:
     enum Error {
@@ -106,8 +105,6 @@ public:
     void shutdown() { board_shutdown(); }
 
     Error getFault(uint32_t *status) { return (Error) board_fault(status); }
-
-    bool selfTest();
 
 
     uint32_t getAsicMaxDifficulty() { return info().max_difficulty; }

@@ -45,6 +45,7 @@ use crate::pool_dispatch::{V1Hooks, V2Hooks};
 use crate::pool_stats::ffi as stats;
 use crate::sdkconfig as k;
 use crate::stratum_config::PoolConfig;
+use crate::stratum_task::Family;
 use crate::stratum_transport::{Kind, Transport};
 use crate::stratum_v1::connection::{self as v1, Io, Transfer};
 use crate::stratum_v1::lines::LineBuffer;
@@ -67,11 +68,68 @@ const SV2_SUBMIT_BUF: usize = 6 + 24 + 1 + 32;
 
 #[cfg(target_os = "espidf")]
 mod sys {
+    use super::*;
     pub use crate::board_api::*;
+    use crate::idf::raw;
     pub use crate::idf::raw::{
         esp_task_wdt_add, esp_task_wdt_delete, esp_task_wdt_reset, uxTaskGetStackHighWaterMark,
         vTaskDelay, vTaskSuspend,
     };
+    use std::net::IpAddr;
+
+    /// `getaddrinfo()` for `family`: the first address, else the error.
+    pub fn lookup(host: &CStr, family: Family) -> Result<IpAddr, c_int> {
+        let hints = raw::addrinfo {
+            ai_family: match family {
+                Family::Any => raw::AF_UNSPEC,
+                Family::V4 => raw::AF_INET,
+                Family::V6 => raw::AF_INET6,
+            } as c_int,
+            ..Default::default()
+        };
+        let mut res = core::ptr::null_mut();
+        let err =
+            unsafe { raw::lwip_getaddrinfo(host.as_ptr(), core::ptr::null(), &hints, &mut res) };
+        if err != 0 || res.is_null() {
+            return Err(err);
+        }
+        // SAFETY: getaddrinfo() returned an entry with a sockaddr of its family
+        let ip = unsafe {
+            let ai = &*res;
+            if ai.ai_family == raw::AF_INET6 as c_int {
+                IpAddr::from(
+                    (*ai.ai_addr.cast::<raw::sockaddr_in6>())
+                        .sin6_addr
+                        .un
+                        .u8_addr,
+                )
+            } else {
+                let a = (*ai.ai_addr.cast::<raw::sockaddr_in>()).sin_addr.s_addr;
+                IpAddr::from(a.to_ne_bytes())
+            }
+        };
+        unsafe { raw::lwip_freeaddrinfo(res) };
+        Ok(ip)
+    }
+
+    /// True if the station or Ethernet interface has a preferred global or
+    /// unique-local IPv6 address, so IPv6 pool connections can be routed.
+    pub fn has_routable_ipv6() -> bool {
+        [c"WIFI_STA_DEF", c"ETH_DEF"].iter().any(|key| unsafe {
+            let netif = raw::esp_netif_get_handle_from_ifkey(key.as_ptr());
+            if netif.is_null() {
+                return false;
+            }
+            let mut addrs =
+                [raw::esp_ip6_addr_t::default(); raw::CONFIG_LWIP_IPV6_NUM_ADDRESSES as usize];
+            let n = raw::esp_netif_get_all_preferred_ip6(netif, addrs.as_mut_ptr());
+            addrs.iter_mut().take(n.max(0) as usize).any(|a| {
+                let t = raw::esp_netif_ip6_get_addr_type(a);
+                t == raw::esp_ip6_addr_type_t_ESP_IP6_ADDR_IS_GLOBAL
+                    || t == raw::esp_ip6_addr_type_t_ESP_IP6_ADDR_IS_UNIQUE_LOCAL
+            })
+        })
+    }
 }
 
 /// On the host: no tasks, no board.
@@ -114,6 +172,12 @@ mod sys {
     }
     pub unsafe fn bapi_set_board_error_if_none(_: c_int, _: u32) {}
     pub unsafe fn bapi_clear_board_error(_: c_int) {}
+    pub fn lookup(_: &CStr, _: Family) -> Result<std::net::IpAddr, c_int> {
+        Err(-1)
+    }
+    pub fn has_routable_ipv6() -> bool {
+        false
+    }
 }
 
 fn delay_ms(ms: u32) {
@@ -511,26 +575,27 @@ impl crate::stratum_task::Hooks for Ctx {
     fn network_up(&mut self) -> bool {
         crate::netmgr::has_ip()
     }
-    fn resolve(&mut self, host: &str) -> Option<String> {
-        use std::net::{IpAddr, ToSocketAddrs};
+    fn resolve(&mut self, host: &str, family: Family) -> Option<String> {
         const T: &CStr = c"DNS";
-        let ip = match (host, 0u16).to_socket_addrs() {
-            Ok(addrs) => addrs
-                .map(|a| a.ip())
-                .find(IpAddr::is_ipv4)
-                .map(|ip| ip.to_string()),
+        let h = CString::new(host).ok()?;
+        let ip = match sys::lookup(&h, family) {
+            Ok(ip) => ip.to_string(),
+            // no AAAA record: IPv4 is tried
+            Err(_) if family == Family::V6 => return None,
             Err(e) => {
                 log!(Error, T, "DNS lookup failed: {e}");
                 return None;
             }
         };
-        let Some(ip) = ip else {
-            log!(Error, T, "DNS lookup failed: no IPv4 address");
-            return None;
-        };
         lock(&self.t.resolved_ip).clone_from(&ip);
         log!(Info, T, "Resolved IP: {ip}");
         Some(ip)
+    }
+    fn has_routable_ipv6(&mut self) -> bool {
+        sys::has_routable_ipv6()
+    }
+    fn now_us(&mut self) -> u64 {
+        now_us()
     }
     fn connect(&mut self, host: &str, ip: &str, port: u16) -> bool {
         let t = self.t;
@@ -1585,8 +1650,9 @@ unsafe extern "C" fn stratum_task_entry(arg: *mut c_void) {
         t,
         proto: t.proto(),
     };
+    let mut skip = crate::stratum_task::Ipv6Skip::default();
     loop {
-        crate::stratum_task::round(&mut c, t.tag);
+        crate::stratum_task::round(&mut c, &mut skip, t.tag);
     }
 }
 

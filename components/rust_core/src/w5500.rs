@@ -229,6 +229,9 @@ mod sys {
             i.gw.addr.to_ne_bytes(),
         ]
     }
+    pub fn create_ip6_linklocal(netif: *mut c_void) {
+        unsafe { raw::esp_netif_create_ip6_linklocal(netif.cast()) };
+    }
 }
 
 #[cfg(not(target_os = "espidf"))]
@@ -284,6 +287,7 @@ mod sys {
     pub unsafe fn got_ip(_: *mut c_void) -> [[u8; 4]; 3] {
         [[0; 4]; 3]
     }
+    pub fn create_ip6_linklocal(_: *mut c_void) {}
 }
 
 fn delay_ms(ms: u32) {
@@ -593,6 +597,11 @@ unsafe extern "C" fn ip_event(_: *mut c_void, _: *const c_char, id: i32, data: *
     let [ip, netmask, gw] = sys::got_ip(data);
     *IP.lock().unwrap_or_else(|e| e.into_inner()) = ip_str(&ip);
     HAS_IP.store(true, Ordering::Release);
+    // Start IPv6: a link-local address enables router discovery and SLAAC.
+    let netif = netif();
+    if !netif.is_null() {
+        sys::create_ip6_linklocal(netif);
+    }
     log!(
         Warn,
         TAG,

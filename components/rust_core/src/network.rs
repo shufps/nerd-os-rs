@@ -34,6 +34,7 @@ idf_const!(WIFI_EVENT_SCAN_DONE: i32 = wifi_event_t_WIFI_EVENT_SCAN_DONE, 1);
 idf_const!(WIFI_EVENT_STA_START: i32 = wifi_event_t_WIFI_EVENT_STA_START, 2);
 idf_const!(WIFI_EVENT_STA_DISCONNECTED: i32 = wifi_event_t_WIFI_EVENT_STA_DISCONNECTED, 5);
 idf_const!(IP_EVENT_STA_GOT_IP: i32 = ip_event_t_IP_EVENT_STA_GOT_IP, 0);
+idf_const!(IP_EVENT_GOT_IP6: i32 = ip_event_t_IP_EVENT_GOT_IP6, 3);
 idf_const!(ESP_EVENT_ANY_ID: i32 = ESP_EVENT_ANY_ID, -1);
 idf_const!(ESP_ERR_INVALID_STATE: EspErr = ESP_ERR_INVALID_STATE, 0x103);
 idf_const!(ESP_ERR_TIMEOUT: EspErr = ESP_ERR_TIMEOUT, 0x107);
@@ -246,6 +247,21 @@ mod sys {
             .addr
             .to_ne_bytes()
     }
+    /// The address of an `IP_EVENT_GOT_IP6`.
+    ///
+    /// # Safety
+    /// `data` the event's `ip_event_got_ip6_t`.
+    pub unsafe fn got_ip6(data: *mut c_void) -> std::net::Ipv6Addr {
+        let words = (*(data as *const raw::ip_event_got_ip6_t)).ip6_info.ip.addr;
+        let mut bytes = [0u8; 16];
+        for (b, w) in bytes.chunks_exact_mut(4).zip(words) {
+            b.copy_from_slice(&w.to_ne_bytes());
+        }
+        bytes.into()
+    }
+    pub fn create_ip6_linklocal(netif: *mut c_void) {
+        unsafe { raw::esp_netif_create_ip6_linklocal(netif.cast()) };
+    }
 }
 
 #[cfg(not(target_os = "espidf"))]
@@ -332,6 +348,10 @@ mod sys {
     pub unsafe fn got_ip(_: *mut c_void) -> [u8; 4] {
         [0; 4]
     }
+    pub unsafe fn got_ip6(_: *mut c_void) -> std::net::Ipv6Addr {
+        std::net::Ipv6Addr::UNSPECIFIED
+    }
+    pub fn create_ip6_linklocal(_: *mut c_void) {}
 }
 
 /// `ESP_ERROR_CHECK()`
@@ -433,7 +453,14 @@ unsafe extern "C" fn wifi_event(_: *mut c_void, base: *const c_char, id: i32, da
         let ip = sys::got_ip(data);
         let [a, b, c, d] = ip;
         log!(Info, TAG, "WiFi got IP: {a}.{b}.{c}.{d}");
+        // Start IPv6: a link-local address enables router discovery and SLAAC.
+        let sta = NETIF_STA.load(Ordering::Acquire);
+        if !sta.is_null() {
+            sys::create_ip6_linklocal(sta);
+        }
         run_actions(wifi_state::wifi_state_got_ip(ip.as_ptr()));
+    } else if base == sys::ip_event() && id == IP_EVENT_GOT_IP6 && !data.is_null() {
+        log!(Info, TAG, "IPv6 address: {}", sys::got_ip6(data));
     }
 }
 
@@ -491,6 +518,10 @@ pub fn wifi_init(ssid: &[u8], pass: &[u8], hostname: &CStr) -> *mut c_void {
         check(
             sys::register_handler(sys::ip_event(), IP_EVENT_STA_GOT_IP, wifi_event),
             "esp_event_handler_instance_register(IP_EVENT)",
+        );
+        check(
+            sys::register_handler(sys::ip_event(), IP_EVENT_GOT_IP6, wifi_event),
+            "esp_event_handler_instance_register(IP_EVENT_GOT_IP6)",
         );
         let e = sys::wifi_init_default();
         if e != ESP_ERR_INVALID_STATE {

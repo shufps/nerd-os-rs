@@ -411,10 +411,9 @@ pub mod http {
         crate::http_server::send_json(req, &doc.serialize())
     }
 
-    /// The request body (read through the server context's scratch buffer),
-    /// copied: the handlers send answers while they still use it.
+    /// The request body.
     fn body(req: &mut Request) -> Option<Vec<u8>> {
-        crate::http_server::read_body(req).ok().map(<[u8]>::to_vec)
+        crate::http_server::read_body(req).ok()
     }
 
     /// `GET /api/v2/profiles`

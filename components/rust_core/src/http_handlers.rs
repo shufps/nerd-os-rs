@@ -99,7 +99,7 @@ pub(crate) fn apply_settings(
         Ok(b) => b,
         Err(e) => return e,
     };
-    if !settings_apply::apply_body(body, parse, applied, &mut settings_apply::Config) {
+    if !settings_apply::apply_body(&body, parse, applied, &mut settings_apply::Config) {
         log!(Error, tag, "JSON parsing failed");
         send_err(req, err::E400_BAD_REQUEST, c"Invalid JSON");
         return ESP_FAIL;
@@ -293,7 +293,7 @@ fn otp_patch(req: &mut Request) -> EspErr {
         Ok(b) => b,
         Err(e) => return e,
     };
-    let enabled = match http_settings::otp_body(body) {
+    let enabled = match http_settings::otp_body(&body) {
         http_settings::OtpBody::Enabled(b) => b,
         http_settings::OtpBody::Invalid => {
             log!(Error, c"http_otp", "JSON parsing failed");

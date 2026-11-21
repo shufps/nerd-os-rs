@@ -9,7 +9,8 @@
 #include "esp_heap_caps.h"
 #include "esp_log.h"
 
-bool ws_log_enqueue(char *line);
+/* copies the line (src/http_ws.rs); false if it was dropped */
+bool ws_log_enqueue(const char *line, size_t len);
 
 static int log_to_queue(const char *format, va_list args)
 {
@@ -36,9 +37,8 @@ static int log_to_queue(const char *format, va_list args)
 
     printf("%s", line);
 
-    if (!ws_log_enqueue(line)) {
-        heap_caps_free(line);
-    }
+    ws_log_enqueue(line, strlen(line));
+    heap_caps_free(line);
     return 0;
 }
 

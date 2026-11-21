@@ -7,9 +7,9 @@
 //! and the CORS preflights, and starts the captive portal DNS server. The
 //! handlers are in the `http_*` modules.
 
-use crate::idf::idf_const;
-use core::ffi::{c_char, c_int, c_void, CStr};
+use core::ffi::{c_int, c_void, CStr};
 use std::sync::atomic::{AtomicBool, AtomicPtr, Ordering};
+use std::sync::Mutex;
 
 use crate::http_routes::{self, flag, Handler, Method, Route, ROUTES};
 use crate::idf::httpd::{self, err, Req, Request};
@@ -20,14 +20,14 @@ const TAG: &CStr = c"http_server";
 
 /// `SCRATCH_BUFSIZE`
 pub const SCRATCH_SIZE: usize = 16384;
-idf_const!(BASE_PATH_SIZE: usize = ESP_VFS_PATH_MAX + 1, 16);
 
-/// `rest_server_context_t`: the request body buffer of the handlers.
-#[repr(C)]
-pub struct ServerCtx {
-    pub base_path: [c_char; BASE_PATH_SIZE],
-    pub scratch: [c_char; SCRATCH_SIZE],
-}
+/// The transfer buffer of the file and core dump handlers (the former
+/// server context); the server runs one handler at a time.
+static SCRATCH: Mutex<Vec<u8>> = Mutex::new(Vec::new());
+
+/// The `user_ctx` of the routes with the buffer (`flag::CTX`): only
+/// compared with NULL, never read.
+static WITH_SCRATCH: u8 = 0;
 
 /// The page served in recovery mode (the web UI could not be mounted).
 static RECOVERY_PAGE: &[u8] = include_bytes!("recovery_page.html");
@@ -62,16 +62,6 @@ struct RouteCtx {
 // ---------------------------------------------------------------------------
 // helpers for the handlers
 
-fn scratch(req: &mut Request) -> Option<&mut [u8]> {
-    let ctx = req.user_ctx() as *mut ServerCtx;
-    // SAFETY: the context the route was registered with; the server runs
-    // one handler at a time, and the slice is bound to the request borrow
-    unsafe { ctx.as_mut() }.map(|c| {
-        // SAFETY: c_char and u8 have the same layout
-        unsafe { core::slice::from_raw_parts_mut(c.scratch.as_mut_ptr() as *mut u8, SCRATCH_SIZE) }
-    })
-}
-
 /// Runs `f` with the request and the server context's scratch buffer (file
 /// and core dump transfers) of a route with the context (`flag::CTX`);
 /// None without the context.
@@ -79,11 +69,11 @@ pub fn with_scratch<T>(
     req: &mut Request,
     f: impl FnOnce(&mut Request, &mut [u8]) -> T,
 ) -> Option<T> {
-    let buf = scratch(req)?.as_mut_ptr();
-    // SAFETY: the buffer is in the server context, not in the request, so
-    // the two borrows are disjoint; one handler runs at a time
-    let buf = unsafe { core::slice::from_raw_parts_mut(buf, SCRATCH_SIZE) };
-    Some(f(req, buf))
+    if req.user_ctx().is_null() {
+        return None;
+    }
+    let mut buf = SCRATCH.lock().unwrap_or_else(|e| e.into_inner());
+    Some(f(req, &mut buf))
 }
 
 /// `is_network_allowed()`: the decision is `http_auth.rs`.
@@ -172,10 +162,10 @@ pub fn validate_otp(req: &mut Request, force: bool) -> EspErr {
     }
 }
 
-/// `getPostData()`: the body (up to a NUL byte, as before) through the
-/// server context's scratch buffer; sends 500 and returns the error if it
-/// does not fit or fails.
-pub fn read_body(req: &mut Request) -> Result<&[u8], EspErr> {
+/// `getPostData()`: the body (up to a NUL byte, as before; at most the
+/// former scratch buffer); sends 500 and returns the error if it does not
+/// fit or fails.
+pub fn read_body(req: &mut Request) -> Result<Vec<u8>, EspErr> {
     const T: &CStr = c"http_utils";
     let total = req.content_len();
     if total >= SCRATCH_SIZE {
@@ -183,16 +173,15 @@ pub fn read_body(req: &mut Request) -> Result<&[u8], EspErr> {
         req.send_err(err::E500_INTERNAL_SERVER_ERROR, Some(c"content too long"));
         return Err(ESP_FAIL);
     }
-    // read into a copy of the pointer: recv() needs the request as well
-    let Some(buf) = scratch(req).map(|b| b.as_mut_ptr()) else {
+    // only the routes with the former server context read bodies
+    if req.user_ctx().is_null() {
         req.send_err(err::E500_INTERNAL_SERVER_ERROR, None);
         return Err(ESP_FAIL);
-    };
+    }
+    let mut buf = vec![0u8; total];
     let mut cur = 0;
     while cur < total {
-        // SAFETY: the scratch buffer holds SCRATCH_SIZE > total bytes
-        let dst = unsafe { core::slice::from_raw_parts_mut(buf.add(cur), total - cur) };
-        let n = req.recv(dst);
+        let n = req.recv(&mut buf[cur..]);
         if n <= 0 {
             log!(Error, T, "error receiving data");
             req.send_err(
@@ -203,8 +192,9 @@ pub fn read_body(req: &mut Request) -> Result<&[u8], EspErr> {
         }
         cur += n as usize;
     }
-    let body = &scratch(req).unwrap_or_default()[..total];
-    Ok(crate::cutil::until_nul(body))
+    let n = crate::cutil::until_nul(&buf).len();
+    buf.truncate(n);
+    Ok(buf)
 }
 
 /// `sendJsonBuffer()`: sends `json` in 2048 byte chunks.
@@ -318,7 +308,7 @@ fn method(m: Method) -> httpd::Method {
     }
 }
 
-unsafe fn register_routes(ctx: *mut ServerCtx) {
+unsafe fn register_routes() {
     let s = server();
     // the extra routes first: the table ends with the file handler's
     // wildcard, which would shadow them
@@ -366,7 +356,7 @@ unsafe fn register_routes(ctx: *mut ServerCtx) {
             handler: rt.handler,
             cpp,
             ctx: if rt.flags & flag::CTX != 0 {
-                ctx as *mut c_void
+                &WITH_SCRATCH as *const u8 as *mut c_void
             } else {
                 core::ptr::null_mut()
             },
@@ -400,15 +390,14 @@ pub fn start() -> EspErr {
         ENTER_RECOVERY.store(true, Ordering::Release);
     }
 
-    let ctx = crate::cutil::c_malloc(core::mem::size_of::<ServerCtx>()) as *mut ServerCtx;
-    if ctx.is_null() {
-        log!(Error, TAG, "No memory for rest context");
-        return ESP_FAIL;
+    {
+        let mut buf = SCRATCH.lock().unwrap_or_else(|e| e.into_inner());
+        if buf.try_reserve_exact(SCRATCH_SIZE).is_err() {
+            log!(Error, TAG, "No memory for rest context");
+            return ESP_FAIL;
+        }
+        buf.resize(SCRATCH_SIZE, 0);
     }
-    // the base path is ""
-    // SAFETY: `ctx` is a non-null allocation of size_of::<ServerCtx>() bytes;
-    // all-zero is a valid ServerCtx (char arrays)
-    unsafe { core::ptr::write_bytes(ctx, 0, 1) };
 
     let mut config = httpd::default_config();
     config.uri_match_fn = Some(httpd::httpd_uri_match_wildcard);
@@ -427,16 +416,13 @@ pub fn start() -> EspErr {
     // SAFETY: `handle` and `config` are live locals; httpd copies the config
     if unsafe { httpd::httpd_start(&mut handle, &config) } != ESP_OK {
         log!(Error, TAG, "Start server failed");
-        // SAFETY: `ctx` came from c_malloc() above and was not handed out yet
-        unsafe { crate::cutil::c_free(ctx as *mut c_void) };
         return ESP_FAIL;
     }
     HTTP_SERVER.store(handle, Ordering::Release);
 
-    // SAFETY: the server is running; `ctx` is initialized and never freed (it
-    // stays the routes' user context); the handler matches the err callback type
+    // SAFETY: the server is running; the handler matches the err callback type
     unsafe {
-        register_routes(ctx);
+        register_routes();
         httpd::httpd_register_err_handler(handle, err::E404_NOT_FOUND, Some(not_found_handler));
     }
     // the queue and the task of the log over the web socket
@@ -465,10 +451,5 @@ mod tests {
         assert_eq!(RECOVERY_PAGE.len(), 2967);
         assert!(RECOVERY_PAGE.starts_with(b"<html><meta charset=\"UTF-8\">"));
         assert!(RECOVERY_PAGE.ends_with(b"</html>"));
-    }
-
-    #[test]
-    fn context_layout() {
-        assert_eq!(core::mem::size_of::<ServerCtx>(), 16 + 16384);
     }
 }

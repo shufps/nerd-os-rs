@@ -65,11 +65,8 @@ mod sys {
 /// task).
 static FD: AtomicI32 = AtomicI32::new(-1);
 
-/// A `malloc()`ed log line.
-struct Line(*mut c_char);
-// SAFETY: the line is owned exclusively by whoever holds the `Line` (handed
-// from the logging task to the log task, freed there)
-unsafe impl Send for Line {}
+/// A log line (with its newline).
+struct Line(Vec<u8>);
 
 static TX: OnceLock<SyncSender<Line>> = OnceLock::new();
 
@@ -120,20 +117,26 @@ pub fn handler(req: &mut Request) -> EspErr {
     ESP_OK
 }
 
-unsafe fn send(line: *mut c_char) {
-    let mut pkt: WsFrame = core::mem::zeroed();
-    pkt.payload = line as *mut u8;
-    pkt.len = CStr::from_ptr(line).to_bytes().len();
+fn send(line: &mut [u8]) {
+    // SAFETY: an all-zero frame is valid (no payload)
+    let mut pkt: WsFrame = unsafe { core::mem::zeroed() };
+    pkt.payload = line.as_mut_ptr();
+    pkt.len = line.len();
     pkt.type_ = WS_TEXT;
     // the socket number is reused after a close: send only while it is a
     // web socket (the close callback resets FD before)
     let fd = FD.load(Ordering::Acquire);
     let server = crate::http_server::HTTP_SERVER.load(Ordering::Acquire);
-    if !server.is_null()
-        && fd >= 0
-        && (sys::httpd_ws_get_fd_info(server, fd) != WS_CLIENT_WEBSOCKET
-            || sys::httpd_ws_send_frame_async(server, fd, &mut pkt) != ESP_OK)
-    {
+    if server.is_null() || fd < 0 {
+        return;
+    }
+    // SAFETY: the running server's handle; `pkt` points to `line`, which
+    // outlives the (synchronous) send
+    let failed = unsafe {
+        sys::httpd_ws_get_fd_info(server, fd) != WS_CLIENT_WEBSOCKET
+            || sys::httpd_ws_send_frame_async(server, fd, &mut pkt) != ESP_OK
+    };
+    if failed {
         // dead, or the socket was reused
         reset_fd(fd);
     }
@@ -143,15 +146,13 @@ unsafe extern "C" fn task(_: *mut c_void) {
     let Some(rx) = task_rx().lock().unwrap_or_else(|e| e.into_inner()).take() else {
         return;
     };
-    for Line(line) in rx.iter() {
+    for Line(mut line) in rx.iter() {
         if FD.load(Ordering::Acquire) < 0 {
             // no socket: dropped
-            crate::cutil::c_free(line as *mut c_void);
             std::thread::sleep(std::time::Duration::from_millis(100));
             continue;
         }
-        send(line);
-        crate::cutil::c_free(line as *mut c_void);
+        send(&mut line);
     }
 }
 
@@ -173,13 +174,18 @@ fn task_rx() -> &'static Mutex<Option<Receiver<Line>>> {
 pub(crate) mod api {
     use super::*;
 
-    /// A formatted log line (`malloc()`ed) for the socket; false if the
-    /// queue is full or not there (the caller frees it then). Must not log.
+    /// A formatted log line for the socket (copied; the caller keeps its
+    /// buffer); false if the queue is full or not there. Must not log.
+    ///
+    /// # Safety
+    /// `line` holds `len` bytes.
     #[no_mangle]
-    pub extern "C" fn ws_log_enqueue(line: *mut c_char) -> bool {
-        match TX.get() {
-            Some(tx) => tx.try_send(Line(line)).is_ok(),
-            None => false,
-        }
+    pub unsafe extern "C" fn ws_log_enqueue(line: *const c_char, len: usize) -> bool {
+        let Some(tx) = TX.get() else {
+            return false;
+        };
+        // SAFETY: `len` bytes (caller contract), copied at once
+        let bytes = unsafe { core::slice::from_raw_parts(line as *const u8, len) };
+        tx.try_send(Line(bytes.to_vec())).is_ok()
     }
 }

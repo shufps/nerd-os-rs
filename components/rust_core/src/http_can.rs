@@ -93,7 +93,7 @@ pub fn patch(req: &mut Request) -> EspErr {
     let Ok(body) = crate::http_server::read_body(req) else {
         return ESP_FAIL;
     };
-    let Ok(doc) = crate::ajson::deserialize(body) else {
+    let Ok(doc) = crate::ajson::deserialize(&body) else {
         log!(Error, c"can_swarm", "JSON parsing failed");
         send_err(req, err::E400_BAD_REQUEST, c"Invalid JSON");
         return ESP_FAIL;

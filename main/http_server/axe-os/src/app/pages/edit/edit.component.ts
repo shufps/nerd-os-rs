@@ -219,7 +219,7 @@ export class EditComponent implements OnInit {
             Validators.required,
             Validators.pattern(/^[^:]*$/),
             Validators.min(0),
-            Validators.max(65353)
+            Validators.max(65535)
           ]],
           stratumUser: [info.pools[0].user, [Validators.required]],
           stratumPassword: ['*****', [Validators.required]],
@@ -236,7 +236,7 @@ export class EditComponent implements OnInit {
           fallbackStratumPort: [info.pools[1].port, [
             Validators.pattern(/^[^:]*$/),
             Validators.min(0),
-            Validators.max(65353)
+            Validators.max(65535)
           ]],
           fallbackStratumUser: [info.pools[1].user],
           fallbackStratumPassword: ['*****'],

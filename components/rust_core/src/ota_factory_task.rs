@@ -47,7 +47,6 @@ mod sys {
         esp_ota_abort, esp_ota_begin, esp_ota_end, esp_ota_get_next_update_partition,
         esp_ota_set_boot_partition, esp_ota_write, esp_partition_erase_range,
         esp_partition_find_first, esp_partition_write, heap_caps_free, heap_caps_malloc,
-        vTaskDelay,
     };
 }
 
@@ -91,12 +90,9 @@ mod sys {
         core::ptr::null_mut()
     }
     pub unsafe fn heap_caps_free(_: *mut c_void) {}
-    pub unsafe fn vTaskDelay(_: u32) {}
 }
 
-fn delay_ms(ms: u32) {
-    unsafe { sys::vTaskDelay(crate::idf::ms_to_ticks(ms)) }
-}
+use crate::idf::task::delay_ms;
 
 fn err_name(e: EspErr) -> String {
     crate::idf::nvs::err_name(e)

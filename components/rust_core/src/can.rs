@@ -55,7 +55,7 @@ idf_const!(CAP_INTERNAL: u32 = MALLOC_CAP_INTERNAL, 1 << 11);
 
 #[cfg(target_os = "espidf")]
 mod sys {
-    pub use crate::idf::raw::{esp_read_mac, esp_restart, heap_caps_get_free_size};
+    pub use crate::idf::raw::esp_read_mac;
     extern "C" {
         pub fn ui_send_identify(duration_ms: u32) -> bool;
     }
@@ -66,12 +66,6 @@ mod sys {
     use super::*;
     pub unsafe fn esp_read_mac(_: *mut u8, _: u32) -> EspErr {
         crate::idf::ESP_FAIL
-    }
-    pub unsafe fn esp_restart() -> ! {
-        panic!("esp_restart")
-    }
-    pub unsafe fn heap_caps_get_free_size(_: u32) -> usize {
-        0
     }
     pub unsafe fn ui_send_identify(_: u32) -> bool {
         false
@@ -501,7 +495,7 @@ fn telemetry() -> [u8; can_master::TELEMETRY_LEN] {
             crate::system::error().0 as u8,
         ],
     );
-    let heap = unsafe { sys::heap_caps_get_free_size(CAP_INTERNAL) } as u32;
+    let heap = crate::idf::task::free_heap(CAP_INTERNAL) as u32;
     put(45, &heap.to_le_bytes());
     t
 }
@@ -623,7 +617,7 @@ fn handle_settings_cmd(p: &[u8]) {
         CMD_RESTART => {
             log!(Info, TAG_SLAVE, "CMD RESTART → restarting");
             sleep_ms(100);
-            unsafe { sys::esp_restart() }
+            crate::idf::task::restart()
         }
         _ => log!(Warn, TAG_SLAVE, "Unknown settings cmd 0x{cmd:02X}"),
     }

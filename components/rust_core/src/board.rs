@@ -107,7 +107,7 @@ pub struct GpioConfig {
 mod sys {
     pub use crate::idf::raw::{
         gpio_config, gpio_get_level, gpio_pad_select_gpio, gpio_reset_pin, gpio_set_direction,
-        gpio_set_level, gpio_set_pull_mode, vTaskDelay,
+        gpio_set_level, gpio_set_pull_mode,
     };
 }
 
@@ -135,12 +135,9 @@ mod sys {
     pub unsafe fn gpio_config(_: *const GpioConfig) -> c_int {
         0
     }
-    pub unsafe fn vTaskDelay(_: u32) {}
 }
 
-fn delay_ms(ms: u32) {
-    unsafe { sys::vTaskDelay(crate::idf::ms_to_ticks(ms)) }
-}
+use crate::idf::task::delay_ms;
 
 /// `gpio_pad_select_gpio()`, output, `level`.
 fn gpio_output(pin: c_int, level: bool) {

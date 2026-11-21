@@ -21,7 +21,7 @@ const TAG: &CStr = c"power_management";
 mod sys {
     pub use crate::board_api::*;
     pub use crate::idf::raw::{
-        esp_restart, xQueueCreateMutex, xQueueGiveMutexRecursive, xQueueTakeMutexRecursive,
+        xQueueCreateMutex, xQueueGiveMutexRecursive, xQueueTakeMutexRecursive,
     };
 }
 
@@ -38,9 +38,6 @@ mod sys {
     }
     pub unsafe fn xQueueGiveMutexRecursive(_: *mut c_void) -> i32 {
         1
-    }
-    pub unsafe fn esp_restart() -> ! {
-        std::process::abort()
     }
     pub fn bapi_is_initialized() -> bool {
         false
@@ -157,7 +154,7 @@ pub fn restart() -> ! {
     log!(Warn, TAG, "HW lock acquired!");
     shutdown();
     log!(Warn, TAG, "restart");
-    unsafe { sys::esp_restart() }
+    crate::idf::task::restart()
 }
 
 /// The fan settings with the board's defaults (as the former

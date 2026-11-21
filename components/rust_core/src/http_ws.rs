@@ -158,16 +158,7 @@ pub fn start() {
     let _ = TX.set(tx);
     // the task takes the receiver
     *task_rx().lock().unwrap_or_else(|e| e.into_inner()) = Some(rx);
-    unsafe {
-        crate::idf::task::create_psram(
-            task,
-            c"websocket_log_handler".as_ptr(),
-            4096,
-            core::ptr::null_mut(),
-            2,
-            core::ptr::null_mut(),
-        )
-    };
+    crate::idf::task::spawn_psram(task, c"websocket_log_handler", 4096, 0, 2);
 }
 
 /// The receiver until the task takes it.

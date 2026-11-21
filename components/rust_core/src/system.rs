@@ -87,7 +87,7 @@ pub fn reset_reason_text(reason: c_int) -> &'static CStr {
 mod sys {
     use super::*;
     pub use crate::board_api::*;
-    pub use crate::idf::raw::{esp_reset_reason, vTaskSuspend};
+    pub use crate::idf::raw::esp_reset_reason;
     extern "C" {
         pub fn disp_wait_for_splashs();
         pub fn disp_portal_screen(ssid: *const c_char);
@@ -107,7 +107,6 @@ mod sys {
 #[allow(non_snake_case)]
 mod sys {
     use super::*;
-    pub unsafe fn vTaskSuspend(_: *mut core::ffi::c_void) {}
     pub unsafe fn esp_reset_reason() -> c_int {
         1
     }
@@ -406,7 +405,7 @@ pub fn run() -> ! {
 
         if crate::power_mgmt::is_shutdown() {
             log!(Warn, TAG, "suspended");
-            unsafe { sys::vTaskSuspend(core::ptr::null_mut()) };
+            crate::idf::task::suspend_self();
         }
 
         if can_slave {

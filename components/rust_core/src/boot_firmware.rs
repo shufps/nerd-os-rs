@@ -12,7 +12,7 @@ use std::time::Duration;
 
 use crate::boot::{Hooks, PoolMode};
 use crate::idf::nvs::err_name;
-use crate::idf::task::{create_internal, create_psram, TaskFn};
+use crate::idf::task::{create_internal, TaskFn};
 use crate::idf::{EspErr, ESP_OK};
 use crate::log::log;
 
@@ -52,8 +52,8 @@ pub struct WdtConfig {
 mod sys {
     pub use crate::idf::raw::{
         boot_cpp_hooks, esp_event_loop_create_default, esp_netif_init, esp_task_wdt_init,
-        gpio_install_isr_service, heap_caps_calloc, heap_caps_free, heap_caps_get_free_size,
-        mbedtls_platform_set_calloc_free, nvs_flash_init, vTaskSuspend,
+        gpio_install_isr_service, heap_caps_calloc, heap_caps_free,
+        mbedtls_platform_set_calloc_free, nvs_flash_init,
     };
 }
 
@@ -74,9 +74,6 @@ mod sys {
         core::ptr::null_mut()
     }
     pub unsafe fn heap_caps_free(_: *mut c_void) {}
-    pub unsafe fn heap_caps_get_free_size(_: u32) -> usize {
-        0
-    }
     pub unsafe fn nvs_flash_init() -> EspErr {
         ESP_OK
     }
@@ -89,7 +86,6 @@ mod sys {
     pub unsafe fn esp_event_loop_create_default() -> EspErr {
         ESP_OK
     }
-    pub unsafe fn vTaskSuspend(_: *mut c_void) {}
 }
 
 /// `ESP_ERROR_CHECK()`
@@ -137,15 +133,8 @@ fn board_info() -> crate::board::ffi::Info {
     }
 }
 
-unsafe fn task(code: TaskFn, name: &'static CStr, stack: u32, prio: u32) {
-    create_psram(
-        code,
-        name.as_ptr(),
-        stack,
-        core::ptr::null_mut(),
-        prio,
-        core::ptr::null_mut(),
-    );
+fn task(code: TaskFn, name: &'static CStr, stack: u32, prio: u32) {
+    crate::idf::task::spawn_psram(code, name, stack, 0, prio);
 }
 
 /// Network preferred route changed (ETH <-> WiFi): the pools reconnect.
@@ -290,15 +279,13 @@ impl Hooks for Firmware {
     }
 
     fn start_system_tasks(&mut self) {
-        unsafe {
-            task(crate::system::ffi::system_task, c"SYSTEM_task", 4096, 3);
-            task(
-                crate::power_mgmt::ffi::pm_task,
-                c"power mangement",
-                8192,
-                10,
-            );
-        }
+        task(crate::system::ffi::system_task, c"SYSTEM_task", 4096, 3);
+        task(
+            crate::power_mgmt::ffi::pm_task,
+            c"power mangement",
+            8192,
+            10,
+        );
         crate::system::set_startup_done();
     }
 
@@ -325,11 +312,9 @@ impl Hooks for Firmware {
 
     fn start_can_slave_tasks(&mut self) {
         use crate::can::ffi as can;
-        unsafe {
-            task(can::can_slave_task, c"can slave", 4096, 10);
-            task(can::can_slave_result_task, c"can result", 4096, 10);
-            task(can::can_slave_telemetry_task, c"can telem", 4096, 5);
-        }
+        task(can::can_slave_task, c"can slave", 4096, 10);
+        task(can::can_slave_result_task, c"can result", 4096, 10);
+        task(can::can_slave_telemetry_task, c"can telem", 4096, 5);
     }
 
     fn has_hashrate_counter(&mut self) -> bool {
@@ -446,18 +431,16 @@ impl Hooks for Firmware {
 
     fn start_mining_tasks(&mut self) {
         use crate::tasks::ffi as t;
-        unsafe {
-            task(t::create_jobs_task, c"stratum miner", 8192, 10);
-            task(t::ASIC_result_task, c"asic result", 8192, 15);
-            task(t::influx_task, c"influx", 8192, 1);
-            task(crate::apis_fetcher::ffi::apis_task, c"apis ticker", 8192, 5);
-            task(
-                crate::wifi_health::ffi::wifi_monitor_task,
-                c"wifi monitor",
-                4096,
-                1,
-            );
-        }
+        task(t::create_jobs_task, c"stratum miner", 8192, 10);
+        task(t::ASIC_result_task, c"asic result", 8192, 15);
+        task(t::influx_task, c"influx", 8192, 1);
+        task(crate::apis_fetcher::ffi::apis_task, c"apis ticker", 8192, 5);
+        task(
+            crate::wifi_health::ffi::wifi_monitor_task,
+            c"wifi monitor",
+            4096,
+            1,
+        );
     }
 
     fn can_master_wanted(&mut self) -> bool {
@@ -476,14 +459,12 @@ impl Hooks for Firmware {
     }
 
     fn start_stratum_task(&mut self) {
-        unsafe {
-            task(
-                crate::pool_manager::ffi::pool_mgr_task,
-                c"stratum manager",
-                8192,
-                5,
-            )
-        };
+        task(
+            crate::pool_manager::ffi::pool_mgr_task,
+            c"stratum manager",
+            8192,
+            5,
+        );
     }
 
     fn is_shutdown(&mut self) -> bool {
@@ -493,11 +474,11 @@ impl Hooks for Firmware {
     fn suspend(&mut self) {
         // the stratum task leaves the watchdog on shutdown
         log!(Warn, TAG, "suspended");
-        unsafe { sys::vTaskSuspend(core::ptr::null_mut()) };
+        crate::idf::task::suspend_self();
     }
 
     fn free_internal_heap(&mut self) -> usize {
-        unsafe { sys::heap_caps_get_free_size(CAP_INTERNAL) }
+        crate::idf::task::free_heap(CAP_INTERNAL)
     }
 
     fn log_low_heap(&mut self, bytes: usize) {

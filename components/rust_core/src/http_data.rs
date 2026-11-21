@@ -46,9 +46,7 @@ pub struct Partition {
 
 #[cfg(target_os = "espidf")]
 mod sys {
-    pub use crate::idf::raw::{
-        esp_ota_get_running_partition, heap_caps_get_free_size, httpd_req_get_url_query_str,
-    };
+    pub use crate::idf::raw::{esp_ota_get_running_partition, httpd_req_get_url_query_str};
     extern "C" {
         pub fn disp_load_settings();
     }
@@ -58,9 +56,6 @@ mod sys {
 #[allow(non_snake_case)]
 mod sys {
     use super::*;
-    pub unsafe fn heap_caps_get_free_size(_: u32) -> usize {
-        0
-    }
     pub unsafe fn disp_load_settings() {}
     pub unsafe fn esp_ota_get_running_partition() -> *const Partition {
         core::ptr::null()
@@ -316,8 +311,8 @@ unsafe extern "C" fn system_info(req: *mut Req) -> EspErr {
     s.uptime_seconds = uptime_seconds();
     s.last_reset_reason = crate::system::reset_reason().as_ptr();
     s.wifi_status = wifi_status.as_ptr();
-    s.free_heap = sys::heap_caps_get_free_size(CAP_SPIRAM) as u64;
-    s.free_heap_int = sys::heap_caps_get_free_size(CAP_INTERNAL) as u64;
+    s.free_heap = crate::idf::task::free_heap(CAP_SPIRAM) as u64;
+    s.free_heap_int = crate::idf::task::free_heap(CAP_INTERNAL) as u64;
     s.version = version.as_ptr();
     s.running_partition = partition.as_ptr();
     s.default_theme = b.default_theme;

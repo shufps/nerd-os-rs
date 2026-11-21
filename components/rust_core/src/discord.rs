@@ -69,16 +69,7 @@ unsafe extern "C" fn sender_task(_: *mut c_void) {
 /// Reads the settings and starts the sender task.
 pub fn start() {
     load_config();
-    unsafe {
-        task::create_psram(
-            sender_task,
-            c"discord_task".as_ptr(),
-            8192,
-            core::ptr::null_mut(),
-            5,
-            core::ptr::null_mut(),
-        );
-    }
+    task::spawn_psram(sender_task, c"discord_task", 8192, 0, 5);
     log!(Info, TAG, "Discord task started");
 }
 

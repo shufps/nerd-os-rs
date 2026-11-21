@@ -178,6 +178,73 @@ pub fn create_internal(code: TaskFn, name: &'static CStr, stack_bytes: u32, prio
     }
 }
 
+/// Starts `code` as a task with its stack in PSRAM; `arg` is the task's
+/// parameter. False if out of memory.
+pub fn spawn_psram(
+    code: TaskFn,
+    name: &'static CStr,
+    stack_bytes: u32,
+    arg: usize,
+    prio: u32,
+) -> bool {
+    // SAFETY: a static name, no handle to write
+    unsafe {
+        create_psram(
+            code,
+            name.as_ptr(),
+            stack_bytes,
+            arg as *mut c_void,
+            prio,
+            core::ptr::null_mut(),
+        ) == PD_PASS
+    }
+}
+
+/// Blocks the calling task for `ms` (in ticks, rounded down; nothing on the
+/// host).
+pub fn delay_ms(ms: u32) {
+    #[cfg(target_os = "espidf")]
+    // SAFETY: a plain FreeRTOS call from a task
+    unsafe {
+        crate::idf::raw::vTaskDelay(crate::idf::ms_to_ticks(ms))
+    };
+    #[cfg(not(target_os = "espidf"))]
+    let _ = ms;
+}
+
+/// Suspends the calling task until another one resumes it (nothing on the
+/// host).
+pub fn suspend_self() {
+    #[cfg(target_os = "espidf")]
+    // SAFETY: NULL is the calling task
+    unsafe {
+        crate::idf::raw::vTaskSuspend(core::ptr::null_mut())
+    };
+}
+
+/// Free heap with the `MALLOC_CAP_*` bits `caps` (0 on the host).
+pub fn free_heap(caps: u32) -> usize {
+    #[cfg(target_os = "espidf")]
+    // SAFETY: reads the heap statistics
+    return unsafe { crate::idf::raw::heap_caps_get_free_size(caps) };
+    #[cfg(not(target_os = "espidf"))]
+    {
+        let _ = caps;
+        0
+    }
+}
+
+/// Restarts the chip (panics on the host).
+pub fn restart() -> ! {
+    #[cfg(target_os = "espidf")]
+    // SAFETY: does not return
+    unsafe {
+        crate::idf::raw::esp_restart()
+    }
+    #[cfg(not(target_os = "espidf"))]
+    panic!("esp_restart")
+}
+
 // firmware only
 #[cfg(target_os = "espidf")]
 mod ffi {

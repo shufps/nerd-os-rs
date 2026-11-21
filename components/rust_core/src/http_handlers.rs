@@ -32,7 +32,7 @@ const SESSION_TTL_S: u32 = 24 * 3600;
 
 #[cfg(target_os = "espidf")]
 mod sys {
-    pub use crate::idf::raw::{heap_caps_get_free_size, vTaskDelay};
+
     extern "C" {
         pub fn ui_send_show_qr() -> bool;
         pub fn ui_send_hide_qr() -> bool;
@@ -43,10 +43,6 @@ mod sys {
 #[cfg(not(target_os = "espidf"))]
 #[allow(non_snake_case)]
 mod sys {
-    pub unsafe fn vTaskDelay(_: u32) {}
-    pub unsafe fn heap_caps_get_free_size(_: u32) -> usize {
-        0
-    }
     pub unsafe fn ui_send_show_qr() -> bool {
         false
     }
@@ -152,7 +148,7 @@ unsafe extern "C" fn restart(req: *mut Req) -> EspErr {
     );
     send_str(req, c"System will restart shortly.");
     // let the response go out
-    sys::vTaskDelay(crate::idf::ms_to_ticks(1000));
+    crate::idf::task::delay_ms(1000);
     crate::power_mgmt::restart()
 }
 
@@ -163,7 +159,7 @@ unsafe extern "C" fn shutdown(req: *mut Req) -> EspErr {
         "Shutting down System because of API Request"
     );
     send_str(req, c"System will shutdown shortly.");
-    sys::vTaskDelay(crate::idf::ms_to_ticks(1000));
+    crate::idf::task::delay_ms(1000);
     crate::power_mgmt::shutdown();
     ESP_OK
 }
@@ -213,8 +209,8 @@ unsafe extern "C" fn v2_system(req: *mut Req) -> EspErr {
         ip_addr: ip.as_ptr(),
         wifi_status: wifi_status.as_ptr(),
         wifi_rssi: crate::network::wifi_rssi(),
-        free_heap: sys::heap_caps_get_free_size(CAP_SPIRAM) as u64,
-        free_heap_int: sys::heap_caps_get_free_size(CAP_INTERNAL) as u64,
+        free_heap: crate::idf::task::free_heap(CAP_SPIRAM) as u64,
+        free_heap_int: crate::idf::task::free_heap(CAP_INTERNAL) as u64,
     };
     send_doc(req, http_json::v2_system(&v))
 }

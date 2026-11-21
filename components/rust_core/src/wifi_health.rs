@@ -48,7 +48,6 @@ struct Counters {
 mod sys {
     use super::*;
     use crate::idf::raw;
-    pub use raw::vTaskSuspend;
 
     /// The block (plain counters written by the lwIP task, read without a
     /// lock as before).
@@ -100,7 +99,6 @@ mod sys {
     pub fn ap_info() -> Option<(i8, Vec<u8>, u8)> {
         None
     }
-    pub unsafe fn vTaskSuspend(_: *mut c_void) {}
 }
 
 fn reset_stats() {
@@ -152,7 +150,7 @@ pub(crate) mod ffi {
         loop {
             if crate::power_mgmt::is_shutdown() {
                 log!(Warn, TAG, "suspended");
-                sys::vTaskSuspend(core::ptr::null_mut());
+                crate::idf::task::suspend_self();
             }
             log_health();
             std::thread::sleep(PERIOD);

@@ -69,7 +69,6 @@ mod sys {
     pub use crate::board_api::*;
     pub use crate::idf::raw::{
         esp_task_wdt_add, esp_task_wdt_delete, esp_task_wdt_reset, uxTaskGetStackHighWaterMark,
-        vTaskDelay, vTaskSuspend,
     };
 }
 
@@ -78,8 +77,6 @@ mod sys {
 #[allow(non_snake_case)]
 mod sys {
     use super::*;
-    pub unsafe fn vTaskDelay(_: u32) {}
-    pub unsafe fn vTaskSuspend(_: *mut c_void) {}
     pub unsafe fn uxTaskGetStackHighWaterMark(_: *mut c_void) -> u32 {
         0
     }
@@ -115,13 +112,9 @@ mod sys {
     pub fn bapi_clear_board_error(_: c_int) {}
 }
 
-fn delay_ms(ms: u32) {
-    unsafe { sys::vTaskDelay(crate::idf::ms_to_ticks(ms)) }
-}
+use crate::idf::task::delay_ms;
 
-fn suspend_self() {
-    unsafe { sys::vTaskSuspend(core::ptr::null_mut()) }
-}
+use crate::idf::task::suspend_self;
 
 fn now_us() -> u64 {
     crate::cutil::now_us().max(1) as u64
@@ -1417,28 +1410,10 @@ impl Manager {
             // 12 KB: with the Rust loops in the call chain, 8 KB overflowed
             // once on the first mining.notify (see log_stack_low())
             let name = [c"stratum task (pri)", c"stratum task (sec)"][i];
-            unsafe {
-                crate::idf::task::create_psram(
-                    stratum_task_entry,
-                    name.as_ptr(),
-                    12288,
-                    i as *mut c_void,
-                    5,
-                    core::ptr::null_mut(),
-                )
-            };
+            crate::idf::task::spawn_psram(stratum_task_entry, name, 12288, i, 5);
             self.pings[i].store(true, Release);
             let name = [c"ping task (pri)", c"ping task (sec)"][i];
-            unsafe {
-                crate::idf::task::create_psram(
-                    ping_task_entry,
-                    name.as_ptr(),
-                    4096,
-                    i as *mut c_void,
-                    1,
-                    core::ptr::null_mut(),
-                )
-            };
+            crate::idf::task::spawn_psram(ping_task_entry, name, 4096, i, 1);
         }
 
         let first = if self.is_dual() { 2 } else { 1 };

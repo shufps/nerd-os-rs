@@ -18,18 +18,6 @@ use crate::power_mgmt;
 
 idf_const!(CAP_INTERNAL: u32 = MALLOC_CAP_INTERNAL, 1 << 11);
 
-#[cfg(target_os = "espidf")]
-mod sys {
-    pub use crate::idf::raw::heap_caps_get_free_size;
-}
-
-#[cfg(not(target_os = "espidf"))]
-mod sys {
-    pub unsafe fn heap_caps_get_free_size(_: u32) -> usize {
-        0
-    }
-}
-
 unsafe fn send_err(req: *mut Req, code: httpd::ErrCode, msg: &CStr) -> EspErr {
     httpd::httpd_resp_send_err(req, code, msg.as_ptr())
 }
@@ -103,7 +91,7 @@ pub unsafe extern "C" fn nodes(req: *mut Req) -> EspErr {
         current: power_mgmt::get(2),
         vout: crate::board::ffi::board_power_value(3),
         board_error: crate::system::error().0,
-        free_heap_int: sys::heap_caps_get_free_size(CAP_INTERNAL) as c_int,
+        free_heap_int: crate::idf::task::free_heap(CAP_INTERNAL) as c_int,
         frequency: b.asic_frequency,
         core_voltage: b.asic_voltage_mv,
         flip_screen: b.flip_screen,

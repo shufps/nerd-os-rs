@@ -21,22 +21,10 @@ use crate::pool_manager::ffi as mgr;
 /// the influx client's answer limit (`influx.rs`)
 const RESPONSE_MAX: usize = 32768;
 
-#[cfg(target_os = "espidf")]
-mod sys {
-    pub use crate::idf::raw::vTaskSuspend;
-}
-
-#[cfg(not(target_os = "espidf"))]
-#[allow(non_snake_case)]
-mod sys {
-    use super::*;
-    pub unsafe fn vTaskSuspend(_: *mut c_void) {}
-}
-
 fn suspend_if_shutdown(tag: &CStr) {
     if crate::power_mgmt::is_shutdown() {
         log!(Warn, tag, "suspended");
-        unsafe { sys::vTaskSuspend(core::ptr::null_mut()) };
+        crate::idf::task::suspend_self();
     }
 }
 
@@ -348,16 +336,13 @@ pub(crate) mod ffi {
             return false;
         };
         crate::hashrate::ffi::hashrate_monitor_init(board_info().asic_count);
-        unsafe {
-            crate::idf::task::create_psram(
-                hashrate_task,
-                c"hr_monitor".as_ptr(),
-                4096,
-                a as *const asic::Handle as *mut c_void,
-                10,
-                core::ptr::null_mut(),
-            )
-        };
+        crate::idf::task::spawn_psram(
+            hashrate_task,
+            c"hr_monitor",
+            4096,
+            a as *const asic::Handle as usize,
+            10,
+        );
         log!(Info, HR_TAG, "started (period=5000ms)");
         true
     }

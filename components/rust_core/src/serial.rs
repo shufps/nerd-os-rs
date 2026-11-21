@@ -41,7 +41,7 @@ pub struct UartConfig {
 mod sys {
     pub use crate::idf::raw::{
         uart_driver_install, uart_flush, uart_param_config, uart_read_bytes, uart_set_baudrate,
-        uart_set_pin, uart_write_bytes, vTaskDelay,
+        uart_set_pin, uart_write_bytes,
     };
 }
 
@@ -77,7 +77,6 @@ mod sys {
     pub unsafe fn uart_flush(_: u32) -> c_int {
         0
     }
-    pub unsafe fn vTaskDelay(_: u32) {}
 }
 
 /// Whole frames: the jobs, the results and the counter tasks send.
@@ -149,7 +148,7 @@ unsafe extern "C" fn uart_clear(_: *mut c_void) {
 }
 
 unsafe extern "C" fn uart_delay(_: *mut c_void, ms: u32) {
-    sys::vTaskDelay(crate::idf::ms_to_ticks(ms))
+    crate::idf::task::delay_ms(ms)
 }
 
 /// The ASIC driver's UART.

@@ -31,7 +31,7 @@ mod sys {
         esp_ota_abort, esp_ota_begin, esp_ota_end, esp_ota_get_next_update_partition,
         esp_ota_set_boot_partition, esp_ota_write, esp_partition_erase_range,
         esp_partition_find_first, esp_partition_write, heap_caps_free, heap_caps_malloc,
-        vPortYield, vTaskDelay,
+        vPortYield,
     };
 }
 
@@ -76,7 +76,6 @@ mod sys {
     }
     pub unsafe fn heap_caps_free(_: *mut c_void) {}
     pub unsafe fn vPortYield() {}
-    pub unsafe fn vTaskDelay(_: u32) {}
 }
 
 /// A buffer in internal RAM.
@@ -171,7 +170,7 @@ unsafe fn upload_error(req: *mut Req, e: UploadError) -> EspErr {
 
 /// The restart after a firmware upload (with or without success).
 fn restart_soon() -> ! {
-    unsafe { sys::vTaskDelay(crate::idf::ms_to_ticks(1000)) };
+    crate::idf::task::delay_ms(1000);
     power_mgmt::restart()
 }
 

@@ -166,3 +166,12 @@ Still to test:
 - identify (CAN command), the error overlay;
 - the self test (`selftest` set, best difficulty 0) with its two log screens;
 - a board with `flip_screen` (mirrored panel).
+
+## IPv6 (pool connections and web access)
+
+Ported from #18/#19. Tested on a Q1373 over Ethernet with SLAAC (global prefix from the router): IPv6 to a dual-stack TLS pool (solo.atlaspool.io:4333) with accepted shares; fallback to IPv4 when the pool refuses IPv6 (ckpool); web access from a link-local client allowed, from a global IPv6 client refused.
+
+Still to test:
+- the web UI accepting IPv6 pool addresses (the www image was not rebuilt);
+- IPv6 over Wi-Fi on a Q1373, and a unique-local (fc00::/7) client;
+- an IPv6 literal (with and without brackets) as the pool address.

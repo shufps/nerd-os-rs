@@ -36,10 +36,9 @@ pub fn build(
     extranonce2_len: i32,
     extranonce2: u32,
 ) -> Option<(JobHashes, String)> {
-    let n = notify.n_merkle_branches.min(notify.merkle_branches.len());
     build_parts(
         &notify.prev_block_hash,
-        &notify.merkle_branches[..n],
+        &notify.merkle_branches,
         coinbase,
         extranonce2_len,
         extranonce2,

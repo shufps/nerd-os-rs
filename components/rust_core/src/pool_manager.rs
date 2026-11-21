@@ -819,7 +819,7 @@ impl V1Hooks for DispatchCtx<'_> {
     }
 
     fn process_coinbase(&mut self, pool: c_int, n: &MiningNotify) {
-        if n.coinbase_1.is_null() || n.coinbase_2.is_null() || !(0..2).contains(&pool) {
+        if !(0..2).contains(&pool) {
             return;
         }
         let c = &self.cfg[pool as usize];
@@ -828,12 +828,10 @@ impl V1Hooks for DispatchCtx<'_> {
             return;
         }
         let vc = verify_config(pool);
-        // SAFETY: the parser's NUL-terminated strings, alive for this call
-        let (c1, c2) = unsafe { (CStr::from_ptr(n.coinbase_1), CStr::from_ptr(n.coinbase_2)) };
         let o = self.m.coinbase.process_v1(
             pool,
-            c1.to_bytes(),
-            c2.to_bytes(),
+            &n.coinbase_1,
+            &n.coinbase_2,
             n.version,
             n.target,
             Some(c.user.to_bytes()),

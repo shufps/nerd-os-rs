@@ -257,21 +257,17 @@ impl V1 {
         self.coinbase_2 = None;
     }
 
-    /// # Safety
-    /// The notify's strings are NUL-terminated or NULL.
-    unsafe fn notify(&mut self, n: &MiningNotify) {
+    fn notify(&mut self, n: &MiningNotify) {
         // a pending extranonce switch takes effect now
         if let Some((e, len)) = self.next_extranonce.take() {
             self.extranonce = Some(e);
             self.extranonce2_len = len;
         }
-        let s = |p: *mut c_char| (!p.is_null()).then(|| CStr::from_ptr(p).to_bytes().to_vec());
-        self.job_id = s(n.job_id);
-        self.coinbase_1 = s(n.coinbase_1);
-        self.coinbase_2 = s(n.coinbase_2);
+        self.job_id = Some(n.job_id.clone());
+        self.coinbase_1 = Some(n.coinbase_1.clone());
+        self.coinbase_2 = Some(n.coinbase_2.clone());
         self.prev_block_hash = n.prev_block_hash;
-        let branches = n.n_merkle_branches.min(n.merkle_branches.len());
-        self.merkle_branches = n.merkle_branches[..branches].to_vec();
+        self.merkle_branches = n.merkle_branches.clone();
         self.version = n.version;
         self.nbits = n.target;
         self.ntime = n.ntime;
@@ -531,10 +527,7 @@ pub static TRIGGERS: core::sync::atomic::AtomicU32 = core::sync::atomic::AtomicU
 // --- Stratum v1 (from the pool dispatch)
 
 /// `mining.notify`; `abandon` drops the pool's jobs first.
-///
-/// # Safety
-/// The notify's strings are NUL-terminated or NULL.
-pub unsafe fn v1_notify(pool: c_int, notify: &MiningNotify, abandon: bool) {
+pub fn v1_notify(pool: c_int, notify: &MiningNotify, abandon: bool) {
     if abandon {
         master().clean(pool);
     }
@@ -766,29 +759,24 @@ mod tests {
 
     use super::test_support::{fresh as serial, take};
 
-    fn notify(
-        job_id: &std::ffi::CString,
-        cb1: &std::ffi::CString,
-        cb2: &std::ffi::CString,
-    ) -> Box<MiningNotify> {
-        // SAFETY: MiningNotify is plain numbers, arrays and nullable pointers
-        let mut n: Box<MiningNotify> = unsafe { Box::new(core::mem::zeroed()) };
-        n.job_id = job_id.as_ptr() as *mut _;
-        n.coinbase_1 = cb1.as_ptr() as *mut _;
-        n.coinbase_2 = cb2.as_ptr() as *mut _;
-        n.version = 0x2000_0000;
-        n.target = 0x1703_a30c;
-        n.ntime = 0x66f0_0000;
-        n
+    fn notify(job_id: &[u8], cb1: &[u8], cb2: &[u8]) -> MiningNotify {
+        MiningNotify {
+            job_id: job_id.to_vec(),
+            coinbase_1: cb1.to_vec(),
+            coinbase_2: cb2.to_vec(),
+            version: 0x2000_0000,
+            target: 0x1703_a30c,
+            ntime: 0x66f0_0000,
+            ..Default::default()
+        }
     }
 
     #[test]
     fn v1_needs_notify_and_extranonce() {
         let _s = serial();
-        let (id, cb1, cb2) = (c"1d2e".into(), c"0100".into(), c"ffff".into());
-        let n = notify(&id, &cb1, &cb2);
-        // SAFETY: the notify's strings are the test's live CStrings
-        unsafe { v1_notify(0, &n, false) };
+        let (id, cb1, cb2) = (b"1d2e", b"0100", b"ffff");
+        let n = notify(id, cb1, cb2);
+        v1_notify(0, &n, false);
         assert!(build(0, 0, false, |d| d).is_none());
 
         v1_set_extranonce(0, Some(b"aabbccdd"), 4);
@@ -804,23 +792,20 @@ mod tests {
             (8192, 512, "1d2e".into(), "00000007".into(), 0, 0)
         );
 
-        // SAFETY: the notify's strings are the test's live CStrings
-        unsafe { v1_notify(0, &n, false) };
+        v1_notify(0, &n, false);
         assert_eq!(take(build(0, 1, false, |d| d)).0, 4096);
     }
 
     #[test]
     fn v1_next_extranonce_waits_for_the_notify() {
         let _s = serial();
-        let (id, cb1, cb2) = (c"1".into(), c"01".into(), c"02".into());
-        let n = notify(&id, &cb1, &cb2);
+        let (id, cb1, cb2) = (b"1", b"01", b"02");
+        let n = notify(id, cb1, cb2);
         v1_set_extranonce(1, Some(b"aa"), 2);
-        // SAFETY: the notify's strings are the test's live CStrings
-        unsafe { v1_notify(1, &n, false) };
+        v1_notify(1, &n, false);
         v1_set_next_extranonce(1, Some(b"bb"), 3);
         assert_eq!(take(build(1, 1, false, |d| d)).3, "0001");
-        // SAFETY: the notify's strings are the test's live CStrings
-        unsafe { v1_notify(1, &n, false) };
+        v1_notify(1, &n, false);
         assert_eq!(take(build(1, 1, false, |d| d)).3, "000001");
     }
 
@@ -929,14 +914,12 @@ mod tests {
         sv2_standard(0, &std_job(2), true, 0, 1);
         assert!(master().clone_job(1).is_none());
 
-        let (id, cb1, cb2) = (c"1".into(), c"01".into(), c"02".into());
-        let n = notify(&id, &cb1, &cb2);
+        let (id, cb1, cb2) = (b"1", b"01", b"02");
+        let n = notify(id, cb1, cb2);
         v1_set_extranonce(0, Some(b"aa"), 2);
-        // SAFETY: the notify's strings are the test's live CStrings
-        unsafe { v1_notify(0, &n, false) };
+        v1_notify(0, &n, false);
         master().store(build(0, 0, false, |d| d).unwrap(), 2);
-        // SAFETY: the notify's strings are the test's live CStrings
-        unsafe { v1_notify(0, &n, true) };
+        v1_notify(0, &n, true);
         assert!(master().clone_job(2).is_none());
     }
 }

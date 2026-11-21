@@ -126,38 +126,30 @@ impl Session {
     }
 }
 
-pub(crate) mod api {
-    use super::*;
+/// The log lines of the former `StratumApi::parse()`.
+pub(crate) fn log_parsed(ok: bool, m: &Message) {
+    use super::method::*;
+    use crate::log::log;
     use core::ffi::CStr;
-
-    /// The log lines of the former `StratumApi::parse()`.
-    pub(crate) unsafe fn log_parsed(ok: bool, m: &Message) {
-        use super::super::method::*;
-        use crate::log::log;
-        const TAG: &CStr = c"stratum_api";
-        match m.method {
-            MINING_NOTIFY => log!(Info, TAG, "mining notify"),
-            MINING_SET_EXTRANONCE | STRATUM_RESULT_SUBSCRIBE if ok => {
-                let en = if m.extranonce_str.is_null() {
-                    "".into()
-                } else {
-                    CStr::from_ptr(m.extranonce_str).to_string_lossy()
-                };
-                log!(Info, TAG, "extranonce_str: {en}");
-                log!(Info, TAG, "extranonce_2_len: {}", m.extranonce_2_len);
-            }
-            MINING_SET_EXTRANONCE | STRATUM_RESULT_SUBSCRIBE => log!(
-                Error,
-                TAG,
-                "Invalid extranonce (extranonce_2_len {})",
-                m.extranonce_2_len
-            ),
-            STRATUM_RESULT_VERSION_MASK if ok => {
-                log!(Info, TAG, "Set version mask: {:08x}", m.version_mask)
-            }
-            STRATUM_UNKNOWN => log!(Warn, TAG, "Unhandled stratum message"),
-            _ => {}
+    const TAG: &CStr = c"stratum_api";
+    match m.method {
+        MINING_NOTIFY => log!(Info, TAG, "mining notify"),
+        MINING_SET_EXTRANONCE | STRATUM_RESULT_SUBSCRIBE if ok => {
+            let en = String::from_utf8_lossy(m.extranonce_str.as_deref().unwrap_or_default());
+            log!(Info, TAG, "extranonce_str: {en}");
+            log!(Info, TAG, "extranonce_2_len: {}", m.extranonce_2_len);
         }
+        MINING_SET_EXTRANONCE | STRATUM_RESULT_SUBSCRIBE => log!(
+            Error,
+            TAG,
+            "Invalid extranonce (extranonce_2_len {})",
+            m.extranonce_2_len
+        ),
+        STRATUM_RESULT_VERSION_MASK if ok => {
+            log!(Info, TAG, "Set version mask: {:08x}", m.version_mask)
+        }
+        STRATUM_UNKNOWN => log!(Warn, TAG, "Unhandled stratum message"),
+        _ => {}
     }
 }
 
@@ -167,9 +159,9 @@ mod tests {
     use super::*;
 
     fn parse_method(s: &mut Session, json: &str) -> (bool, i32) {
-        let mut m = Message::zeroed();
+        let mut m = Message::default();
         let ok = s.parse(json.as_bytes(), &mut m);
-        assert!(m.mining_notification.is_null() && m.extranonce_str.is_null());
+        assert!(m.mining_notification.is_none() && m.extranonce_str.is_none());
         (ok, m.method)
     }
 

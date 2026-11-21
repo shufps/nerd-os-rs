@@ -6,7 +6,6 @@ use core::ffi::{c_char, c_void};
 #[cfg(not(target_os = "espidf"))]
 extern "C" {
     fn malloc(size: usize) -> *mut c_void;
-    fn calloc(n: usize, size: usize) -> *mut c_void;
 }
 
 extern "C" {
@@ -49,40 +48,6 @@ pub fn c_malloc(size: usize) -> *mut c_void {
     unsafe {
         malloc(size.max(1))
     }
-}
-
-/// Zeroed `c_malloc()` for a `T`; null if out of memory.
-pub fn c_alloc_zeroed<T>() -> *mut T {
-    let size = core::mem::size_of::<T>();
-    #[cfg(target_os = "espidf")]
-    {
-        let p = c_malloc(size);
-        if !p.is_null() {
-            // SAFETY: p points to `size` writable bytes.
-            unsafe { core::ptr::write_bytes(p as *mut u8, 0, size) };
-        }
-        p as *mut T
-    }
-    #[cfg(not(target_os = "espidf"))]
-    // SAFETY: plain allocation call.
-    unsafe {
-        calloc(1, size) as *mut T
-    }
-}
-
-/// NUL-terminated copy of `s` (cut at its first NUL), allocated with
-/// `c_malloc()`; null if out of memory.
-pub fn c_strdup(s: &[u8]) -> *mut c_char {
-    let s = until_nul(s);
-    let p = c_malloc(s.len() + 1) as *mut u8;
-    if !p.is_null() {
-        // SAFETY: p has room for s.len() + 1 bytes.
-        unsafe {
-            core::ptr::copy_nonoverlapping(s.as_ptr(), p, s.len());
-            *p.add(s.len()) = 0;
-        }
-    }
-    p as *mut c_char
 }
 
 /// Lowercase hex of `b`.

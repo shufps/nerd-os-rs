@@ -6,14 +6,12 @@
 
 use std::cell::Cell;
 use std::collections::VecDeque;
-use std::ffi::{c_char, CStr};
 use std::sync::Mutex;
 
-use rust_core::cutil::c_free;
 use rust_core::stratum_v1::connection::{receive_line, send_tracked, Io, Transfer};
 use rust_core::stratum_v1::lines::LineBuffer;
 use rust_core::stratum_v1::session::Session;
-use rust_core::stratum_v1::{method, Message, MiningNotify};
+use rust_core::stratum_v1::{method, Message};
 use serde_json::{json, Value};
 
 mod golden;
@@ -56,38 +54,21 @@ impl Rng {
     }
 }
 
-/// Owned parse result; frees what the parser allocated.
+/// A parse result.
 struct Parsed {
     ok: bool,
     m: Message,
 }
 
-impl Drop for Parsed {
-    fn drop(&mut self) {
-        // SAFETY: the parser allocates with malloc on the host.
-        unsafe {
-            let n = self.m.mining_notification;
-            if !n.is_null() {
-                for p in [(*n).job_id, (*n).coinbase_1, (*n).coinbase_2] {
-                    c_free(p as _);
-                }
-                c_free(n as _);
-            }
-            c_free(self.m.extranonce_str as _);
-        }
-    }
-}
-
 /// Parsing without requests sent: responses fall back to the fixed ID rule.
 fn parse_new(json: &str) -> Parsed {
-    let mut m = Message::zeroed();
+    let mut m = Message::default();
     let ok = Session::default().parse(json.as_bytes(), &mut m);
     Parsed { ok, m }
 }
 
-fn cstr(p: *const c_char) -> Option<String> {
-    // SAFETY: NUL-terminated strings allocated by the parsers.
-    (!p.is_null()).then(|| unsafe { CStr::from_ptr(p) }.to_string_lossy().into_owned())
+fn text(s: &[u8]) -> String {
+    String::from_utf8_lossy(s).into_owned()
 }
 
 /// Everything the firmware reads from a parse result.
@@ -99,22 +80,20 @@ fn summary(p: &Parsed) -> String {
         m.method,
         m.message_id,
         m.extranonce_2_len,
-        cstr(m.extranonce_str),
-        m.should_abandon_work,
+        m.extranonce_str.as_deref().map(text),
+        m.should_abandon_work as i32,
         m.new_difficulty,
         m.version_mask,
         m.response_success
     );
-    if !m.mining_notification.is_null() && p.ok {
-        // SAFETY: set by a successful parse.
-        let n: &MiningNotify = unsafe { &*m.mining_notification };
+    if let Some(n) = m.mining_notification.as_ref().filter(|_| p.ok) {
         s += &format!(
             " notify: job={:?} prev={:02x?} cb1={:?} cb2={:?} merkle={:02x?} version={:#x} nbits={:#x} ntime={:#x}",
-            cstr(n.job_id),
+            Some(text(&n.job_id)),
             n.prev_block_hash,
-            cstr(n.coinbase_1),
-            cstr(n.coinbase_2),
-            &n.merkle_branches[..n.n_merkle_branches],
+            Some(text(&n.coinbase_1)),
+            Some(text(&n.coinbase_2)),
+            &n.merkle_branches[..],
             n.version,
             n.target,
             n.ntime
@@ -635,7 +614,7 @@ fn share_result_with_setup_id() {
     let sent = String::from_utf8(t.sent.clone()).unwrap();
     assert!(sent.contains("{\"id\": 5, \"method\": \"mining.submit\""));
 
-    let mut m = Message::zeroed();
+    let mut m = Message::default();
     let ok = api.parse("{\"id\":5,\"result\":true,\"error\":null}", &mut m);
     let result = (ok, m.method, m.response_success);
     assert_eq!(result, (true, method::STRATUM_RESULT, true));

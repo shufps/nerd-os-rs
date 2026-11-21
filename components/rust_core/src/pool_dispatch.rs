@@ -7,7 +7,7 @@
 //! `SubmitShares.Success` counts its shares at once instead of once per
 //! share: the count comes from the pool and can be as large as `0xFFFFFFFF`.
 
-use core::ffi::{c_char, c_int, CStr};
+use core::ffi::{c_int, CStr};
 use std::sync::Mutex;
 
 use crate::jobs;
@@ -49,22 +49,14 @@ pub trait V2Hooks {
     fn valid_notify(&mut self, pool: c_int);
 }
 
-/// # Safety
-/// `p` is NULL or NUL-terminated and outlives the result.
-unsafe fn text<'a>(p: *const c_char) -> std::borrow::Cow<'a, str> {
-    if p.is_null() {
-        "".into()
-    } else {
-        CStr::from_ptr(p).to_string_lossy()
-    }
+/// `s` for a log line ("" for None).
+fn text(s: Option<&[u8]>) -> std::borrow::Cow<'_, str> {
+    String::from_utf8_lossy(s.unwrap_or_default())
 }
 
 /// Acts on one parsed v1 message (`ok`: the parser's result).
-///
-/// # Safety
-/// `m` comes from the v1 parser (its strings NULL or NUL-terminated).
 #[allow(clippy::too_many_arguments)]
-unsafe fn handle_v1(
+fn handle_v1(
     h: &mut impl V1Hooks,
     stats: &Stats,
     coinbase: &Coinbase,
@@ -87,20 +79,19 @@ unsafe fn handle_v1(
         return;
     }
 
-    let enonce =
-        || (!m.extranonce_str.is_null()).then(|| CStr::from_ptr(m.extranonce_str).to_bytes());
+    let enonce = || m.extranonce_str.as_deref();
     let store_extranonce =
         || coinbase.with(|c| c.set_extranonce(pool, enonce(), m.extranonce_2_len));
 
     match m.method {
         MINING_NOTIFY => {
-            let Some(n) = m.mining_notification.as_ref() else {
+            let Some(n) = &m.mining_notification else {
                 return;
             };
             stats.with(|s| s.set_network_difficulty(pool, n.target));
             h.process_coinbase(pool, n);
             let first = h.take_first_job(pool);
-            jobs::v1_notify(pool, n, m.should_abandon_work != 0 || first);
+            jobs::v1_notify(pool, n, m.should_abandon_work || first);
             if n.ntime != 0 {
                 h.valid_notify(pool);
             }
@@ -120,7 +111,7 @@ unsafe fn handle_v1(
                 Info,
                 tag,
                 "Set next enonce {} enonce2-len: {}",
-                text(m.extranonce_str),
+                text(enonce()),
                 m.extranonce_2_len
             );
             store_extranonce();
@@ -131,7 +122,7 @@ unsafe fn handle_v1(
                 Info,
                 tag,
                 "Set enonce {} enonce2-len: {}",
-                text(m.extranonce_str),
+                text(enonce()),
                 m.extranonce_2_len
             );
             store_extranonce();
@@ -224,17 +215,13 @@ pub fn dispatch_v1(
     line: &[u8],
     now_us: u64,
 ) {
-    let mut m = Message::zeroed();
+    let mut m = Message::default();
     let ok = session
         .lock()
         .unwrap_or_else(|e| e.into_inner())
         .parse(line, &mut m);
-    // SAFETY: m was filled by the parser and is freed only below
-    unsafe {
-        crate::stratum_v1::session::api::log_parsed(ok, &m);
-        handle_v1(h, stats, coinbase, pool, tag, &m, ok, now_us);
-        crate::stratum_v1::api::stratum_v1_message_free(&mut m);
-    }
+    crate::stratum_v1::session::log_parsed(ok, &m);
+    handle_v1(h, stats, coinbase, pool, tag, &m, ok, now_us);
 }
 
 /// Takes every pending session event and acts on it (the former
@@ -284,8 +271,7 @@ mod tests {
             self.calls.push(format!("valid_notify {pool}"));
         }
         fn process_coinbase(&mut self, pool: c_int, n: &MiningNotify) {
-            // SAFETY: a parsed notify
-            let c1 = unsafe { text(n.coinbase_1) };
+            let c1 = text(Some(&n.coinbase_1));
             self.calls.push(format!("coinbase {pool} {c1}"));
         }
     }

@@ -69,11 +69,6 @@ fn hashes_text(h: &JobHashes) -> String {
     )
 }
 
-fn zeroed_notify() -> MiningNotify {
-    // SAFETY: all-zero is a valid MiningNotify (null pointers, zero numbers).
-    unsafe { std::mem::zeroed() }
-}
-
 #[test]
 fn build_job_matches_reference() {
     let (n, seed) = iterations();
@@ -85,7 +80,6 @@ fn build_job_matches_reference() {
         let cb1 = CString::new(rng.hex(rng.below(200) + rng.below(2))).unwrap();
         let cb2 = CString::new(rng.hex(rng.below(300) + rng.below(2))).unwrap();
         let en1 = CString::new(rng.hex(2 * rng.below(9))).unwrap();
-        let job_id = CString::new("1").unwrap();
         let en2_len = 1 + rng.below(16) as i32;
         let en2 = match rng.below(4) {
             0 => rng.below(256) as u32,
@@ -94,15 +88,16 @@ fn build_job_matches_reference() {
             _ => rng.below(1 << 20) as u32,
         };
 
-        let mut notify = zeroed_notify();
-        notify.job_id = job_id.as_ptr() as _;
-        notify.coinbase_1 = cb1.as_ptr() as _;
-        notify.coinbase_2 = cb2.as_ptr() as _;
-        notify.prev_block_hash = rng.bytes32();
-        notify.n_merkle_branches = rng.below(15);
-        for b in &mut notify.merkle_branches[..notify.n_merkle_branches] {
-            *b = rng.bytes32();
-        }
+        let prev_block_hash = rng.bytes32();
+        let n_merkle = rng.below(15);
+        let notify = MiningNotify {
+            job_id: b"1".to_vec(),
+            coinbase_1: cb1.as_bytes().to_vec(),
+            coinbase_2: cb2.as_bytes().to_vec(),
+            prev_block_hash,
+            merkle_branches: (0..n_merkle).map(|_| rng.bytes32()).collect(),
+            ..Default::default()
+        };
 
         let (hashes, new_en2) = build(
             &notify,
@@ -162,7 +157,7 @@ fn genesis_block_through_both() {
     let tx = "01000000010000000000000000000000000000000000000000000000000000000000000000ffffffff4d04ffff001d0104455468652054696d65732030332f4a616e2f32303039204368616e63656c6c6f72206f6e206272696e6b206f66207365636f6e64206261696c6f757420666f722062616e6b73ffffffff0100f2052a01000000434104678afdb0fe5548271967f1a67130b7105cd6a828e03909a67962e0ea1f61deb649f6bc3f4cef38c4f35504e51ec112de5c384df7ba0b8d578a4c702b6bf11d5fac00000000";
     let (cb1, en1, cb2) = (&tx[..100], &tx[100..108], &tx[116..]);
     let en2 = u32::from_str_radix(&tx[108..116], 16).unwrap();
-    let notify = zeroed_notify();
+    let notify = MiningNotify::default();
 
     let (hashes, _) = build(
         &notify,

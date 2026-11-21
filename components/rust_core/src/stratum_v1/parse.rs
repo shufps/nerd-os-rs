@@ -3,7 +3,7 @@
 use super::session::Request;
 use super::*;
 use crate::ajson::{self, Json};
-use crate::cutil::{c_alloc_zeroed, c_strdup, hex2bin, strtoul32_hex};
+use crate::cutil::{hex2bin, strtoul32_hex, until_nul};
 
 /// Whether `line` is one JSON value as ArduinoJson reads it (the former
 /// `deserializeJson()` check of the connection loop).
@@ -97,30 +97,22 @@ fn parse_notify(params: &Json, message: &mut Message) -> bool {
         return false;
     };
 
-    let notify = c_alloc_zeroed::<MiningNotify>();
-    if notify.is_null() {
-        return false;
-    }
-    // SAFETY: freshly allocated and zeroed; all-zero is a valid MiningNotify.
-    let n = unsafe { &mut *notify };
-    message.mining_notification = notify;
-
-    n.job_id = c_strdup(job_id);
-    n.coinbase_1 = c_strdup(coinbase_1);
-    n.coinbase_2 = c_strdup(coinbase_2);
-    if n.job_id.is_null() || n.coinbase_1.is_null() || n.coinbase_2.is_null() {
-        return false; // the caller frees what was allocated
-    }
-    hex2bin(prev_hash, &mut n.prev_block_hash);
-    for (dst, hex) in n.merkle_branches.iter_mut().zip(&branches) {
-        hex2bin(hex, dst);
-    }
-    n.n_merkle_branches = n_merkle;
-    n.version = strtoul32_hex(version);
-    n.target = strtoul32_hex(nbits);
-    n.ntime = strtoul32_hex(ntime);
-
-    message.should_abandon_work = params.at(params.len() - 1).truthy() as c_int;
+    let hash = |hex| {
+        let mut h = [0; HASH_SIZE];
+        hex2bin(hex, &mut h);
+        h
+    };
+    message.mining_notification = Some(MiningNotify {
+        job_id: until_nul(job_id).to_vec(),
+        prev_block_hash: hash(prev_hash),
+        coinbase_1: until_nul(coinbase_1).to_vec(),
+        coinbase_2: until_nul(coinbase_2).to_vec(),
+        merkle_branches: branches.into_iter().map(hash).collect(),
+        version: strtoul32_hex(version),
+        target: strtoul32_hex(nbits),
+        ntime: strtoul32_hex(ntime),
+    });
+    message.should_abandon_work = params.at(params.len() - 1).truthy();
     true
 }
 
@@ -132,8 +124,8 @@ fn set_extranonce(extranonce: &Json, extranonce2_len: &Json, message: &mut Messa
     if !EXTRANONCE2_LEN.contains(&message.extranonce_2_len) {
         return false;
     }
-    message.extranonce_str = c_strdup(extranonce);
-    !message.extranonce_str.is_null()
+    message.extranonce_str = Some(until_nul(extranonce).to_vec());
+    true
 }
 
 /// A response to `request` (None: not a known request).
@@ -179,38 +171,13 @@ fn parse_result(doc: &Json) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use core::ffi::CStr;
 
     struct Parsed(Message, bool);
 
-    impl Drop for Parsed {
-        fn drop(&mut self) {
-            extern "C" {
-                fn free(p: *mut core::ffi::c_void);
-            }
-            // SAFETY: the parser allocated these with malloc (host build).
-            unsafe {
-                let n = self.0.mining_notification;
-                if !n.is_null() {
-                    for p in [(*n).job_id, (*n).coinbase_1, (*n).coinbase_2] {
-                        free(p as _);
-                    }
-                    free(n as _);
-                }
-                free(self.0.extranonce_str as _);
-            }
-        }
-    }
-
     fn parse_str(s: &str) -> Parsed {
-        let mut m = Message::zeroed();
+        let mut m = Message::default();
         let ok = parse(s.as_bytes(), &mut m);
         Parsed(m, ok)
-    }
-
-    fn cstr(p: *const c_char) -> &'static str {
-        // SAFETY: test strings come from the parser and live until Parsed drops.
-        unsafe { CStr::from_ptr(p) }.to_str().unwrap()
     }
 
     const NOTIFY: &str = r#"{"params":["67a1","4d16b6f85af6e2198f44ae2a6de67f78487ae5611b77c6c0440b921e00000000","01000000010000000000000000000000000000000000000000000000000000000000000000ffffffff20020862062f503253482f04b8864e5008","072f736c7573682f000000000100f2052a010000001976a914d23fcdf86f7e756a64a7a9688ef9903327048ed988ac00000000",["cd0b41a3b1a17d6e8bb9ce9a3ff0a1c2e2b3e5b1f1a6c3d9e8f7a6b5c4d3e2f1"],"20000000","1703a30c","66b9a2f0",true],"id":null,"method":"mining.notify"}"#;
@@ -221,13 +188,15 @@ mod tests {
         assert!(p.1);
         assert_eq!(
             (p.0.method, p.0.message_id, p.0.should_abandon_work),
-            (method::MINING_NOTIFY, -1, 1)
+            (method::MINING_NOTIFY, -1, true)
         );
-        // SAFETY: set by a successful parse.
-        let n = unsafe { &*p.0.mining_notification };
-        assert_eq!(cstr(n.job_id), "67a1");
+        let n = p.0.mining_notification.as_ref().unwrap();
+        assert_eq!(n.job_id, b"67a1");
         assert_eq!(&n.prev_block_hash[..4], &[0x4d, 0x16, 0xb6, 0xf8]);
-        assert_eq!((n.n_merkle_branches, n.merkle_branches[0][0]), (1, 0xcd));
+        assert_eq!(
+            (n.merkle_branches.len(), n.merkle_branches[0][0]),
+            (1, 0xcd)
+        );
         assert_eq!(
             (n.version, n.target, n.ntime),
             (0x2000_0000, 0x1703_a30c, 0x66b9_a2f0)
@@ -258,7 +227,7 @@ mod tests {
             (p.0.method, p.0.extranonce_2_len),
             (method::STRATUM_RESULT_SUBSCRIBE, 4)
         );
-        assert_eq!(cstr(p.0.extranonce_str), "08000002");
+        assert_eq!(p.0.extranonce_str.as_deref(), Some(&b"08000002"[..]));
 
         for en2 in ["0", "-1", "17", "-2147483648"] {
             let p = parse_str(&format!(
@@ -337,7 +306,7 @@ mod tests {
         }
         for bad in [&b""[..], b"{", b"{\"id\":}", b"12 "] {
             assert!(!is_json(bad));
-            assert!(!parse(bad, &mut Message::zeroed()));
+            assert!(!parse(bad, &mut Message::default()));
         }
     }
 }

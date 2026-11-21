@@ -333,7 +333,12 @@ fn network_check_matches_reference_except_origin() {
                 c_host.as_ptr(),
             )
         };
-        let current = http_auth::network_allowed(ap, ip, origin.as_deref(), &hostname);
+        let current = http_auth::network_allowed(
+            ap,
+            std::net::IpAddr::V4(ip.into()),
+            origin.as_deref(),
+            &hostname,
+        );
         if current != reference {
             // only the bypass is closed: the reference allowed, the requester is public
             assert!(

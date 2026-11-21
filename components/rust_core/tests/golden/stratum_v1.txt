@@ -1,0 +1,133 @@
+# Golden outputs (the former C/C++ code), see tests/golden/mod.rs
+=== lenient_syntax_matches_reference
+count 42448
+sha256 e351fc2c9cbbb937bcecf5ef7d9579031797239743e419464a384adfbe0858a3
+--- sample 0
+| 0 ok=false method=0 id=-1 en2_len=0 en=None abandon=0 diff=0 mask=0x0 success=false
+--- sample 1
+| 1 ok=false method=8 id=1 en2_len=0 en=None abandon=0 diff=0 mask=0x0 success=false
+--- sample 2
+| 3 ok=false method=7 id=2 en2_len=0 en=None abandon=0 diff=0 mask=0x0 success=false
+--- sample 3
+| 4 ok=true method=1 id=-1 en2_len=0 en=None abandon=1 diff=0 mask=0x0 success=false notify: job=Some("D1f86d") prev=[90, 98, fd, b2, ce, e5, eb, a3, c6, da, 59, e0, c1, 4e, ce, cc, 3b, f7, db, e0, 09, bf, ff, b4, ad, b2, 72, 13, d1, 4b, 8b, 59] cb1=Some("2") cb2=Some("D75BEc42cFC9FD7926d8d8f") merkle=[[9a, 4a, c9, e5, 8d, d6, dc, fb, 97, 1e, b4, 4f, bc, ba, 4b, 8d, f3, e9, fe, 4c, cf, ac, e6, ce, 5d, 5e, b3, db, 9d, c6, e4, 50], [b0, 3a, ad, 92, df, 9e, dd, 9a, 6f, 5d, a5, 7f, bc, cd, 2d, 20, 1d, 4f, 5e, ee, e3, bb, 0c, f6, c3, e3, ea, 50, bb, dd, 58, 90], [57, f3, e2, be, eb, 97, f6, e9, ed, df, ac, 6f, e9, 83, 91, cd, 5f, 9c, 6d, a7, da, d0, 6d, 9f, 34, 5b, a3, f3, 3b, bf, a2, fb], [f8, f8, 17, 03, 42, df, f0, da, 28, 88, 55, e0, d7, b1, 9f, 3f, b6, d3, 8e, fd, 9c, dc, fe, ad, 5b, 9e, ec, d0, ed, 45, bf, f4], [a3, d2, 6d, 65, db, b6, 47, f9, a1, 1f, a3, a0, 3b, 49, fb, ea, dd, 53, bf, fd, 2f, d9, 9f, 82, c1, ef, cf, ba, e9, 15, 36, e0], [5a, cc, 3b, bb, 1a, 4c, b1, 4b, 13, 1f, af, 5c, b7, fb, fc, fd, 1a, eb, d7, cc, fd, ed, 61, ae, 21, c4, 9d, c3, cf, 05, 7a, 6a]] version=0x6c311ade nbits=0x683727b8 ntime=0x2b2e373a
+--- sample 4
+| 5 ok=false method=0 id=-1 en2_len=0 en=None abandon=0 diff=0 mask=0x0 success=false
+--- sample 5
+| 6 ok=false method=0 id=-1 en2_len=0 en=None abandon=0 diff=0 mask=0x0 success=false
+--- sample 6
+| 7 ok=true method=3 id=-1 en2_len=0 en=None abandon=0 diff=0 mask=0xe0079f6d success=false
+--- sample 7
+| 8 ok=true method=4 id=-1 en2_len=1 en=Some("aAFD0Cff") abandon=0 diff=0 mask=0x0 success=false
+=== line_framing_matches_reference
+count 1000
+sha256 5b09ebd9a26ad241316fd48a1f17021b095bbbf380c8370647592af7e4df4922
+--- sample 0
+| 0
+| <280 bytes, sha256 0a5a9f50beeadf0b..>
+| <end>
+--- sample 1
+| 1
+| <221 bytes, sha256 84957f4026fcc42b..>
+| <224 bytes, sha256 3382d5f334c93105..>
+| "[ZYzH,xa'f&)S*=w>%e_0MT{;jb'>jX7VNtD=8TpRU{(gc2Ts;j7 7|d`mTP9W?]EnzGIe,_helo#VS]FcOD L;*C ~9-?RZd/pQJG0\"T9kul3i+]y8tjk+;\\Gt-p:d')|[Y~UhF(FYn4+ Regd$Vq9'L#S&rIl\\QiHC#LCRZrDLl_86CrU"
+| "$=^O>:yznA"
+| "k|M+fwK4KTG/u8_7{2+&kV.y:o*kuN+\"Kz,m$rllWtSAY(OU*ib)Fkw`LIA7;vT_[fEq4*zA"
+| "IHg8N1gdoh5?@6]H`-lk'>qhpa+ORtu-&ZOl!nU{0=8@5Xv(N?dsYq7&.i0}[e<-z]G(wc$*.VVl6R|y{B=o,"
+| <219 bytes, sha256 f4c3e236fb398897..>
+| <end>
+--- sample 2
+| 2
+| "(yp$eGg~c};uu=9tw:K2(QLJS'[~MyI@MFS^vAJxs`?6Qu}KCsn_T_tJ[ZSWSSuz|I~Qb<OLx#'LgY&L"
+| "[Su0il!j<haVoReV|rI7fmo3dNv4b<S)vv[aNC~1+xK4RbX<BhV%ot:)R^1Ck.vk'm-.*)MuG-4cHo&J[pP\"rS:B5_r>Z?}IcXNRKj8G~dx!9S[482rH3<.5,y/1,N8O~{%z(_Y"
+| ""
+| <end>
+--- sample 3
+| 3
+| "7`e-]}WMcWM{Dx;F[KJFU[|Uf}7O;Rl=4[NG_'oXtiTR[\"@y}x8LgDLMy}dT# s[LfeyDVzvFSM$''7)M/"
+| ""
+| <end>
+--- sample 4
+| 4
+| "3oqS^q1vI;rcI1*mZ#xwREBG33g-:n:subH{x&jf,,9$Mo\\k//tG>q>PNGs`YT844Zf/f-HcK4@UMpFMU~O8wyZ8E|k)c,rR8o`tJNV5-}P2:j5(cA~KO>cafj7e:bkq@B5y6SY;XnN>?A_GN:}N7.}7D7#(u_GD}:y}$!P >2q\"Fi$Zi^e>LGaVbfm\\f^"
+| "+Wm1L9y&MlX.{Fe\\Nn2wU)T6#0\"Yg.7+q.x^2~ `B?U;)8gly:c#^AddZ8|S$vQ+!)j:\\N&bu|nOIuULF>.OL'w"
+| <end>
+--- sample 5
+| 5
+| "U>p05^dUmnzh[p+zw(,Nc,bGOU;vXM{*5gd$VWx_HKZjp%q{acDOPib*FJJ#P+LPy=[[ivHcSn+}wy]0q+7fPb<#r[*Z7G%\"xWc# 7vf'VT37(>-FnZ\"w%vJ`{[W7(_&aIm,LK=DU(+6QwP?bR0$`d%8*XJ3(pN:8"
+| ""
+| <15226 bytes, sha256 ed8275efa0e80aba..>
+| "G}ug C]edwl7v8G.MMKcwX)62-yVP5*6Ey#9)=$RW}\\k9cs{'6rfazxfnV_xF:4rB9xLai{)eZFswW!j+uhku9~-1gKE|a}a5W)*YvQlECuvy3\\\\5d0=2jyN2tVPU,L*R [Pk\\f?1a(^t$x$8s5@~+2au&%h\"=EH\"=g.=.Md"
+| "1C\\Of9$eXv;Puu%YJE6wh,4}60de1:I!]:U46_>p}Mg-jnVX\\' .ZhG_"
+| "j*\\%q~x+yX9\\<6e:|be-W:th~!\",\\9luUTkZVFx*^tybY3l2<,"
+| <end>
+--- sample 6
+| 6
+| <230 bytes, sha256 d6832d46015409d5..>
+| "|`Q7/5kfENP9Ep0ewotDLdNC<yQ8[Xh>BM(8g[|c(_R>N)]2jKh+8w5yG<4&2f%DE?X2C.,VXX&9,4,<i@ ;{/(5!Z:s;+d7_XL![?pWnoe[.>x:eSqppfUfW?u@rk'&4>hS%:H/Y_%"
+| <462 bytes, sha256 c08b40932d485d44..>
+| <end>
+--- sample 7
+| 7
+| "jWeuX`Ow7OoU{ZD9S|q\"d2-/\\g\")U]yy5@)X_s~_jz43h1N\"FRTi\"+VQ;5Ub;_6^#z5Pmbz.vO,eL7@rjn#\"</c#A"
+| "18dWYg3B\"e96R,;&t]PLSLx7c\\*c1&pNYM},A8[ghn@/-!_;N?EY"
+| "5s{/up{d`oCL]n_`y\\~v*Y/MJjlj1oFG$lu}?Cx],S?a6<:_ Oaf[o[!yF|(O@OYox4z!Y?,-ciaDc;u@{y\\!o'fe}ji9re{"
+| "<fj@-@@(Y!/nYpM)`~zmIDT=t;'h *$+zH!I\\aH-~#wVT1z`%G@7zIE fk'[IM)%5f\\'CG\"[kULNe(dZ<\"{\"(.\\s?Y1/t,[E{mTCQLc%<i0u\"|O({)t~5U,flC?;~0HDO]Oyb1}/L.(yUX51ii8?pLUY(b#'N3dkI~uM9AxdAV>^I0:$FNGnF0#mH0o/&1*"
+| ""
+| <end>
+=== parse_matches_reference
+count 100000
+sha256 c722d8d2d4a28dce3baefd24baf8f820a33df764202fa7a646f4bff599ea8a12
+--- sample 0
+| 0 ok=false method=8 id=1 en2_len=0 en=None abandon=0 diff=0 mask=0x0 success=false
+--- sample 1
+| 1 ok=false method=0 id=-1 en2_len=0 en=None abandon=0 diff=0 mask=0x0 success=false
+--- sample 2
+| 2 ok=true method=3 id=-2147483648 en2_len=0 en=None abandon=0 diff=0 mask=0x5c5ecf5c success=false
+--- sample 3
+| 3 ok=true method=6 id=3 en2_len=0 en=None abandon=0 diff=0 mask=0x0 success=false
+--- sample 4
+| 4 ok=true method=3 id=-1 en2_len=0 en=None abandon=0 diff=0 mask=0xfcedfacc success=false
+--- sample 5
+| 5 ok=false method=4 id=-1 en2_len=0 en=None abandon=0 diff=0 mask=0x0 success=false
+--- sample 6
+| 6 rejected (undefined in C)
+--- sample 7
+| 7 ok=false method=8 id=1 en2_len=0 en=None abandon=0 diff=0 mask=0x0 success=false
+=== requests_escape_strings_and_reject_oversized
+count 2
+sha256 51aa7cd10a44fda1f6b067b54b889a729086162e16feb60143d6ce8f1ca2d353
+--- sample 0
+| true "{\"id\": 1, \"method\": \"mining.authorize\", \"params\": [\"we\\\"ird\\\\user\\u000a\", \"pa\\\"ss\"]}\n"
+--- sample 1
+| false ""
+=== requests_match_reference
+count 10000
+sha256 6d169deb85cfcfdfd983c137db423d30c15470fa2dc01417de0f7161de8c8214
+--- sample 0
+| 0 0 true "{\"id\": 1, \"method\": \"mining.subscribe\", \"params\": [\"sN%QH-._>]/pj/v-test\"]}\n"
+--- sample 1
+| 1 4 true <310 bytes, sha256 6e085741fab2dd03..>
+--- sample 2
+| 2 2 true <216 bytes, sha256 16cfcc52fab49475..>
+--- sample 3
+| 3 2 true "{\"id\": 1, \"method\": \"mining.suggest_difficulty\", \"params\": [857089158]}\n"
+--- sample 4
+| 4 2 true "{\"id\": 1, \"method\": \"mining.suggest_difficulty\", \"params\": [895558364]}\n{\"id\": 2, \"method\": \"mining.suggest_difficulty\", \"params\": [895558364]}\n"
+--- sample 5
+| 5 5 true <333 bytes, sha256 abc9375ad901b21d..>
+--- sample 6
+| 6 0 true "{\"id\": 1, \"method\": \"mining.subscribe\", \"params\": [\"XlM]o`j1/lf7d,GA[6u/v-test\"]}\n"
+--- sample 7
+| 7 2 true "{\"id\": 1, \"method\": \"mining.suggest_difficulty\", \"params\": [307637943]}\n{\"id\": 2, \"method\": \"mining.suggest_difficulty\", \"params\": [307637943]}\n"
+=== share_result_with_setup_id
+count 2
+sha256 76750dc8582eb9d76bbe94ea1fb1ca28a58ea96c614fbc3efb5e1f899440edd3
+--- sample 0
+| {"id": 1, "method": "mining.subscribe", "params": ["NerdQAxe+/BM1370/v-test"]}
+| {"id": 2, "method": "mining.configure", "params": [["version-rolling"], {"version-rolling.mask": "1fffe000"}]}
+| {"id": 3, "method": "mining.authorize", "params": ["bc1q.worker", "x"]}
+| {"id": 4, "method": "mining.suggest_difficulty", "params": [1000]}
+| {"id": 5, "method": "mining.submit", "params": ["bc1q.worker", "6a1", "00000001", "00000001", "00000002", "00000003"]}
+| 
+--- sample 1
+| (true, 5, true)

@@ -14,6 +14,10 @@ use c_reference as _;
 use rust_core::mining::JobHashes;
 use rust_core::stratum_v2::ExtJob;
 
+#[path = "../../tests/golden/mod.rs"]
+mod golden;
+use golden::Rec;
+
 /// `bm_job` (`include/jobs.h`)
 #[repr(C)]
 #[derive(Clone, Copy)]
@@ -98,10 +102,23 @@ impl Rng {
     }
 }
 
+/// Fixed (the golden file records the outputs for exactly these inputs).
 fn iterations() -> (usize, u64) {
-    let n = std::env::var("DIFF_ITERATIONS").map_or(100_000, |v| v.parse().unwrap());
-    let seed = std::env::var("DIFF_SEED").map_or(0x005f_20b5_0000_0006, |v| v.parse().unwrap());
-    (n, seed)
+    (100_000, 0x005f_20b5_0000_0006)
+}
+
+fn hex(b: &[u8]) -> String {
+    b.iter().map(|b| format!("{b:02x}")).collect()
+}
+
+fn hashes_text(h: &JobHashes) -> String {
+    format!(
+        "{} {} {} {}",
+        hex(&h.merkle_root),
+        hex(&h.merkle_root_be),
+        hex(&h.prev_block_hash),
+        hex(&h.prev_block_hash_be)
+    )
 }
 
 fn zeroed<T>() -> T {
@@ -113,6 +130,7 @@ fn zeroed<T>() -> T {
 fn standard_jobs_match_reference() {
     let (n, seed) = iterations();
     let rng = Rng(Cell::new(seed));
+    let mut rec = Rec::new("sv2_jobs", "standard_jobs_match_reference");
     for i in 0..n {
         let (merkle, prev) = (rng.bytes32(), rng.bytes32());
         let mut reference: BmJob = zeroed();
@@ -123,13 +141,16 @@ fn standard_jobs_match_reference() {
             sv2_job_hashes(merkle.as_ptr(), prev.as_ptr(), &mut current);
         }
         assert_eq!(current, reference.hashes(), "case {i}");
+        rec.add(format!("{i} {}", hashes_text(&current)));
     }
+    rec.finish();
 }
 
 #[test]
 fn extended_jobs_match_reference() {
     let (n, seed) = iterations();
     let rng = Rng(Cell::new(seed ^ 0x66));
+    let mut rec = Rec::new("sv2_jobs", "extended_jobs_match_reference");
     for i in 0..n {
         let prefix = rng.bytes(rng.below(300));
         let suffix = rng.bytes(rng.below(300));
@@ -196,5 +217,11 @@ fn extended_jobs_match_reference() {
         };
         assert_eq!(b, a, "case {i}: extranonce2");
         assert_eq!(current, reference.hashes(), "case {i}");
+        rec.add(format!(
+            "{i} {ok} {} {}",
+            b.to_str().unwrap(),
+            hashes_text(&current)
+        ));
     }
+    rec.finish();
 }

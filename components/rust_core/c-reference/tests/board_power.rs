@@ -11,6 +11,10 @@ use c_reference as _;
 use rust_core::board_core::Limits;
 use rust_core::board_power::{self, Hw, Params, Variant};
 
+#[path = "../../tests/golden/mod.rs"]
+mod golden;
+use golden::Rec;
+
 #[repr(C)]
 #[derive(Clone, Copy, Debug)]
 struct RefParams {
@@ -155,6 +159,7 @@ fn params(p: &RefParams) -> Params {
 fn sequences() {
     let _g = LOCK.lock().unwrap_or_else(|e| e.into_inner());
     let mut r = Rng(0x5e9);
+    let mut rec = Rec::new("board_power", "sequences");
     let mut seen_init_ok = [0u32; 2];
     for round in 0..20_000 {
         let rev7 = r.below(2) == 1;
@@ -230,12 +235,19 @@ fn sequences() {
             assert_eq!(res, r_ref, "round {round}");
         }
         assert_eq!(f.state, state_ref, "round {round} {p:?}");
+        rec.add(format!(
+            "what {what} rev7 {rev7} volts {:08x} {p:?}\nres {res} state {:?}\n{}",
+            volts.to_bits(),
+            f.state,
+            f.trace
+        ));
         if what == 0 && res {
             seen_init_ok[rev7 as usize] += 1;
         }
     }
     // not vacuous: successful power-ups of both variants
     assert!(seen_init_ok.iter().all(|&n| n > 500), "{seen_init_ok:?}");
+    rec.finish();
 }
 
 /// The NerdAxe family; voltages within the DS4432U range (the C++ cast of a
@@ -244,6 +256,7 @@ fn sequences() {
 fn nerdaxe_sequences() {
     let _g = LOCK.lock().unwrap_or_else(|e| e.into_inner());
     let mut r = Rng(0xa9e);
+    let mut rec = Rec::new("board_power", "nerdaxe_sequences");
     let mut seen = [0u32; 3];
     for round in 0..20_000 {
         let which = r.below(3) as c_int;
@@ -309,11 +322,18 @@ fn nerdaxe_sequences() {
             assert_eq!(res, r_ref, "round {round}");
         }
         assert_eq!(f.state, state_ref, "round {round}");
+        rec.add(format!(
+            "{v:?} what {what} volts {:08x} {p:?}\nres {res} state {:?}\n{}",
+            volts.to_bits(),
+            f.state,
+            f.trace
+        ));
         if what == 0 && res {
             seen[which as usize] += 1;
         }
     }
     assert!(seen.iter().all(|&n| n > 1000), "{seen:?}");
+    rec.finish();
 }
 
 #[test]
@@ -337,6 +357,7 @@ fn ds4432_codes() {
         chips: 0,
         baud: 0,
     };
+    let mut rec = Rec::new("board_power", "ds4432_codes");
     let mut checked = 0;
     for mv in 0..=2500u32 {
         for frac in [0.0f32, 0.0004, 0.0009] {
@@ -354,6 +375,7 @@ fn ds4432_codes() {
                 .ceil();
             if !(0.046..=2.39).contains(&(v as f64)) || raw <= 127.0 {
                 assert_eq!(code, c_ref, "{v}");
+                rec.add(format!("{:08x} {code:02x}", v.to_bits()));
                 checked += 1;
             } else {
                 assert_eq!(code & 0x7f, 127, "{v}");
@@ -364,4 +386,5 @@ fn ds4432_codes() {
     assert!(checked > 3000, "{checked}");
     // 0.98 V: 0x82 before (about 1.43 V), now the lowest code
     assert_eq!(board_power::ds4432_code(0.98), 0xff);
+    rec.finish();
 }

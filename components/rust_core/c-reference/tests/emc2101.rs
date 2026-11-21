@@ -11,6 +11,10 @@ use c_reference as _;
 use rust_core::emc2101;
 use rust_core::i2c::RegBus;
 
+#[path = "../../tests/golden/mod.rs"]
+mod golden;
+use golden::Rec;
+
 extern "C" {
     fn i2c_stub_reset();
     fn i2c_stub_set(reg: u8, value: u16);
@@ -82,33 +86,39 @@ unsafe fn set(f: &mut Fake, reg: u8, v: u8) {
 #[test]
 fn init_polarity_settings() {
     let _g = LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    let mut rec = Rec::new("emc2101", "init_polarity_settings");
     unsafe {
         for fail in [false, true] {
             for invert in [false, true] {
                 i2c_stub_reset();
                 i2c_stub_fail(fail);
                 let mut f = Fake::new(fail);
-                assert_eq!(emc2101::init(&mut f, invert), ref2101_init(invert));
-                assert_eq!(
-                    emc2101::set_polarity(&mut f, invert),
-                    ref2101_polarity(invert)
-                );
+                let init = emc2101::init(&mut f, invert);
+                assert_eq!(init, ref2101_init(invert));
+                let pol = emc2101::set_polarity(&mut f, invert);
+                assert_eq!(pol, ref2101_polarity(invert));
                 emc2101::set_ideality_factor(&mut f, 0x24);
                 ref2101_ideality(0x24);
                 emc2101::set_beta_compensation(&mut f, 0x00);
                 ref2101_beta(0x00);
                 let t = ref_trace();
                 assert_eq!(f.trace, t);
+                rec.add(format!(
+                    "fail {fail} invert {invert}: {init} {pol}\n{}",
+                    f.trace
+                ));
                 assert!(t.starts_with("wr 4c 03 04\n"), "{t}");
             }
         }
         i2c_stub_fail(false);
     }
+    rec.finish();
 }
 
 #[test]
 fn fan_speeds() {
     let _g = LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    let mut rec = Rec::new("emc2101", "fan_speeds");
     unsafe {
         i2c_stub_reset();
         let mut f = Fake::new(false);
@@ -119,17 +129,20 @@ fn fan_speeds() {
             emc2101::set_speed(&mut f, p);
             ref2101_set_speed(p);
             assert_eq!(f.trace, ref_trace(), "{p}");
+            rec.add(format!("{:#x}\n{}", p.to_bits(), f.trace));
         }
         // the boards' setFanSpeed(100) is full speed
         f.trace.clear();
         emc2101::set_speed(&mut f, 100.0);
         assert_eq!(f.trace, "wr 4c 4c 3f\n");
     }
+    rec.finish();
 }
 
 #[test]
 fn tach_and_temperatures() {
     let _g = LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    let mut rec = Rec::new("emc2101", "tach_and_temperatures");
     unsafe {
         i2c_stub_reset();
         let mut f = Fake::new(false);
@@ -145,6 +158,7 @@ fn tach_and_temperatures() {
                 continue;
             }
             assert_eq!(rust, ref2101_get_speed(), "{reading}");
+            rec.add(format!("tach {reading:#06x}: {rust}"));
             checked += 1;
         }
         assert_eq!(checked, 0x10000 - 83);
@@ -155,9 +169,16 @@ fn tach_and_temperatures() {
                 set(&mut f, 0x01, msb);
                 set(&mut f, 0x10, lsb);
                 set(&mut f, 0x00, msb);
+                let at = f.trace.len();
                 let t = emc2101::external_temp(&mut f);
                 assert_eq!(t.to_bits(), ref2101_external_temp().to_bits());
-                assert_eq!(emc2101::internal_temp(&mut f), ref2101_internal_temp());
+                let int = emc2101::internal_temp(&mut f);
+                assert_eq!(int, ref2101_internal_temp());
+                rec.add(format!(
+                    "temp {msb:02x} {lsb:02x}: {:#x} {int}\n{}",
+                    t.to_bits(),
+                    &f.trace[at..]
+                ));
             }
         }
         assert_eq!(f.trace, ref_trace());
@@ -167,12 +188,21 @@ fn tach_and_temperatures() {
         f.fail = true;
         f.trace.clear();
         i2c_stub_clear_trace();
-        assert_eq!(emc2101::speed(&mut f), ref2101_get_speed());
-        assert_eq!(emc2101::external_temp(&mut f), ref2101_external_temp());
-        assert_eq!(emc2101::internal_temp(&mut f), ref2101_internal_temp());
+        let sp = emc2101::speed(&mut f);
+        assert_eq!(sp, ref2101_get_speed());
+        let ext = emc2101::external_temp(&mut f);
+        assert_eq!(ext, ref2101_external_temp());
+        let int = emc2101::internal_temp(&mut f);
+        assert_eq!(int, ref2101_internal_temp());
         let t = ref_trace();
         assert_eq!(f.trace, t);
+        rec.add(format!(
+            "bus error: {sp} {:#x} {int}\n{}",
+            ext.to_bits(),
+            f.trace
+        ));
         assert_eq!(t, "rr 4c 46 1\nrr 4c 01 1\nrr 4c 00 1\n");
         i2c_stub_fail(false);
     }
+    rec.finish();
 }

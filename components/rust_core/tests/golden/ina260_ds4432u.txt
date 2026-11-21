@@ -1,0 +1,79 @@
+# Golden outputs (the former C/C++ code), see tests/golden/mod.rs
+=== ds4432u_codes
+count 38
+sha256 4b0c26d58ab69c09053ec415a2531c57b134f43322ef2058db6df8dd8f01208f
+--- sample 0
+| fail false out 0 code 00: true Some(17)
+--- sample 1
+| fail false out 0 code 01: true Some(16)
+--- sample 2
+| fail false out 0 code 7f: true Some(110)
+--- sample 3
+| fail false out 0 code 80: true Some(145)
+--- sample 4
+| fail false out 0 code 9c: true Some(141)
+--- sample 5
+| fail false out 0 code ff: true Some(238)
+--- sample 6
+| fail false out 1 code 00: true Some(34)
+--- sample 7
+| fail false out 1 code 01: true Some(35)
+=== ina260_registers
+count 9367
+sha256 c3f017eaa179edb4417e6c025c26cf29971a6b9c0bd18e04799bd84f5b19799a
+--- sample 0
+| 0000: true 0x0 0x42e10000 0x48629c80
+| rr 40 02 2
+| rr 40 01 2
+| rr 40 02 2
+| rr 40 03 2
+| 
+--- sample 1
+| 0007: true 0x410c0000 0x45130800 0x48629500
+| rr 40 02 2
+| rr 40 01 2
+| rr 40 02 2
+| rr 40 03 2
+| 
+--- sample 2
+| 000e: true 0x418c0000 0x458f8400 0x4862ab80
+| rr 40 02 2
+| rr 40 01 2
+| rr 40 02 2
+| rr 40 03 2
+| 
+--- sample 3
+| 0015: true 0x41d20000 0x45d58400 0x4862b800
+| rr 40 02 2
+| rr 40 01 2
+| rr 40 02 2
+| rr 40 03 2
+| 
+--- sample 4
+| 001c: true 0x420c0000 0x460dc200 0x4862ce80
+| rr 40 02 2
+| rr 40 01 2
+| rr 40 02 2
+| rr 40 03 2
+| 
+--- sample 5
+| 0023: true 0x422f0000 0x4630c200 0x48624f00
+| rr 40 02 2
+| rr 40 01 2
+| rr 40 02 2
+| rr 40 03 2
+| 
+--- sample 6
+| 002a: true 0x42520000 0x4653c200 0x48626580
+| rr 40 02 2
+| rr 40 01 2
+| rr 40 02 2
+| rr 40 03 2
+| 
+--- sample 7
+| 0031: true 0x42750000 0x4676c200 0x48627200
+| rr 40 02 2
+| rr 40 01 2
+| rr 40 02 2
+| rr 40 03 2
+| 

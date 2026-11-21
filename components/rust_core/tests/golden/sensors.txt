@@ -1,0 +1,1908 @@
+# Golden outputs (the former C/C++ code), see tests/golden/mod.rs
+=== fxl6408_sequences
+count 300
+sha256 90e28b10208f0ccf136cc0fc9936cf7829cbd675976934e711fbf0405cbac2d2
+--- sample 0
+| round 0 fail false: init true
+| op 3 pin 3 true: (0, 111)
+| op 2 pin 3 true: 0
+| op 4 pin 8 false: Err(258)
+| op 0 pin 3 true: 0
+| op 0 pin 9 true: 258
+| op 3 pin 6 true: (0, 111)
+| op 2 pin 9 false: 258
+| op 1 pin 0 true: 0
+| op 3 pin 8 false: (0, 111)
+| op 3 pin 0 true: (0, 111)
+| op 4 pin 5 false: Ok(true)
+| op 0 pin 7 true: 0
+| op 1 pin 7 false: 0
+| op 0 pin 3 false: 0
+| op 3 pin 9 true: (0, 111)
+| op 3 pin 0 false: (0, 111)
+| op 0 pin 7 true: 0
+| op 0 pin 2 true: 0
+| op 1 pin 1 false: 0
+| op 3 pin 3 false: (0, 111)
+| op 4 pin 9 false: Err(258)
+| op 4 pin 5 true: Ok(true)
+| op 1 pin 2 true: 0
+| op 4 pin 8 false: Err(258)
+| op 3 pin 8 true: (0, 111)
+| op 3 pin 5 false: (0, 111)
+| op 1 pin 8 false: 258
+| op 4 pin 2 false: Ok(true)
+| op 3 pin 5 false: (0, 111)
+| op 1 pin 7 false: 0
+| op 1 pin 2 false: 0
+| op 1 pin 2 false: 0
+| op 3 pin 6 true: (0, 111)
+| op 1 pin 3 true: 0
+| op 0 pin 2 true: 0
+| op 3 pin 5 true: (0, 111)
+| op 1 pin 0 false: 0
+| op 0 pin 6 false: 0
+| op 2 pin 7 true: 0
+| op 3 pin 2 true: (0, 111)
+| rr 43 01 1
+| wr 43 01 01
+| delay 100
+| wr 43 07 00
+| delay 100
+| rr 43 0f 1
+| wr 43 0d 08
+| wr 43 0b 08
+| wr 43 03 08
+| rr 43 0f 1
+| wr 43 05 01
+| rr 43 0f 1
+| rr 43 0f 1
+| rr 43 0f 1
+| wr 43 03 88
+| wr 43 05 01
+| wr 43 03 80
+| rr 43 0f 1
+| rr 43 0f 1
+| wr 43 03 80
+| wr 43 03 84
+| wr 43 05 01
+| rr 43 0f 1
+| rr 43 0f 1
+| wr 43 05 05
+| rr 43 0f 1
+| rr 43 0f 1
+| rr 43 0f 1
+| rr 43 0f 1
+| wr 43 05 05
+| wr 43 05 01
+| wr 43 05 01
+| rr 43 0f 1
+| wr 43 05 09
+| wr 43 03 84
+| rr 43 0f 1
+| wr 43 05 08
+| wr 43 03 84
+| wr 43 0d 88
+| wr 43 0b 88
+| rr 43 0f 1
+| 
+--- sample 1
+| round 1 fail false: init true
+| op 0 pin 5 true: 0
+| op 2 pin 7 true: 0
+| op 3 pin 4 true: (0, 101)
+| op 4 pin 2 false: Ok(true)
+| op 0 pin 7 true: 0
+| op 4 pin 5 true: Ok(true)
+| op 2 pin 0 true: 0
+| op 2 pin 4 false: 0
+| op 1 pin 0 true: 0
+| op 1 pin 6 true: 0
+| op 3 pin 3 true: (0, 101)
+| op 4 pin 6 false: Ok(true)
+| op 2 pin 2 true: 0
+| op 0 pin 6 false: 0
+| op 1 pin 6 false: 0
+| op 2 pin 8 true: 258
+| op 2 pin 6 false: 0
+| op 4 pin 1 false: Ok(false)
+| op 1 pin 3 false: 0
+| op 1 pin 0 true: 0
+| op 3 pin 4 true: (0, 101)
+| op 1 pin 1 false: 0
+| op 2 pin 5 true: 0
+| op 2 pin 7 false: 0
+| op 0 pin 0 true: 0
+| op 4 pin 0 true: Ok(true)
+| op 1 pin 0 true: 0
+| op 1 pin 7 true: 0
+| op 4 pin 8 false: Err(258)
+| op 0 pin 5 true: 0
+| op 2 pin 9 true: 258
+| op 3 pin 0 true: (0, 101)
+| op 1 pin 2 false: 0
+| op 1 pin 4 false: 0
+| op 3 pin 0 false: (0, 101)
+| op 1 pin 8 false: 258
+| op 2 pin 7 false: 0
+| op 1 pin 2 false: 0
+| op 0 pin 8 true: 258
+| op 4 pin 2 true: Ok(true)
+| rr 43 01 1
+| wr 43 01 01
+| delay 100
+| wr 43 07 00
+| delay 100
+| wr 43 03 20
+| wr 43 0d 80
+| wr 43 0b 80
+| rr 43 0f 1
+| rr 43 0f 1
+| wr 43 03 a0
+| rr 43 0f 1
+| wr 43 0d 81
+| wr 43 0b 81
+| wr 43 0d 91
+| wr 43 0b 91
+| wr 43 05 01
+| wr 43 05 41
+| rr 43 0f 1
+| rr 43 0f 1
+| wr 43 0d 95
+| wr 43 0b 95
+| wr 43 03 a0
+| wr 43 05 01
+| wr 43 0d d5
+| wr 43 0b d5
+| rr 43 0f 1
+| wr 43 05 01
+| wr 43 05 01
+| rr 43 0f 1
+| wr 43 05 01
+| wr 43 0d f5
+| wr 43 0b f5
+| wr 43 0d f5
+| wr 43 0b f5
+| wr 43 03 a1
+| rr 43 0f 1
+| wr 43 05 01
+| wr 43 05 81
+| wr 43 03 a1
+| rr 43 0f 1
+| wr 43 05 81
+| wr 43 05 81
+| rr 43 0f 1
+| wr 43 0d f5
+| wr 43 0b f5
+| wr 43 05 81
+| rr 43 0f 1
+| 
+--- sample 2
+| round 2 fail false: init true
+| op 2 pin 6 true: 0
+| op 1 pin 3 true: 0
+| op 0 pin 6 true: 0
+| op 0 pin 6 false: 0
+| op 4 pin 4 false: Ok(false)
+| op 3 pin 2 true: (0, 165)
+| op 4 pin 8 true: Err(258)
+| op 0 pin 5 true: 0
+| op 4 pin 9 true: Err(258)
+| op 2 pin 1 false: 0
+| op 2 pin 4 false: 0
+| op 2 pin 9 false: 258
+| op 2 pin 7 true: 0
+| op 2 pin 9 false: 258
+| op 1 pin 7 true: 0
+| op 4 pin 9 false: Err(258)
+| op 2 pin 1 true: 0
+| op 2 pin 1 true: 0
+| op 4 pin 4 true: Ok(false)
+| op 2 pin 5 true: 0
+| op 4 pin 3 true: Ok(false)
+| op 4 pin 5 true: Ok(true)
+| op 1 pin 5 false: 0
+| op 2 pin 1 false: 0
+| op 4 pin 7 false: Ok(true)
+| op 4 pin 7 true: Ok(true)
+| op 2 pin 5 true: 0
+| op 2 pin 1 true: 0
+| op 1 pin 6 false: 0
+| op 3 pin 8 true: (0, 165)
+| op 3 pin 6 false: (0, 165)
+| op 4 pin 9 false: Err(258)
+| op 4 pin 8 true: Err(258)
+| op 0 pin 5 true: 0
+| op 3 pin 7 true: (0, 165)
+| op 1 pin 0 true: 0
+| op 4 pin 5 true: Ok(true)
+| op 2 pin 5 false: 0
+| op 2 pin 8 true: 258
+| op 4 pin 8 true: Err(258)
+| rr 43 01 1
+| wr 43 01 01
+| delay 100
+| wr 43 07 00
+| delay 100
+| wr 43 0d 40
+| wr 43 0b 40
+| wr 43 05 08
+| wr 43 03 40
+| wr 43 03 00
+| rr 43 0f 1
+| rr 43 0f 1
+| wr 43 03 20
+| wr 43 0d 42
+| wr 43 0b 42
+| wr 43 0d 52
+| wr 43 0b 52
+| wr 43 0d d2
+| wr 43 0b d2
+| wr 43 05 88
+| wr 43 0d d2
+| wr 43 0b d2
+| wr 43 0d d2
+| wr 43 0b d2
+| rr 43 0f 1
+| wr 43 0d f2
+| wr 43 0b f2
+| rr 43 0f 1
+| rr 43 0f 1
+| wr 43 05 88
+| wr 43 0d f2
+| wr 43 0b f2
+| rr 43 0f 1
+| rr 43 0f 1
+| wr 43 0d f2
+| wr 43 0b f2
+| wr 43 0d f2
+| wr 43 0b f2
+| wr 43 05 88
+| rr 43 0f 1
+| rr 43 0f 1
+| wr 43 03 20
+| rr 43 0f 1
+| wr 43 05 89
+| rr 43 0f 1
+| wr 43 0d f2
+| wr 43 0b f2
+| 
+--- sample 3
+| round 3 fail false: init true
+| op 2 pin 4 false: 0
+| op 4 pin 1 false: Ok(true)
+| op 1 pin 9 false: 258
+| op 0 pin 7 false: 0
+| op 0 pin 8 true: 258
+| op 4 pin 0 false: Ok(true)
+| op 3 pin 7 false: (0, 23)
+| op 3 pin 0 true: (0, 23)
+| op 3 pin 4 false: (0, 23)
+| op 0 pin 9 true: 258
+| op 0 pin 1 false: 0
+| op 3 pin 1 false: (0, 23)
+| op 4 pin 4 true: Ok(true)
+| op 3 pin 6 true: (0, 23)
+| op 3 pin 7 true: (0, 23)
+| op 4 pin 5 false: Ok(false)
+| op 3 pin 9 false: (0, 23)
+| op 3 pin 6 false: (0, 23)
+| op 2 pin 7 true: 0
+| op 4 pin 6 false: Ok(false)
+| op 2 pin 6 false: 0
+| op 2 pin 1 false: 0
+| op 4 pin 0 true: Ok(true)
+| op 2 pin 7 true: 0
+| op 1 pin 7 true: 0
+| op 3 pin 7 true: (0, 23)
+| op 4 pin 0 true: Ok(true)
+| op 4 pin 5 true: Ok(false)
+| op 4 pin 7 false: Ok(false)
+| op 0 pin 4 true: 0
+| op 2 pin 9 true: 258
+| op 2 pin 1 true: 0
+| op 3 pin 2 true: (0, 23)
+| op 0 pin 7 false: 0
+| op 2 pin 3 false: 0
+| op 2 pin 1 false: 0
+| op 0 pin 4 true: 0
+| op 3 pin 9 false: (0, 23)
+| op 1 pin 5 false: 0
+| op 0 pin 0 true: 0
+| rr 43 01 1
+| wr 43 01 01
+| delay 100
+| wr 43 07 00
+| delay 100
+| wr 43 0d 10
+| wr 43 0b 10
+| rr 43 0f 1
+| wr 43 03 00
+| rr 43 0f 1
+| rr 43 0f 1
+| rr 43 0f 1
+| rr 43 0f 1
+| wr 43 03 00
+| rr 43 0f 1
+| rr 43 0f 1
+| rr 43 0f 1
+| rr 43 0f 1
+| rr 43 0f 1
+| rr 43 0f 1
+| rr 43 0f 1
+| wr 43 0d 90
+| wr 43 0b 90
+| rr 43 0f 1
+| wr 43 0d d0
+| wr 43 0b d0
+| wr 43 0d d2
+| wr 43 0b d2
+| rr 43 0f 1
+| wr 43 0d d2
+| wr 43 0b d2
+| wr 43 05 80
+| rr 43 0f 1
+| rr 43 0f 1
+| rr 43 0f 1
+| rr 43 0f 1
+| wr 43 03 10
+| wr 43 0d d2
+| wr 43 0b d2
+| rr 43 0f 1
+| wr 43 03 10
+| wr 43 0d da
+| wr 43 0b da
+| wr 43 0d da
+| wr 43 0b da
+| wr 43 03 10
+| rr 43 0f 1
+| wr 43 05 80
+| wr 43 03 11
+| 
+--- sample 4
+| round 4 fail false: init true
+| op 2 pin 4 false: 0
+| op 4 pin 6 true: Ok(true)
+| op 0 pin 9 false: 258
+| op 2 pin 0 false: 0
+| op 2 pin 6 false: 0
+| op 3 pin 6 false: (0, 195)
+| op 4 pin 3 true: Ok(false)
+| op 2 pin 3 false: 0
+| op 4 pin 1 true: Ok(true)
+| op 0 pin 5 true: 0
+| op 2 pin 1 true: 0
+| op 4 pin 8 true: Err(258)
+| op 0 pin 6 true: 0
+| op 4 pin 9 true: Err(258)
+| op 2 pin 0 true: 0
+| op 3 pin 7 false: (0, 195)
+| op 2 pin 0 true: 0
+| op 2 pin 9 true: 258
+| op 1 pin 6 false: 0
+| op 2 pin 6 true: 0
+| op 2 pin 2 false: 0
+| op 3 pin 7 true: (0, 195)
+| op 0 pin 0 true: 0
+| op 4 pin 9 true: Err(258)
+| op 2 pin 3 true: 0
+| op 2 pin 6 false: 0
+| op 2 pin 8 false: 258
+| op 2 pin 2 false: 0
+| op 3 pin 5 true: (0, 195)
+| op 0 pin 1 true: 0
+| op 4 pin 8 false: Err(258)
+| op 3 pin 2 true: (0, 195)
+| op 2 pin 7 true: 0
+| op 1 pin 9 false: 258
+| op 4 pin 6 false: Ok(true)
+| op 1 pin 8 false: 258
+| op 0 pin 6 true: 0
+| op 2 pin 1 true: 0
+| op 1 pin 8 false: 258
+| op 3 pin 3 true: (0, 195)
+| rr 43 01 1
+| wr 43 01 01
+| delay 100
+| wr 43 07 00
+| delay 100
+| wr 43 0d 10
+| wr 43 0b 10
+| rr 43 0f 1
+| wr 43 0d 11
+| wr 43 0b 11
+| wr 43 0d 51
+| wr 43 0b 51
+| rr 43 0f 1
+| rr 43 0f 1
+| wr 43 0d 59
+| wr 43 0b 59
+| rr 43 0f 1
+| wr 43 03 20
+| wr 43 0d 5b
+| wr 43 0b 5b
+| wr 43 03 60
+| wr 43 0d 5b
+| wr 43 0b 5b
+| rr 43 0f 1
+| wr 43 0d 5b
+| wr 43 0b 5b
+| wr 43 05 00
+| wr 43 0d 5b
+| wr 43 0b 5b
+| wr 43 0d 5f
+| wr 43 0b 5f
+| rr 43 0f 1
+| wr 43 03 61
+| wr 43 0d 5f
+| wr 43 0b 5f
+| wr 43 0d 5f
+| wr 43 0b 5f
+| wr 43 0d 5f
+| wr 43 0b 5f
+| rr 43 0f 1
+| wr 43 03 63
+| rr 43 0f 1
+| wr 43 0d df
+| wr 43 0b df
+| rr 43 0f 1
+| wr 43 03 63
+| wr 43 0d df
+| wr 43 0b df
+| rr 43 0f 1
+| 
+--- sample 5
+| round 5 fail false: init true
+| op 4 pin 6 true: Ok(true)
+| op 2 pin 3 true: 0
+| op 3 pin 0 true: (0, 197)
+| op 4 pin 7 true: Ok(true)
+| op 4 pin 7 false: Ok(true)
+| op 4 pin 0 false: Ok(true)
+| op 2 pin 9 true: 258
+| op 2 pin 1 true: 0
+| op 2 pin 3 true: 0
+| op 3 pin 9 false: (0, 197)
+| op 1 pin 5 false: 0
+| op 2 pin 8 false: 258
+| op 3 pin 7 false: (0, 197)
+| op 1 pin 8 false: 258
+| op 3 pin 6 true: (0, 197)
+| op 1 pin 1 true: 0
+| op 0 pin 1 false: 0
+| op 1 pin 3 false: 0
+| op 4 pin 6 false: Ok(true)
+| op 3 pin 6 false: (0, 197)
+| op 1 pin 4 true: 0
+| op 2 pin 3 false: 0
+| op 1 pin 0 false: 0
+| op 1 pin 7 false: 0
+| op 1 pin 6 true: 0
+| op 0 pin 5 false: 0
+| op 4 pin 5 true: Ok(false)
+| op 3 pin 8 true: (0, 197)
+| op 3 pin 7 false: (0, 197)
+| op 4 pin 3 true: Ok(false)
+| op 3 pin 6 false: (0, 197)
+| op 0 pin 3 false: 0
+| op 2 pin 6 true: 0
+| op 3 pin 5 true: (0, 197)
+| op 4 pin 5 true: Ok(false)
+| op 2 pin 7 true: 0
+| op 0 pin 3 true: 0
+| op 3 pin 6 false: (0, 197)
+| op 3 pin 3 true: (0, 197)
+| op 4 pin 5 true: Ok(false)
+| rr 43 01 1
+| wr 43 01 01
+| delay 100
+| wr 43 07 00
+| delay 100
+| rr 43 0f 1
+| wr 43 0d 08
+| wr 43 0b 08
+| rr 43 0f 1
+| rr 43 0f 1
+| rr 43 0f 1
+| rr 43 0f 1
+| wr 43 0d 0a
+| wr 43 0b 0a
+| wr 43 0d 0a
+| wr 43 0b 0a
+| rr 43 0f 1
+| wr 43 05 00
+| rr 43 0f 1
+| rr 43 0f 1
+| wr 43 05 02
+| wr 43 03 00
+| wr 43 05 02
+| rr 43 0f 1
+| rr 43 0f 1
+| wr 43 05 12
+| wr 43 0d 0a
+| wr 43 0b 0a
+| wr 43 05 12
+| wr 43 05 12
+| wr 43 05 52
+| wr 43 03 00
+| rr 43 0f 1
+| rr 43 0f 1
+| rr 43 0f 1
+| rr 43 0f 1
+| rr 43 0f 1
+| wr 43 03 00
+| wr 43 0d 4a
+| wr 43 0b 4a
+| rr 43 0f 1
+| rr 43 0f 1
+| wr 43 0d ca
+| wr 43 0b ca
+| wr 43 03 08
+| rr 43 0f 1
+| rr 43 0f 1
+| rr 43 0f 1
+| 
+--- sample 6
+| round 6 fail false: init true
+| op 3 pin 1 true: (0, 26)
+| op 0 pin 9 true: 258
+| op 2 pin 9 false: 258
+| op 2 pin 0 true: 0
+| op 2 pin 7 true: 0
+| op 3 pin 7 true: (0, 26)
+| op 2 pin 1 false: 0
+| op 0 pin 0 false: 0
+| op 2 pin 7 true: 0
+| op 0 pin 8 false: 258
+| op 3 pin 9 true: (0, 26)
+| op 2 pin 9 true: 258
+| op 2 pin 2 true: 0
+| op 2 pin 3 false: 0
+| op 1 pin 8 true: 258
+| op 2 pin 1 false: 0
+| op 4 pin 6 true: Ok(false)
+| op 4 pin 8 true: Err(258)
+| op 1 pin 9 true: 258
+| op 3 pin 3 true: (0, 26)
+| op 4 pin 1 false: Ok(true)
+| op 0 pin 4 true: 0
+| op 4 pin 0 true: Ok(false)
+| op 0 pin 1 true: 0
+| op 1 pin 6 true: 0
+| op 2 pin 0 true: 0
+| op 2 pin 8 true: 258
+| op 3 pin 8 true: (0, 26)
+| op 1 pin 2 true: 0
+| op 3 pin 8 true: (0, 26)
+| op 0 pin 9 true: 258
+| op 2 pin 0 true: 0
+| op 1 pin 5 false: 0
+| op 1 pin 2 true: 0
+| op 0 pin 2 false: 0
+| op 1 pin 1 true: 0
+| op 3 pin 2 false: (0, 26)
+| op 3 pin 5 false: (0, 26)
+| op 1 pin 8 true: 258
+| op 1 pin 8 true: 258
+| rr 43 01 1
+| wr 43 01 01
+| delay 100
+| wr 43 07 00
+| delay 100
+| rr 43 0f 1
+| wr 43 0d 01
+| wr 43 0b 01
+| wr 43 0d 81
+| wr 43 0b 81
+| rr 43 0f 1
+| wr 43 0d 83
+| wr 43 0b 83
+| wr 43 03 00
+| wr 43 0d 83
+| wr 43 0b 83
+| rr 43 0f 1
+| wr 43 0d 87
+| wr 43 0b 87
+| wr 43 0d 8f
+| wr 43 0b 8f
+| wr 43 0d 8f
+| wr 43 0b 8f
+| rr 43 0f 1
+| rr 43 0f 1
+| rr 43 0f 1
+| wr 43 03 10
+| rr 43 0f 1
+| wr 43 03 12
+| wr 43 05 40
+| wr 43 0d 8f
+| wr 43 0b 8f
+| rr 43 0f 1
+| wr 43 05 44
+| rr 43 0f 1
+| wr 43 0d 8f
+| wr 43 0b 8f
+| wr 43 05 44
+| wr 43 05 44
+| wr 43 03 12
+| wr 43 05 46
+| rr 43 0f 1
+| rr 43 0f 1
+| 
+--- sample 7
+| round 7 fail false: init true
+| op 2 pin 2 false: 0
+| op 3 pin 5 true: (0, 178)
+| op 3 pin 8 false: (0, 178)
+| op 3 pin 4 true: (0, 178)
+| op 3 pin 6 false: (0, 178)
+| op 0 pin 6 true: 0
+| op 0 pin 5 false: 0
+| op 3 pin 9 true: (0, 178)
+| op 1 pin 9 false: 258
+| op 0 pin 1 true: 0
+| op 0 pin 6 true: 0
+| op 0 pin 2 true: 0
+| op 1 pin 8 true: 258
+| op 4 pin 5 true: Ok(true)
+| op 2 pin 2 false: 0
+| op 0 pin 5 false: 0
+| op 3 pin 6 false: (0, 178)
+| op 4 pin 3 false: Ok(false)
+| op 3 pin 4 true: (0, 178)
+| op 3 pin 9 false: (0, 178)
+| op 1 pin 9 true: 258
+| op 2 pin 2 true: 0
+| op 1 pin 8 true: 258
+| op 3 pin 2 true: (0, 178)
+| op 3 pin 8 false: (0, 178)
+| op 4 pin 8 true: Err(258)
+| op 4 pin 0 false: Ok(false)
+| op 1 pin 9 true: 258
+| op 0 pin 6 true: 0
+| op 2 pin 8 true: 258
+| op 3 pin 9 false: (0, 178)
+| op 3 pin 0 true: (0, 178)
+| op 3 pin 0 true: (0, 178)
+| op 3 pin 0 true: (0, 178)
+| op 1 pin 9 false: 258
+| op 0 pin 3 true: 0
+| op 2 pin 8 true: 258
+| op 3 pin 3 true: (0, 178)
+| op 3 pin 2 false: (0, 178)
+| op 2 pin 7 true: 0
+| rr 43 01 1
+| wr 43 01 01
+| delay 100
+| wr 43 07 00
+| delay 100
+| wr 43 0d 04
+| wr 43 0b 04
+| rr 43 0f 1
+| rr 43 0f 1
+| rr 43 0f 1
+| rr 43 0f 1
+| wr 43 03 40
+| wr 43 03 40
+| rr 43 0f 1
+| wr 43 03 42
+| wr 43 03 42
+| wr 43 03 46
+| rr 43 0f 1
+| wr 43 0d 04
+| wr 43 0b 04
+| wr 43 03 46
+| rr 43 0f 1
+| rr 43 0f 1
+| rr 43 0f 1
+| rr 43 0f 1
+| wr 43 0d 04
+| wr 43 0b 04
+| rr 43 0f 1
+| rr 43 0f 1
+| rr 43 0f 1
+| wr 43 03 46
+| rr 43 0f 1
+| rr 43 0f 1
+| rr 43 0f 1
+| rr 43 0f 1
+| wr 43 03 4e
+| rr 43 0f 1
+| rr 43 0f 1
+| wr 43 0d 84
+| wr 43 0b 84
+| 
+=== tmp451_conversions
+count 3000
+sha256 0a84aa1b8706c335c24259956a48dc3ced3277290a8d219faa8330d576599cc0
+--- sample 0
+| round 0 addr 4c fail false cal true: init 0
+| ch -1: 0x42010000 nan
+| ch 0: 0x428ca3d6 0x42b80000
+| ch 1: 0x428cd70a 0x42b80000
+| ch 2: 0x428d0a3c 0x42b80000
+| ch 3: 0x428d3d70 0x42b80000
+| ch 4: nan nan
+| ch -2: nan nan
+| rr 4c 02 1
+| wr 4c 09 40
+| wr 4c 23 00
+| wr 4c 11 00
+| wr 4c 12 00
+| wr 4c 0f ff
+| rr 4c 02 1
+| rr 4c 00 1
+| rr 4c 15 1
+| delay 50
+| wr 4c 0f ff
+| rr 4c 02 1
+| rr 4c 01 1
+| rr 4c 10 1
+| delay 75
+| wr 4c 0f ff
+| rr 4c 02 1
+| rr 4c 01 1
+| rr 4c 10 1
+| delay 50
+| wr 4c 0f ff
+| rr 4c 02 1
+| rr 4c 01 1
+| rr 4c 10 1
+| delay 75
+| wr 4c 0f ff
+| rr 4c 02 1
+| rr 4c 01 1
+| rr 4c 10 1
+| delay 50
+| wr 4c 0f ff
+| rr 4c 02 1
+| rr 4c 01 1
+| rr 4c 10 1
+| delay 75
+| wr 4c 0f ff
+| rr 4c 02 1
+| rr 4c 01 1
+| rr 4c 10 1
+| delay 50
+| wr 4c 0f ff
+| rr 4c 02 1
+| rr 4c 01 1
+| rr 4c 10 1
+| delay 75
+| wr 4c 0f ff
+| rr 4c 02 1
+| rr 4c 01 1
+| rr 4c 10 1
+| 
+--- sample 1
+| round 1 addr 4d fail false cal false: init 0
+| ch -1: 0x42f46000 nan
+| ch 0: 0x40a43d70 0x42090000
+| ch 1: 0x40a43d70 0x42090000
+| ch 2: 0x40a43d70 0x42090000
+| ch 3: 0x40a43d70 0x42090000
+| ch 4: nan nan
+| ch -2: nan nan
+| rr 4d 02 1
+| wr 4d 09 40
+| wr 4d 23 00
+| wr 4d 11 00
+| wr 4d 12 00
+| wr 4d 0f ff
+| rr 4d 02 1
+| rr 4d 00 1
+| rr 4d 15 1
+| delay 50
+| wr 4d 0f ff
+| rr 4d 02 1
+| rr 4d 01 1
+| rr 4d 10 1
+| delay 75
+| wr 4d 0f ff
+| rr 4d 02 1
+| rr 4d 01 1
+| rr 4d 10 1
+| delay 50
+| wr 4d 0f ff
+| rr 4d 02 1
+| rr 4d 01 1
+| rr 4d 10 1
+| delay 75
+| wr 4d 0f ff
+| rr 4d 02 1
+| rr 4d 01 1
+| rr 4d 10 1
+| delay 50
+| wr 4d 0f ff
+| rr 4d 02 1
+| rr 4d 01 1
+| rr 4d 10 1
+| delay 75
+| wr 4d 0f ff
+| rr 4d 02 1
+| rr 4d 01 1
+| rr 4d 10 1
+| delay 50
+| wr 4d 0f ff
+| rr 4d 02 1
+| rr 4d 01 1
+| rr 4d 10 1
+| delay 75
+| wr 4d 0f ff
+| rr 4d 02 1
+| rr 4d 01 1
+| rr 4d 10 1
+| 
+--- sample 2
+| round 2 addr 4e fail false cal false: init 0
+| ch -1: 0x42bcc000 nan
+| ch 0: 0xc191547b 0x414e0000
+| ch 1: 0xc191547b 0x414e0000
+| ch 2: 0xc191547b 0x414e0000
+| ch 3: 0xc191547b 0x414e0000
+| ch 4: nan nan
+| ch -2: nan nan
+| rr 4e 02 1
+| wr 4e 09 40
+| wr 4e 23 00
+| wr 4e 11 00
+| wr 4e 12 00
+| wr 4e 0f ff
+| rr 4e 02 1
+| rr 4e 00 1
+| rr 4e 15 1
+| delay 50
+| wr 4e 0f ff
+| rr 4e 02 1
+| rr 4e 01 1
+| rr 4e 10 1
+| delay 75
+| wr 4e 0f ff
+| rr 4e 02 1
+| rr 4e 01 1
+| rr 4e 10 1
+| delay 50
+| wr 4e 0f ff
+| rr 4e 02 1
+| rr 4e 01 1
+| rr 4e 10 1
+| delay 75
+| wr 4e 0f ff
+| rr 4e 02 1
+| rr 4e 01 1
+| rr 4e 10 1
+| delay 50
+| wr 4e 0f ff
+| rr 4e 02 1
+| rr 4e 01 1
+| rr 4e 10 1
+| delay 75
+| wr 4e 0f ff
+| rr 4e 02 1
+| rr 4e 01 1
+| rr 4e 10 1
+| delay 50
+| wr 4e 0f ff
+| rr 4e 02 1
+| rr 4e 01 1
+| rr 4e 10 1
+| delay 75
+| wr 4e 0f ff
+| rr 4e 02 1
+| rr 4e 01 1
+| rr 4e 10 1
+| 
+--- sample 3
+| round 3 addr 4c fail false cal false: init 0
+| ch -1: 0xc2846000 nan
+| ch 0: 0xc31de400 0xc2e6a000
+| ch 1: 0xc31de400 0xc2e6a000
+| ch 2: 0xc31de400 0xc2e6a000
+| ch 3: 0xc31de400 0xc2e6a000
+| ch 4: nan nan
+| ch -2: nan nan
+| rr 4c 02 1
+| wr 4c 09 40
+| wr 4c 23 00
+| wr 4c 11 00
+| wr 4c 12 00
+| wr 4c 0f ff
+| rr 4c 02 1
+| rr 4c 00 1
+| rr 4c 15 1
+| delay 50
+| wr 4c 0f ff
+| rr 4c 02 1
+| rr 4c 01 1
+| rr 4c 10 1
+| delay 75
+| wr 4c 0f ff
+| rr 4c 02 1
+| rr 4c 01 1
+| rr 4c 10 1
+| delay 50
+| wr 4c 0f ff
+| rr 4c 02 1
+| rr 4c 01 1
+| rr 4c 10 1
+| delay 75
+| wr 4c 0f ff
+| rr 4c 02 1
+| rr 4c 01 1
+| rr 4c 10 1
+| delay 50
+| wr 4c 0f ff
+| rr 4c 02 1
+| rr 4c 01 1
+| rr 4c 10 1
+| delay 75
+| wr 4c 0f ff
+| rr 4c 02 1
+| rr 4c 01 1
+| rr 4c 10 1
+| delay 50
+| wr 4c 0f ff
+| rr 4c 02 1
+| rr 4c 01 1
+| rr 4c 10 1
+| delay 75
+| wr 4c 0f ff
+| rr 4c 02 1
+| rr 4c 01 1
+| rr 4c 10 1
+| 
+--- sample 4
+| round 4 addr 4d fail false cal true: init 0
+| ch -1: 0xc240c000 nan
+| ch 0: 0xc2030f5c 0xc0a80000
+| ch 1: 0xc202a8f5 0xc0a80000
+| ch 2: 0xc202428f 0xc0a80000
+| ch 3: 0xc201dc28 0xc0a80000
+| ch 4: nan nan
+| ch -2: nan nan
+| rr 4d 02 1
+| wr 4d 09 40
+| wr 4d 23 00
+| wr 4d 11 00
+| wr 4d 12 00
+| wr 4d 0f ff
+| rr 4d 02 1
+| rr 4d 00 1
+| rr 4d 15 1
+| delay 50
+| wr 4d 0f ff
+| rr 4d 02 1
+| rr 4d 01 1
+| rr 4d 10 1
+| delay 75
+| wr 4d 0f ff
+| rr 4d 02 1
+| rr 4d 01 1
+| rr 4d 10 1
+| delay 50
+| wr 4d 0f ff
+| rr 4d 02 1
+| rr 4d 01 1
+| rr 4d 10 1
+| delay 75
+| wr 4d 0f ff
+| rr 4d 02 1
+| rr 4d 01 1
+| rr 4d 10 1
+| delay 50
+| wr 4d 0f ff
+| rr 4d 02 1
+| rr 4d 01 1
+| rr 4d 10 1
+| delay 75
+| wr 4d 0f ff
+| rr 4d 02 1
+| rr 4d 01 1
+| rr 4d 10 1
+| delay 50
+| wr 4d 0f ff
+| rr 4d 02 1
+| rr 4d 01 1
+| rr 4d 10 1
+| delay 75
+| wr 4d 0f ff
+| rr 4d 02 1
+| rr 4d 01 1
+| rr 4d 10 1
+| 
+--- sample 5
+| round 5 addr 4e fail false cal false: init 0
+| ch -1: 0xc0d80000 nan
+| ch 0: 0x423a35c4 0x42908000
+| ch 1: 0x423a35c4 0x42908000
+| ch 2: 0x423a35c4 0x42908000
+| ch 3: 0x423a35c4 0x42908000
+| ch 4: nan nan
+| ch -2: nan nan
+| rr 4e 02 1
+| wr 4e 09 40
+| wr 4e 23 00
+| wr 4e 11 00
+| wr 4e 12 00
+| wr 4e 0f ff
+| rr 4e 02 1
+| rr 4e 00 1
+| rr 4e 15 1
+| delay 50
+| wr 4e 0f ff
+| rr 4e 02 1
+| rr 4e 01 1
+| rr 4e 10 1
+| delay 75
+| wr 4e 0f ff
+| rr 4e 02 1
+| rr 4e 01 1
+| rr 4e 10 1
+| delay 50
+| wr 4e 0f ff
+| rr 4e 02 1
+| rr 4e 01 1
+| rr 4e 10 1
+| delay 75
+| wr 4e 0f ff
+| rr 4e 02 1
+| rr 4e 01 1
+| rr 4e 10 1
+| delay 50
+| wr 4e 0f ff
+| rr 4e 02 1
+| rr 4e 01 1
+| rr 4e 10 1
+| delay 75
+| wr 4e 0f ff
+| rr 4e 02 1
+| rr 4e 01 1
+| rr 4e 10 1
+| delay 50
+| wr 4e 0f ff
+| rr 4e 02 1
+| rr 4e 01 1
+| rr 4e 10 1
+| delay 75
+| wr 4e 0f ff
+| rr 4e 02 1
+| rr 4e 01 1
+| rr 4e 10 1
+| 
+--- sample 6
+| round 6 addr 4c fail false cal false: init 0
+| ch -1: nan nan
+| ch 0: nan nan
+| ch 1: nan nan
+| ch 2: nan nan
+| ch 3: nan nan
+| ch 4: nan nan
+| ch -2: nan nan
+| rr 4c 02 1
+| wr 4c 09 40
+| wr 4c 23 00
+| wr 4c 11 00
+| wr 4c 12 00
+| wr 4c 0f ff
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 50
+| wr 4c 0f ff
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 75
+| wr 4c 0f ff
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 50
+| wr 4c 0f ff
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 75
+| wr 4c 0f ff
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 50
+| wr 4c 0f ff
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 75
+| wr 4c 0f ff
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 50
+| wr 4c 0f ff
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 75
+| wr 4c 0f ff
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| delay 5
+| rr 4c 02 1
+| 
+--- sample 7
+| round 7 addr 4d fail false cal false: init 0
+| ch -1: 0xc2538000 nan
+| ch 0: 0x42b8cd1f 0x42e4a000
+| ch 1: 0x42b8cd1f 0x42e4a000
+| ch 2: 0x42b8cd1f 0x42e4a000
+| ch 3: 0x42b8cd1f 0x42e4a000
+| ch 4: nan nan
+| ch -2: nan nan
+| rr 4d 02 1
+| wr 4d 09 40
+| wr 4d 23 00
+| wr 4d 11 00
+| wr 4d 12 00
+| wr 4d 0f ff
+| rr 4d 02 1
+| rr 4d 00 1
+| rr 4d 15 1
+| delay 50
+| wr 4d 0f ff
+| rr 4d 02 1
+| rr 4d 01 1
+| rr 4d 10 1
+| delay 75
+| wr 4d 0f ff
+| rr 4d 02 1
+| rr 4d 01 1
+| rr 4d 10 1
+| delay 50
+| wr 4d 0f ff
+| rr 4d 02 1
+| rr 4d 01 1
+| rr 4d 10 1
+| delay 75
+| wr 4d 0f ff
+| rr 4d 02 1
+| rr 4d 01 1
+| rr 4d 10 1
+| delay 50
+| wr 4d 0f ff
+| rr 4d 02 1
+| rr 4d 01 1
+| rr 4d 10 1
+| delay 75
+| wr 4d 0f ff
+| rr 4d 02 1
+| rr 4d 01 1
+| rr 4d 10 1
+| delay 50
+| wr 4d 0f ff
+| rr 4d 02 1
+| rr 4d 01 1
+| rr 4d 10 1
+| delay 75
+| wr 4d 0f ff
+| rr 4d 02 1
+| rr 4d 01 1
+| rr 4d 10 1
+| 

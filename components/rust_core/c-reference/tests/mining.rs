@@ -14,6 +14,10 @@ use rust_core::mining::{nonce_difficulty, JobHashes};
 use rust_core::stratum_v1::job::{Job, EXTRANONCE2_HEX_MAX};
 use rust_core::stratum_v1::MiningNotify;
 
+#[path = "../../tests/golden/mod.rs"]
+mod golden;
+use golden::Rec;
+
 /// `bm_job` (`include/jobs.h`)
 #[repr(C)]
 #[derive(Clone, Copy)]
@@ -90,10 +94,23 @@ impl Rng {
     }
 }
 
+/// Fixed (the golden file records the outputs for exactly these inputs).
 fn iterations() -> (usize, u64) {
-    let n = std::env::var("DIFF_ITERATIONS").map_or(100_000, |v| v.parse().unwrap());
-    let seed = std::env::var("DIFF_SEED").map_or(0x7a11_b0b0_5eed_0002, |v| v.parse().unwrap());
-    (n, seed)
+    (100_000, 0x7a11_b0b0_5eed_0002)
+}
+
+fn hex(b: &[u8]) -> String {
+    b.iter().map(|b| format!("{b:02x}")).collect()
+}
+
+fn hashes_text(h: &JobHashes) -> String {
+    format!(
+        "{} {} {} {}",
+        hex(&h.merkle_root),
+        hex(&h.merkle_root_be),
+        hex(&h.prev_block_hash),
+        hex(&h.prev_block_hash_be)
+    )
 }
 
 fn zeroed_notify() -> MiningNotify {
@@ -106,6 +123,7 @@ fn build_job_matches_reference() {
     let (n, seed) = iterations();
     let rng = Rng(Cell::new(seed));
     let (mut compared, mut high_digits) = (0, 0);
+    let mut rec = Rec::new("mining", "build_job_matches_reference");
 
     for i in 0..n {
         let cb1 = CString::new(rng.hex(rng.below(200) + rng.below(2))).unwrap();
@@ -168,6 +186,7 @@ fn build_job_matches_reference() {
             // extranonce2_len the reference keeps the high digits, Rust the low.
             assert_eq!(ref_en2, full[..digits], "case {i}");
             assert_eq!(new_en2, full[full.len() - digits..], "case {i}");
+            rec.add(format!("{i} high {new_en2}"));
             high_digits += 1;
             continue;
         }
@@ -184,16 +203,19 @@ fn build_job_matches_reference() {
             job.hashes, expected,
             "case {i}: cb1={cb1:?} en1={en1:?} en2={en2:#x}/{en2_len} cb2={cb2:?}"
         );
+        rec.add(format!("{i} {new_en2} {}", hashes_text(&job.hashes)));
         compared += 1;
     }
     eprintln!("{compared} identical, {high_digits} with a counter beyond extranonce2_len (deliberate difference)");
     assert!(compared > n / 2);
+    rec.finish();
 }
 
 #[test]
 fn nonce_difficulty_matches_reference() {
     let (n, seed) = iterations();
     let rng = Rng(Cell::new(seed ^ 0x55));
+    let mut rec = Rec::new("mining", "nonce_difficulty_matches_reference");
     for i in 0..n {
         // SAFETY: plain data.
         let mut job: BmJob = unsafe { std::mem::zeroed() };
@@ -217,7 +239,9 @@ fn nonce_difficulty_matches_reference() {
             expected.to_bits(),
             "case {i}: {got} vs {expected}"
         );
+        rec.add(format!("{i} {got:?} {:#x}", got.to_bits()));
     }
+    rec.finish();
 }
 
 #[test]
@@ -257,6 +281,8 @@ fn genesis_block_through_both() {
         )
     };
     assert_eq!(job.hashes.merkle_root, reference.merkle_root);
+    let mut rec = Rec::new("mining", "genesis_block_through_both");
+    rec.add(hashes_text(&job.hashes));
 
     reference.ntime = 0x495fab29;
     reference.target = 0x1d00ffff;
@@ -270,5 +296,7 @@ fn genesis_block_through_both() {
         0x7c2bac1d,
     );
     assert_eq!(got.to_bits(), expected.to_bits());
+    rec.add(format!("{got:?} {:#x}", got.to_bits()));
     assert!((2500.0..2600.0).contains(&got), "{got}");
+    rec.finish();
 }

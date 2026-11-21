@@ -1,0 +1,115 @@
+# Golden outputs (the former C/C++ code), see tests/golden/mod.rs
+=== dual_pool_asic_diff_matches_reference
+count 100000
+sha256 f63f4e8f31a3db14731c62cc10e322e2f900eb64cc2aa5616c79f074a10d08f1
+--- sample 0
+| 0 1 16384 16384 false
+--- sample 1
+| 1 0 227 256 true
+--- sample 2
+| 2 0 1417173938 16384 false
+--- sample 3
+| 3 0 32768 16384 false
+--- sample 4
+| 4 1 65536 32768 false
+--- sample 5
+| 5 1 9 256 true
+--- sample 6
+| 6 1 32768 32768 false
+--- sample 7
+| 7 1 1 256 true
+=== dual_pool_balance_matches_reference
+count 10000
+sha256 419970750299d97dba549a2d343e3cd932ed0aae61d5710195e6bfa1710b4018
+--- sample 0
+| 0 1 1 99
+--- sample 1
+| 1 90 0 0
+--- sample 2
+| 2 54 1 0
+--- sample 3
+| 3 94 0 0
+--- sample 4
+| 4 2 1 100
+--- sample 5
+| 5 47 1 53
+--- sample 6
+| 6 38 1 100
+--- sample 7
+| 7 59 0 0
+=== dual_pool_dithering_matches_reference
+count 100000
+sha256 6b54fd78d847f06ea5e1c61acb7d1df3ebc3827755ab912af1573ada599e347b
+--- sample 0
+| 0 50 0
+--- sample 1
+| 1 50 0
+--- sample 2
+| 2 50 0
+--- sample 3
+| 3 50 1
+--- sample 4
+| 4 50 0
+--- sample 5
+| 5 50 0
+--- sample 6
+| 6 50 1
+--- sample 7
+| 7 50 1
+=== dual_pool_events_match_reference
+count 100000
+sha256 1e0a5b3ab93df2f9f4dfa7a3ba84e06b036a908cd843ff0b26d085d629a0afcd
+--- sample 0
+| 0 0 1 Actions { invalidate: [false, false], disconnect: [false, false], stop_timer: [false, false], start_timer: [false, false], connect: [false, false], reset_verify_counts: [false, false] } [false, false]
+--- sample 1
+| 1 1 0 Actions { invalidate: [false, false], disconnect: [false, false], stop_timer: [false, false], start_timer: [false, false], connect: [false, false], reset_verify_counts: [false, false] } [false, false]
+--- sample 2
+| 2 2 1 Actions { invalidate: [false, true], disconnect: [false, false], stop_timer: [false, false], start_timer: [false, true], connect: [false, false], reset_verify_counts: [false, false] } [false, false]
+--- sample 3
+| 3 1 0 Actions { invalidate: [false, false], disconnect: [true, false], stop_timer: [false, false], start_timer: [false, false], connect: [false, false], reset_verify_counts: [false, false] } [false, false]
+--- sample 4
+| 4 0 0 Actions { invalidate: [false, false], disconnect: [false, false], stop_timer: [false, false], start_timer: [false, false], connect: [false, false], reset_verify_counts: [false, false] } [false, false]
+--- sample 5
+| 5 2 0 Actions { invalidate: [true, false], disconnect: [false, false], stop_timer: [false, false], start_timer: [true, false], connect: [false, false], reset_verify_counts: [false, false] } [false, false]
+--- sample 6
+| 6 2 0 Actions { invalidate: [true, false], disconnect: [false, false], stop_timer: [false, false], start_timer: [true, false], connect: [false, false], reset_verify_counts: [false, false] } [false, false]
+--- sample 7
+| 7 2 1 Actions { invalidate: [false, true], disconnect: [false, false], stop_timer: [false, false], start_timer: [false, true], connect: [false, false], reset_verify_counts: [false, false] } [false, false]
+=== failover_matches_reference
+count 100000
+sha256 6416a595492e4456e0bdd397d2d12c57350a0addaf7757bfd9019fd4b146b446
+--- sample 0
+| 0 0 0 Actions { invalidate: [false, false], disconnect: [false, false], stop_timer: [false, false], start_timer: [false, false], connect: [true, false], reset_verify_counts: [false, false] } 0
+--- sample 1
+| 1 2 1 Actions { invalidate: [false, true], disconnect: [false, false], stop_timer: [false, false], start_timer: [false, false], connect: [false, false], reset_verify_counts: [false, false] } 0
+--- sample 2
+| 2 2 0 Actions { invalidate: [true, false], disconnect: [false, false], stop_timer: [false, false], start_timer: [false, true], connect: [false, false], reset_verify_counts: [false, false] } 0
+--- sample 3
+| 3 1 0 Actions { invalidate: [false, false], disconnect: [false, true], stop_timer: [false, true], start_timer: [false, false], connect: [false, false], reset_verify_counts: [true, false] } 0
+--- sample 4
+| 4 0 1 Actions { invalidate: [false, false], disconnect: [false, false], stop_timer: [false, false], start_timer: [false, false], connect: [false, true], reset_verify_counts: [false, false] } 0
+--- sample 5
+| 5 0 1 Actions { invalidate: [false, false], disconnect: [false, false], stop_timer: [false, false], start_timer: [false, false], connect: [false, true], reset_verify_counts: [false, false] } 0
+--- sample 6
+| 6 2 0 Actions { invalidate: [true, false], disconnect: [false, false], stop_timer: [false, false], start_timer: [false, true], connect: [false, false], reset_verify_counts: [false, false] } 0
+--- sample 7
+| 7 2 0 Actions { invalidate: [true, false], disconnect: [false, false], stop_timer: [false, false], start_timer: [false, true], connect: [false, false], reset_verify_counts: [false, false] } 0
+=== verification_matches_reference
+count 100000
+sha256 1d9474db052c86749d8321d2be37a98f49a05d636909a518c7740ac590650fe5
+--- sample 0
+| 0 VerifyOut { ok: false, counted: true, alert: false, blocked: 1, reconnect: true, fault: 0 }
+--- sample 1
+| 1 VerifyOut { ok: true, counted: true, alert: false, blocked: 1, reconnect: false, fault: 7 }
+--- sample 2
+| 2 VerifyOut { ok: false, counted: true, alert: false, blocked: 1, reconnect: false, fault: 7 }
+--- sample 3
+| 3 VerifyOut { ok: false, counted: false, alert: false, blocked: 1, reconnect: false, fault: 7 }
+--- sample 4
+| 4 VerifyOut { ok: false, counted: false, alert: false, blocked: 0, reconnect: false, fault: 7 }
+--- sample 5
+| 5 VerifyOut { ok: false, counted: false, alert: false, blocked: 0, reconnect: false, fault: 0 }
+--- sample 6
+| 6 VerifyOut { ok: true, counted: true, alert: false, blocked: 0, reconnect: false, fault: 0 }
+--- sample 7
+| 7 VerifyOut { ok: true, counted: true, alert: false, blocked: 1, reconnect: false, fault: 7 }

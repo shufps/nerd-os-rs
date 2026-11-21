@@ -9,6 +9,10 @@ use std::sync::Mutex;
 use c_reference as _;
 use rust_core::asic::TaskResult;
 
+#[path = "../../tests/golden/mod.rs"]
+mod golden;
+use golden::Rec;
+
 // The two builds export the same functions with prefixes ref_/new_.
 macro_rules! driver_fns {
     (ref_) => {
@@ -209,6 +213,40 @@ fn run<T>(chip: i32, reads: &[Vec<u8>], f: impl Fn(&Driver, *mut c_void) -> T) -
     })
 }
 
+/// The bytes sent, as hex: a frame (55 aa, header, length, ...) per string.
+fn frames(sent: &[u8]) -> Vec<String> {
+    let mut out = Vec::new();
+    let mut p = 0;
+    while p < sent.len() {
+        let rest = sent.len() - p;
+        let n = if rest >= 4 && sent[p] == 0x55 && sent[p + 1] == 0xaa {
+            (2 + sent[p + 3] as usize).clamp(4, rest)
+        } else {
+            rest
+        };
+        out.push(hex(&sent[p..p + n]));
+        p += n;
+    }
+    out
+}
+
+/// One run for the golden file: `head`, then the frames sent, 16 per entry.
+fn add_sent(rec: &mut Rec, head: String, sent: &[u8], clears: i32) {
+    let fr = frames(sent);
+    rec.add(format!("{head} clears {clears} frames {}", fr.len()));
+    for chunk in fr.chunks(16) {
+        rec.add(chunk.join("\n"));
+    }
+}
+
+fn hex(b: &[u8]) -> String {
+    use std::fmt::Write as _;
+    b.iter().fold(String::new(), |mut s, b| {
+        let _ = write!(s, "{b:02x}");
+        s
+    })
+}
+
 struct Rng(Cell<u64>);
 impl Rng {
     fn next(&self) -> u64 {
@@ -233,6 +271,7 @@ impl Rng {
 #[test]
 fn frames_match_reference() {
     let rng = Rng(Cell::new(0x1234_5678));
+    let mut rec = Rec::new("asic", "frames_match_reference");
     for i in 0..3000 {
         let header = rng.next() as u8;
         let max = if header & 0x20 != 0 { 120 } else { 30 };
@@ -241,12 +280,16 @@ fn frames_match_reference() {
             (d.send)(a, header, data.as_ptr(), data.len() as u8)
         });
         assert_eq!(c, r, "case {i}: header {header:02x}, {} bytes", data.len());
+        let head = format!("case {i}: header {header:02x} data {}", hex(&data));
+        add_sent(&mut rec, head, &c.sent, c.clears);
     }
+    rec.finish();
 }
 
 #[test]
 fn jobs_match_reference() {
     let rng = Rng(Cell::new(0x0bad_cafe));
+    let mut rec = Rec::new("asic", "jobs_match_reference");
     for chip in CHIPS {
         for job_id in 0..=255u32 {
             let (merkle, prev) = (rng.bytes(32), rng.bytes(32));
@@ -265,8 +308,11 @@ fn jobs_match_reference() {
             });
             assert_eq!(c, r, "chip {chip}, job {job_id}");
             assert_eq!(c.sent.len(), 88);
+            let head = format!("chip {chip} job {job_id}: {:?}", c.result);
+            add_sent(&mut rec, head, &c.sent, c.clears);
         }
     }
+    rec.finish();
 }
 
 fn response(rng: &Rng) -> Vec<u8> {
@@ -279,6 +325,7 @@ fn response(rng: &Rng) -> Vec<u8> {
 #[test]
 fn responses_match_reference() {
     let rng = Rng(Cell::new(0xfeed_beef));
+    let mut rec = Rec::new("asic", "responses_match_reference");
     for chip in CHIPS {
         for i in 0..4000 {
             let interval = [0u8, 1, 2, 4, 8, 16, 32, 64, 128][rng.below(9) as usize];
@@ -294,6 +341,12 @@ fn responses_match_reference() {
                 (ok, result)
             });
             assert_eq!(c, r, "chip {chip}, interval {interval}, {read:02x?}");
+            let head = format!(
+                "chip {chip} interval {interval} read {}: {:?}",
+                hex(&read),
+                c.result
+            );
+            add_sent(&mut rec, head, &c.sent, c.clears);
         }
         // a timeout
         let [r, c] = run(chip, &[], |d, a| unsafe {
@@ -301,7 +354,10 @@ fn responses_match_reference() {
         });
         assert_eq!((c.result, c.clears), (false, 0));
         assert_eq!(c, r);
+        let head = format!("chip {chip} timeout: {:?}", c.result);
+        add_sent(&mut rec, head, &c.sent, c.clears);
     }
+    rec.finish();
 }
 
 /// A short read with a valid preamble is rejected.
@@ -319,6 +375,7 @@ fn short_read_is_rejected() {
 #[test]
 fn difficulty_masks_match_reference() {
     let rng = Rng(Cell::new(0x5eed));
+    let mut rec = Rec::new("asic", "difficulty_masks_match_reference");
     for chip in CHIPS {
         // a sequence on one object: unchanged masks are not sent again
         let diffs: Vec<i32> = (0..400)
@@ -336,12 +393,16 @@ fn difficulty_masks_match_reference() {
             }
         });
         assert_eq!(c, r, "chip {chip}");
+        let head = format!("chip {chip} difficulties {diffs:?}: {:?}", c.result);
+        add_sent(&mut rec, head, &c.sent, c.clears);
     }
+    rec.finish();
 }
 
 #[test]
 fn vr_frequency_matches_reference() {
     let rng = Rng(Cell::new(0xabcdef));
+    let mut rec = Rec::new("asic", "vr_frequency_matches_reference");
     for chip in CHIPS {
         let values: Vec<u32> = (0..2000)
             .map(|i| match i % 3 {
@@ -357,7 +418,10 @@ fn vr_frequency_matches_reference() {
             (d.default_vr_frequency)(a)
         });
         assert_eq!(c, r, "chip {chip}");
+        let head = format!("chip {chip} {} values: {:?}", values.len(), c.result);
+        add_sent(&mut rec, head, &c.sent, c.clears);
     }
+    rec.finish();
 }
 
 /// 0 Hz is refused; the reference does not handle it, so only the Rust
@@ -385,6 +449,7 @@ fn chip_id(chip: i32) -> [u8; 11] {
 #[test]
 fn init_sequences_match_reference() {
     let rng = Rng(Cell::new(0x1373));
+    let mut rec = Rec::new("asic", "init_sequences_match_reference");
     for chip in CHIPS {
         for i in 0..150 {
             let chips = rng.below(13) as usize;
@@ -407,13 +472,21 @@ fn init_sequences_match_reference() {
                 c, r,
                 "chip {chip}, case {i}: {chips} chips, {frequency} MHz"
             );
+            let reads_hex: Vec<String> = reads.iter().map(|r| hex(r)).collect();
+            let head = format!(
+                "chip {chip} case {i}: {frequency} MHz count {count} difficulty {difficulty} vr {vr} reads {reads_hex:?}: {:?}",
+                c.result
+            );
+            add_sent(&mut rec, head, &c.sent, c.clears);
         }
     }
+    rec.finish();
 }
 
 #[test]
 fn frequency_ramps_match_reference() {
     let rng = Rng(Cell::new(0x6_25));
+    let mut rec = Rec::new("asic", "frequency_ramps_match_reference");
     for chip in CHIPS {
         let targets: Vec<f32> = (0..30)
             .map(|_| match rng.below(3) {
@@ -429,7 +502,11 @@ fn frequency_ramps_match_reference() {
                 .collect::<Vec<_>>()
         });
         assert_eq!(c, r, "chip {chip}");
+        let bits: Vec<u32> = targets.iter().map(|t| t.to_bits()).collect();
+        let head = format!("chip {chip} targets {bits:x?}: {:?}", c.result);
+        add_sent(&mut rec, head, &c.sent, c.clears);
     }
+    rec.finish();
 }
 
 /// The PLL search over the whole range in 0.01 MHz steps, plus odd values.
@@ -447,6 +524,7 @@ fn pll_settings_match_reference() {
         1e9,
         6.25 * 160.0,
     ]);
+    let mut rec = Rec::new("asic", "pll_settings_match_reference");
     for chunk in targets.chunks(5000) {
         let [r, c] = run(2, &[], |d, a| unsafe {
             chunk
@@ -460,7 +538,18 @@ fn pll_settings_match_reference() {
                 .collect::<Vec<_>>()
         });
         assert_eq!(c, r, "around {} MHz", chunk[0]);
+        let lines: Vec<String> = chunk
+            .iter()
+            .zip(&c.result)
+            .map(|(t, (ok, bits))| format!("{:#x}: {ok} {bits:#x}", t.to_bits()))
+            .collect();
+        for l in lines.chunks(16) {
+            rec.add(l.join("\n"));
+        }
+        let head = format!("chunk from {:#x}", chunk[0].to_bits());
+        add_sent(&mut rec, head, &c.sent, c.clears);
     }
+    rec.finish();
 }
 
 /// Ramps between many start and target frequencies, including off-grid
@@ -468,6 +557,7 @@ fn pll_settings_match_reference() {
 #[test]
 fn frequency_ramps_from_any_start_match_reference() {
     let rng = Rng(Cell::new(0xa2));
+    let mut rec = Rec::new("asic", "frequency_ramps_from_any_start_match_reference");
     for chip in CHIPS {
         for i in 0..300 {
             let pick = |rng: &Rng| match rng.below(4) {
@@ -485,13 +575,22 @@ fn frequency_ramps_from_any_start_match_reference() {
                 (started, ramped)
             });
             assert_eq!(c, r, "chip {chip}, case {i}: {start} -> {target} MHz");
+            let head = format!(
+                "chip {chip} case {i}: {:#x} -> {:#x}: {:?}",
+                start.to_bits(),
+                target.to_bits(),
+                c.result
+            );
+            add_sent(&mut rec, head, &c.sent, c.clears);
         }
     }
+    rec.finish();
 }
 
 #[test]
 fn chip_info_and_raw_jobs_match_reference() {
     let rng = Rng(Cell::new(0x82));
+    let mut rec = Rec::new("asic", "chip_info_and_raw_jobs_match_reference");
     for chip in CHIPS {
         let jobs: Vec<Vec<u8>> = (0..50).map(|_| rng.bytes(82)).collect();
         let [r, c] = run(chip, &[], |d, a| unsafe {
@@ -502,5 +601,8 @@ fn chip_info_and_raw_jobs_match_reference() {
             (name, (d.small_core_count)(a), (d.default_vr_frequency)(a))
         });
         assert_eq!(c, r, "chip {chip}");
+        let head = format!("chip {chip}: {:?}", c.result);
+        add_sent(&mut rec, head, &c.sent, c.clears);
     }
+    rec.finish();
 }

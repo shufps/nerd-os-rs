@@ -1,0 +1,364 @@
+# Golden outputs (the former C/C++ code), see tests/golden/mod.rs
+=== profiles_match_the_former_constructors
+count 48
+sha256 8136d9dee11708832d2c60acc5578071e307afd7a2af9024f7c7f448977ea64f
+--- sample 0
+| NerdAxe tps53667=false six_phase=false
+| device_model NerdAxe
+| mining_agent NerdAxe
+| version 204
+| asic_model BM1366
+| asic_count 1
+| job_interval_ms 1500
+| frequencies [400, 425, 450, 475, 485, 500, 525, 550, 575]
+| voltages [1100, 1150, 1200, 1250, 1300]
+| default_frequency 485
+| default_voltage_mv 1200
+| abs_max_frequency 0
+| abs_min_voltage_mv 0
+| abs_max_voltage_mv 0
+| eco_frequency 0
+| eco_voltage_mv 0
+| init_voltage_mv 0
+| num_phases 0
+| imax 0
+| ifault 0
+| fan_invert_polarity false
+| fan_perc 1120403456
+| flip_screen true
+| num_temp_sensors 1
+| vr_max_temp 0
+| pid [Pid { target_temp: 55, p: 400, i: 10, d: 1000 }, Pid { target_temp: 65, p: 600, i: 10, d: 1000 }]
+| fan_mode0 -1
+| num_fans 1
+| fan_label0 Fan 1
+| fan_label1 Fan 2
+| max_pin 1097859072
+| min_pin 1084227584
+| max_vin 1085276160
+| min_vin 1083179008
+| min_current_a 0
+| max_current_a 1084227584
+| max_difficulty 256
+| min_difficulty 64
+| min_difficulty_dual_pool 32
+| swarm_color #e7cf00
+| default_theme cosmic
+| vr_frequency 36382
+| has_hash_counter true
+| tps53667 false
+--- sample 1
+| NerdAxe tps53667=true six_phase=false
+| device_model NerdAxe
+| mining_agent NerdAxe
+| version 204
+| asic_model BM1366
+| asic_count 1
+| job_interval_ms 1500
+| frequencies [400, 425, 450, 475, 485, 500, 525, 550, 575]
+| voltages [1100, 1150, 1200, 1250, 1300]
+| default_frequency 485
+| default_voltage_mv 1200
+| abs_max_frequency 0
+| abs_min_voltage_mv 0
+| abs_max_voltage_mv 0
+| eco_frequency 0
+| eco_voltage_mv 0
+| init_voltage_mv 0
+| num_phases 0
+| imax 0
+| ifault 0
+| fan_invert_polarity false
+| fan_perc 1120403456
+| flip_screen true
+| num_temp_sensors 1
+| vr_max_temp 0
+| pid [Pid { target_temp: 55, p: 400, i: 10, d: 1000 }, Pid { target_temp: 65, p: 600, i: 10, d: 1000 }]
+| fan_mode0 -1
+| num_fans 1
+| fan_label0 Fan 1
+| fan_label1 Fan 2
+| max_pin 1097859072
+| min_pin 1084227584
+| max_vin 1085276160
+| min_vin 1083179008
+| min_current_a 0
+| max_current_a 1084227584
+| max_difficulty 256
+| min_difficulty 64
+| min_difficulty_dual_pool 32
+| swarm_color #e7cf00
+| default_theme cosmic
+| vr_frequency 36382
+| has_hash_counter true
+| tps53667 false
+--- sample 2
+| NerdAxe tps53667=false six_phase=true
+| device_model NerdAxe
+| mining_agent NerdAxe
+| version 204
+| asic_model BM1366
+| asic_count 1
+| job_interval_ms 1500
+| frequencies [400, 425, 450, 475, 485, 500, 525, 550, 575]
+| voltages [1100, 1150, 1200, 1250, 1300]
+| default_frequency 485
+| default_voltage_mv 1200
+| abs_max_frequency 0
+| abs_min_voltage_mv 0
+| abs_max_voltage_mv 0
+| eco_frequency 0
+| eco_voltage_mv 0
+| init_voltage_mv 0
+| num_phases 0
+| imax 0
+| ifault 0
+| fan_invert_polarity false
+| fan_perc 1120403456
+| flip_screen true
+| num_temp_sensors 1
+| vr_max_temp 0
+| pid [Pid { target_temp: 55, p: 400, i: 10, d: 1000 }, Pid { target_temp: 65, p: 600, i: 10, d: 1000 }]
+| fan_mode0 -1
+| num_fans 1
+| fan_label0 Fan 1
+| fan_label1 Fan 2
+| max_pin 1097859072
+| min_pin 1084227584
+| max_vin 1085276160
+| min_vin 1083179008
+| min_current_a 0
+| max_current_a 1084227584
+| max_difficulty 256
+| min_difficulty 64
+| min_difficulty_dual_pool 32
+| swarm_color #e7cf00
+| default_theme cosmic
+| vr_frequency 36382
+| has_hash_counter true
+| tps53667 false
+--- sample 3
+| NerdAxe tps53667=true six_phase=true
+| device_model NerdAxe
+| mining_agent NerdAxe
+| version 204
+| asic_model BM1366
+| asic_count 1
+| job_interval_ms 1500
+| frequencies [400, 425, 450, 475, 485, 500, 525, 550, 575]
+| voltages [1100, 1150, 1200, 1250, 1300]
+| default_frequency 485
+| default_voltage_mv 1200
+| abs_max_frequency 0
+| abs_min_voltage_mv 0
+| abs_max_voltage_mv 0
+| eco_frequency 0
+| eco_voltage_mv 0
+| init_voltage_mv 0
+| num_phases 0
+| imax 0
+| ifault 0
+| fan_invert_polarity false
+| fan_perc 1120403456
+| flip_screen true
+| num_temp_sensors 1
+| vr_max_temp 0
+| pid [Pid { target_temp: 55, p: 400, i: 10, d: 1000 }, Pid { target_temp: 65, p: 600, i: 10, d: 1000 }]
+| fan_mode0 -1
+| num_fans 1
+| fan_label0 Fan 1
+| fan_label1 Fan 2
+| max_pin 1097859072
+| min_pin 1084227584
+| max_vin 1085276160
+| min_vin 1083179008
+| min_current_a 0
+| max_current_a 1084227584
+| max_difficulty 256
+| min_difficulty 64
+| min_difficulty_dual_pool 32
+| swarm_color #e7cf00
+| default_theme cosmic
+| vr_frequency 36382
+| has_hash_counter true
+| tps53667 false
+--- sample 4
+| NerdAxeGamma tps53667=false six_phase=false
+| device_model NerdAxeGamma
+| mining_agent NerdAxe
+| version 200
+| asic_model BM1370
+| asic_count 1
+| job_interval_ms 1500
+| frequencies [500, 515, 525, 550, 575]
+| voltages [1120, 1130, 1140, 1150, 1160, 1170, 1180, 1190, 1200]
+| default_frequency 515
+| default_voltage_mv 1150
+| abs_max_frequency 0
+| abs_min_voltage_mv 0
+| abs_max_voltage_mv 0
+| eco_frequency 0
+| eco_voltage_mv 0
+| init_voltage_mv 1150
+| num_phases 0
+| imax 0
+| ifault 0
+| fan_invert_polarity false
+| fan_perc 1120403456
+| flip_screen true
+| num_temp_sensors 1
+| vr_max_temp 1121058816
+| pid [Pid { target_temp: 60, p: 600, i: 10, d: 1000 }, Pid { target_temp: 65, p: 600, i: 10, d: 1000 }]
+| fan_mode0 -1
+| num_fans 1
+| fan_label0 Fan 1
+| fan_label1 Fan 2
+| max_pin 1103626240
+| min_pin 1084227584
+| max_vin 1085276160
+| min_vin 1083179008
+| min_current_a 0
+| max_current_a 1086324736
+| max_difficulty 2048
+| min_difficulty 512
+| min_difficulty_dual_pool 256
+| swarm_color #e7cf00
+| default_theme cosmic
+| vr_frequency 25011
+| has_hash_counter true
+| tps53667 false
+--- sample 5
+| NerdAxeGamma tps53667=true six_phase=false
+| device_model NerdAxeGamma
+| mining_agent NerdAxe
+| version 200
+| asic_model BM1370
+| asic_count 1
+| job_interval_ms 1500
+| frequencies [500, 515, 525, 550, 575]
+| voltages [1120, 1130, 1140, 1150, 1160, 1170, 1180, 1190, 1200]
+| default_frequency 515
+| default_voltage_mv 1150
+| abs_max_frequency 0
+| abs_min_voltage_mv 0
+| abs_max_voltage_mv 0
+| eco_frequency 0
+| eco_voltage_mv 0
+| init_voltage_mv 1150
+| num_phases 0
+| imax 0
+| ifault 0
+| fan_invert_polarity false
+| fan_perc 1120403456
+| flip_screen true
+| num_temp_sensors 1
+| vr_max_temp 1121058816
+| pid [Pid { target_temp: 60, p: 600, i: 10, d: 1000 }, Pid { target_temp: 65, p: 600, i: 10, d: 1000 }]
+| fan_mode0 -1
+| num_fans 1
+| fan_label0 Fan 1
+| fan_label1 Fan 2
+| max_pin 1103626240
+| min_pin 1084227584
+| max_vin 1085276160
+| min_vin 1083179008
+| min_current_a 0
+| max_current_a 1086324736
+| max_difficulty 2048
+| min_difficulty 512
+| min_difficulty_dual_pool 256
+| swarm_color #e7cf00
+| default_theme cosmic
+| vr_frequency 25011
+| has_hash_counter true
+| tps53667 false
+--- sample 6
+| NerdAxeGamma tps53667=false six_phase=true
+| device_model NerdAxeGamma
+| mining_agent NerdAxe
+| version 200
+| asic_model BM1370
+| asic_count 1
+| job_interval_ms 1500
+| frequencies [500, 515, 525, 550, 575]
+| voltages [1120, 1130, 1140, 1150, 1160, 1170, 1180, 1190, 1200]
+| default_frequency 515
+| default_voltage_mv 1150
+| abs_max_frequency 0
+| abs_min_voltage_mv 0
+| abs_max_voltage_mv 0
+| eco_frequency 0
+| eco_voltage_mv 0
+| init_voltage_mv 1150
+| num_phases 0
+| imax 0
+| ifault 0
+| fan_invert_polarity false
+| fan_perc 1120403456
+| flip_screen true
+| num_temp_sensors 1
+| vr_max_temp 1121058816
+| pid [Pid { target_temp: 60, p: 600, i: 10, d: 1000 }, Pid { target_temp: 65, p: 600, i: 10, d: 1000 }]
+| fan_mode0 -1
+| num_fans 1
+| fan_label0 Fan 1
+| fan_label1 Fan 2
+| max_pin 1103626240
+| min_pin 1084227584
+| max_vin 1085276160
+| min_vin 1083179008
+| min_current_a 0
+| max_current_a 1086324736
+| max_difficulty 2048
+| min_difficulty 512
+| min_difficulty_dual_pool 256
+| swarm_color #e7cf00
+| default_theme cosmic
+| vr_frequency 25011
+| has_hash_counter true
+| tps53667 false
+--- sample 7
+| NerdAxeGamma tps53667=true six_phase=true
+| device_model NerdAxeGamma
+| mining_agent NerdAxe
+| version 200
+| asic_model BM1370
+| asic_count 1
+| job_interval_ms 1500
+| frequencies [500, 515, 525, 550, 575]
+| voltages [1120, 1130, 1140, 1150, 1160, 1170, 1180, 1190, 1200]
+| default_frequency 515
+| default_voltage_mv 1150
+| abs_max_frequency 0
+| abs_min_voltage_mv 0
+| abs_max_voltage_mv 0
+| eco_frequency 0
+| eco_voltage_mv 0
+| init_voltage_mv 1150
+| num_phases 0
+| imax 0
+| ifault 0
+| fan_invert_polarity false
+| fan_perc 1120403456
+| flip_screen true
+| num_temp_sensors 1
+| vr_max_temp 1121058816
+| pid [Pid { target_temp: 60, p: 600, i: 10, d: 1000 }, Pid { target_temp: 65, p: 600, i: 10, d: 1000 }]
+| fan_mode0 -1
+| num_fans 1
+| fan_label0 Fan 1
+| fan_label1 Fan 2
+| max_pin 1103626240
+| min_pin 1084227584
+| max_vin 1085276160
+| min_vin 1083179008
+| min_current_a 0
+| max_current_a 1086324736
+| max_difficulty 2048
+| min_difficulty 512
+| min_difficulty_dual_pool 256
+| swarm_color #e7cf00
+| default_theme cosmic
+| vr_frequency 25011
+| has_hash_counter true
+| tps53667 false

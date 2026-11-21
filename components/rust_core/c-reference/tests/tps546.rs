@@ -13,6 +13,10 @@ use std::sync::Mutex;
 use c_reference as _;
 use rust_core::tps546::{probe, Bus, Config, Tps546, Variant};
 
+#[path = "../../tests/golden/mod.rs"]
+mod golden;
+use golden::Rec;
+
 extern "C" {
     fn i2c_stub_reset();
     fn i2c_stub_set(reg: u8, value: u16);
@@ -175,6 +179,7 @@ fn small_float(r: &mut Rng) -> f32 {
 fn init_sequences() {
     let _g = LOCK.lock().unwrap_or_else(|e| e.into_inner());
     let mut r = Rng(0x546_546);
+    let mut rec = Rec::new("tps546", "init_sequences");
     let mut found = 0;
     for round in 0..3000 {
         let id = match round % 5 {
@@ -210,6 +215,7 @@ fn init_sequences() {
             let (t, blk) = split(&fake.trace, "wblk ");
             assert_eq!(rc, rc_ref, "round {round}");
             assert_eq!(t, t_ref, "round {round} vin {vin:?} iout {iout:?}");
+            rec.add(format!("{rc}\n{}", fake.trace));
             if rc == 0 {
                 found += 1;
                 // the whole block, to the given command
@@ -234,6 +240,7 @@ fn init_sequences() {
         }
     }
     assert_eq!(found, 2400);
+    rec.finish();
 }
 
 /// Both drivers initialized on the same registers.
@@ -256,6 +263,7 @@ unsafe fn initialized(regs: &[u16; 256]) -> (Tps546, Fake) {
 fn set_vout_over_the_range() {
     let _g = LOCK.lock().unwrap_or_else(|e| e.into_inner());
     let mut r = Rng(0xabcdef);
+    let mut rec = Rec::new("tps546", "set_vout_over_the_range");
     for _ in 0..30 {
         let regs = regs_with_id(&mut r, Some(0));
         let mut volts: Vec<f32> = (0..=3200).map(|i| i as f32 / 1000.0).collect();
@@ -270,17 +278,20 @@ fn set_vout_over_the_range() {
                 assert_eq!(ok, ok_ref, "{v}");
                 let t_ref = ref_trace();
                 assert_eq!(fake.trace, t_ref, "{v} ({:#x})", v.to_bits());
+                rec.add(format!("{:#x} {ok}\n{}", v.to_bits(), fake.trace));
                 // not vacuous
                 assert_eq!(t_ref.contains("ww 24 21 "), ok && v != 0.0, "{v}");
             }
         }
     }
+    rec.finish();
 }
 
 #[test]
 fn getters_and_frequency() {
     let _g = LOCK.lock().unwrap_or_else(|e| e.into_inner());
     let mut r = Rng(0x77);
+    let mut rec = Rec::new("tps546", "getters_and_frequency");
     for round in 0..3000 {
         let regs = regs_with_id(&mut r, Some(round % 3));
         unsafe {
@@ -298,14 +309,18 @@ fn getters_and_frequency() {
             let khz = (r.next() % 3000) as c_int - 10;
             d.set_frequency(&mut fake, khz);
             ref546_set_frequency(khz);
-            assert_eq!(d.frequency(&mut fake), ref546_get_frequency());
+            let f = d.frequency(&mut fake);
+            assert_eq!(f, ref546_get_frequency());
             d.print_status(&mut fake);
             ref546_print_status();
             let t_ref = ref_trace();
             assert_eq!(fake.trace, t_ref);
+            let bits: Vec<u32> = values.iter().map(|v| v.to_bits()).collect();
+            rec.add(format!("{bits:x?} {khz} {f}\n{}", fake.trace));
             assert!(t_ref.starts_with("rw 24 8d\nrw 24 88\nrw 24 8c\nrw 24 8b\nrb 24 20\n"));
         }
     }
+    rec.finish();
 }
 
 #[test]
@@ -367,6 +382,7 @@ fn rev7_dual(domains: u16) -> Tps546 {
 fn rev7_init_sequences() {
     let _g = LOCK.lock().unwrap_or_else(|e| e.into_inner());
     let mut r = Rng(0x7e7);
+    let mut rec = Rec::new("tps546", "rev7_init_sequences");
     let mut found = 0;
     for round in 0..2000 {
         let id = match round % 5 {
@@ -391,6 +407,7 @@ fn rev7_init_sequences() {
             let rc = d.init(&mut fake);
             assert_eq!(rc, rc_ref, "round {round}");
             assert_eq!(fake.trace, t_ref, "round {round} single {single}");
+            rec.add(format!("{rc}\n{}", fake.trace));
             if rc == 0 {
                 found += 1;
                 // not vacuous: stack/sync/phase, limits, MFR blocks
@@ -405,12 +422,14 @@ fn rev7_init_sequences() {
         }
     }
     assert_eq!(found, 1600);
+    rec.finish();
 }
 
 #[test]
 fn rev7_set_vout_and_getters() {
     let _g = LOCK.lock().unwrap_or_else(|e| e.into_inner());
     let mut r = Rng(0x7e70);
+    let mut rec = Rec::new("tps546", "rev7_set_vout_and_getters");
     for round in 0..40 {
         let regs = regs_with_id(&mut r, Some(round % 3));
         let domains = 1 + (round % 2) as u16;
@@ -432,6 +451,7 @@ fn rev7_set_vout_and_getters() {
                 assert_eq!(ok, ok_ref, "{v}");
                 let t_ref = ref_trace();
                 assert_eq!(fake.trace, t_ref, "{v} domains {domains}");
+                rec.add(format!("{:#x} {ok}\n{}", v.to_bits(), fake.trace));
                 assert_eq!(t_ref.contains("ww 24 21 "), ok && v != 0.0, "{v}");
             }
             fake.trace.clear();
@@ -447,23 +467,28 @@ fn rev7_set_vout_and_getters() {
                 let v_ref = ref7_read(what as c_int);
                 assert_eq!(v.to_bits(), v_ref.to_bits(), "{what}: {v} {v_ref}");
             }
+            let mut status = Vec::new();
             for (which, reg) in [0x78u8, 0x7b, 0x7a, 0x7c, 0x7d].iter().enumerate() {
-                assert_eq!(
-                    d.status_reg(&mut fake, *reg),
-                    ref7_status_reg(which as c_int)
-                );
+                let st = d.status_reg(&mut fake, *reg);
+                assert_eq!(st, ref7_status_reg(which as c_int));
+                status.push(st);
             }
             d.print_status(&mut fake);
             ref7_status();
             d.clear_faults(&mut fake);
             ref7_clear_faults();
-            assert_eq!(d.disable_vout(&mut fake), ref7_disable());
-            assert_eq!(probe(&mut fake), ref7_probe());
+            let dis = d.disable_vout(&mut fake);
+            assert_eq!(dis, ref7_disable());
+            let pr = probe(&mut fake);
+            assert_eq!(pr, ref7_probe());
             let t_ref = ref_trace();
             assert_eq!(fake.trace, t_ref);
+            let bits: Vec<u32> = values.iter().map(|v| v.to_bits()).collect();
+            rec.add(format!("{bits:x?} {status:x?} {dis} {pr}\n{}", fake.trace));
             assert!(t_ref.contains("rb 24 7d\nwc 24 03\nwb 24 01 00\nrr 24 ad 7\n"));
         }
     }
+    rec.finish();
 }
 
 #[test]
@@ -479,12 +504,16 @@ fn rev7_single_set_vout() {
         assert_eq!(d.init(&mut fake), 0);
         fake.trace.clear();
         i2c_stub_clear_trace();
+        let mut rec = Rec::new("tps546", "rev7_single_set_vout");
         for i in 0..=3200 {
             let v = i as f32 / 1000.0;
             fake.trace.clear();
-            assert_eq!(d.set_vout(&mut fake, v), ref7_set_vout_single(v), "{v}");
+            let ok = d.set_vout(&mut fake, v);
+            assert_eq!(ok, ref7_set_vout_single(v), "{v}");
             assert_eq!(fake.trace, ref_trace(), "{v}");
+            rec.add(format!("{:#x} {ok}\n{}", v.to_bits(), fake.trace));
         }
+        rec.finish();
         // not initialized: disable is a no-op, status 0xff
         let d = rev7_dual(2);
         let mut fake = Fake::new(regs);

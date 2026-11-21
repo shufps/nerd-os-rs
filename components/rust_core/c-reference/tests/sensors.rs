@@ -12,6 +12,10 @@ use rust_core::fxl6408::Fxl6408;
 use rust_core::i2c::RegBus;
 use rust_core::tmp451::{Clock, Tmp451};
 
+#[path = "../../tests/golden/mod.rs"]
+mod golden;
+use golden::Rec;
+
 extern "C" {
     fn i2c_stub_reset();
     fn i2c_stub_set(reg: u8, value: u16);
@@ -117,6 +121,7 @@ unsafe fn setup(regs: &[u8; 256], fail: bool) {
 fn fxl6408_sequences() {
     let _g = LOCK.lock().unwrap_or_else(|e| e.into_inner());
     let mut r = Rng(0x1357);
+    let mut rec = Rec::new("sensors", "fxl6408_sequences");
     for round in 0..300 {
         let fail = round % 10 == 9;
         let mut regs = [0u8; 256];
@@ -130,34 +135,53 @@ fn fxl6408_sequences() {
             let d = Fxl6408::default();
             let mut bus = &fake;
             let mut clock = &fake;
-            assert_eq!(d.init(&mut bus, &mut |t| clock.sleep(t)), ref_fxl_init());
+            let init = d.init(&mut bus, &mut |t| clock.sleep(t));
+            assert_eq!(init, ref_fxl_init());
+            let mut ops = format!("round {round} fail {fail}: init {init}\n");
             for _ in 0..40 {
                 let pin = (r.next() % 10) as u8;
                 let flag = r.next() % 2 == 0;
-                match r.next() % 5 {
-                    0 => assert_eq!(
-                        d.set_direction(&mut bus, pin, flag),
-                        ref_fxl_set_direction(pin, flag)
-                    ),
-                    1 => assert_eq!(d.write(&mut bus, pin, flag), ref_fxl_write(pin, flag)),
-                    2 => assert_eq!(d.enable_pull_up(&mut bus, pin), ref_fxl_pull_up(pin)),
+                let op = r.next() % 5;
+                let res = match op {
+                    0 => {
+                        let x = d.set_direction(&mut bus, pin, flag);
+                        assert_eq!(x, ref_fxl_set_direction(pin, flag));
+                        format!("{x}")
+                    }
+                    1 => {
+                        let x = d.write(&mut bus, pin, flag);
+                        assert_eq!(x, ref_fxl_write(pin, flag));
+                        format!("{x}")
+                    }
+                    2 => {
+                        let x = d.enable_pull_up(&mut bus, pin);
+                        assert_eq!(x, ref_fxl_pull_up(pin));
+                        format!("{x}")
+                    }
                     3 => {
                         let mut v = 0u8;
                         let e = ref_fxl_input(&mut v);
-                        assert_eq!(d.input_status(&mut bus), (e, v));
+                        let x = d.input_status(&mut bus);
+                        assert_eq!(x, (e, v));
+                        format!("{x:?}")
                     }
                     _ => {
                         let mut level = false;
                         let e = ref_fxl_read_pin(pin, &mut level);
-                        match d.read_pin(&mut bus, pin) {
+                        let x = d.read_pin(&mut bus, pin);
+                        match x {
                             Ok(l) => assert_eq!((e, level), (0, l)),
                             Err(x) => assert_eq!(e, x),
                         }
+                        format!("{x:?}")
                     }
-                }
+                };
+                ops += &format!("op {op} pin {pin} {flag}: {res}\n");
             }
             let t = ref_trace();
-            assert_eq!(fake.take(), t, "round {round}");
+            let ours = fake.take();
+            assert_eq!(ours, t, "round {round}");
+            rec.add(format!("{ops}{ours}"));
             // not vacuous
             assert!(t.starts_with("rr 43 01 1\n"));
             if !fail {
@@ -165,12 +189,14 @@ fn fxl6408_sequences() {
             }
         }
     }
+    rec.finish();
 }
 
 #[test]
 fn tmp451_conversions() {
     let _g = LOCK.lock().unwrap_or_else(|e| e.into_inner());
     let mut r = Rng(0x2468);
+    let mut rec = Rec::new("sensors", "tmp451_conversions");
     for round in 0..3000 {
         let fail = round % 50 == 49;
         let mut regs = [0u8; 256];
@@ -196,7 +222,10 @@ fn tmp451_conversions() {
             }
             let mut bus = &fake;
             let mut clock = &fake;
-            assert_eq!(d.init(&mut bus), ref_tmp_init());
+            let init = d.init(&mut bus);
+            assert_eq!(init, ref_tmp_init());
+            let mut vals =
+                format!("round {round} addr {addr:02x} fail {fail} cal {cal}: init {init}\n");
             for ch in [-1, 0, 1, 2, 3, 4, -2] {
                 let ours = d.temperature(&mut bus, &mut clock, ch, &mut |_| true);
                 let theirs = ref_tmp_temperature(ch);
@@ -206,14 +235,27 @@ fn tmp451_conversions() {
                 );
                 let (a, b) = (d.raw(ch), ref_tmp_raw(ch));
                 assert!(a.to_bits() == b.to_bits() || (a.is_nan() && b.is_nan()));
+                vals += &format!("ch {ch}: {} {}\n", bits(ours), bits(a));
             }
             let t = ref_trace();
-            assert_eq!(fake.take(), t, "round {round}");
+            let trace = fake.take();
+            assert_eq!(trace, t, "round {round}");
+            rec.add(format!("{vals}{trace}"));
             // not vacuous: the switch delays and the remote registers
             if !fail {
                 assert!(t.contains("delay 50\n") && t.contains("delay 75\n"), "{t}");
                 assert!(t.contains(&format!("wr {addr:02x} 0f ff\n")));
             }
         }
+    }
+    rec.finish();
+}
+
+/// The bits of a value, any NaN as "nan" (NaNs are compared as such).
+fn bits(v: f32) -> String {
+    if v.is_nan() {
+        "nan".into()
+    } else {
+        format!("{:#x}", v.to_bits())
     }
 }

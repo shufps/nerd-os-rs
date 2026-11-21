@@ -10,6 +10,10 @@ use std::sync::Mutex;
 use c_reference as _;
 use rust_core::fan_control::{ChannelConfig, FanController, Fans};
 
+#[path = "../../tests/golden/mod.rs"]
+mod golden;
+use golden::Rec;
+
 extern "C" {
     fn reffan_setup(fans: c_int, cfg: *const u16, use_max: bool);
     fn reffan_init(sample_ms: c_int);
@@ -96,6 +100,7 @@ unsafe fn ref_trace() -> String {
 fn control_sequences() {
     let _g = LOCK.lock().unwrap_or_else(|e| e.into_inner());
     let mut r = Rng(0xfa17);
+    let mut rec = Rec::new("fan_control", "control_sequences");
     let mut pid_steps = 0;
     let mut overheats = 0;
     for run in 0..300 {
@@ -141,17 +146,29 @@ fn control_sequences() {
                     fake.trace, t,
                     "run {run} step {step} chip {chip} vr {vr} {cfg:?}"
                 );
+                let mut out = format!(
+                    "run {run} step {step} chip {:08x} vr {:08x} rpm {:?} {:?}\n{}",
+                    chip.to_bits(),
+                    vr.to_bits(),
+                    fake.rpm,
+                    flat(&cfg),
+                    fake.trace
+                );
                 fake.trace.clear();
                 for ch in -1..3 {
-                    assert_eq!(fc.rpm(ch), reffan_get(ch, 0));
-                    assert_eq!(
+                    let vals = (
+                        fc.rpm(ch),
                         fc.speed_perc(ch),
-                        reffan_get(ch, 1),
-                        "run {run} step {step}"
+                        fc.overheated(ch) as u16,
+                        fc.overheat_temp(ch),
                     );
-                    assert_eq!(fc.overheated(ch) as u16, reffan_get(ch, 2));
-                    assert_eq!(fc.overheat_temp(ch), reffan_get(ch, 3));
+                    assert_eq!(vals.0, reffan_get(ch, 0));
+                    assert_eq!(vals.1, reffan_get(ch, 1), "run {run} step {step}");
+                    assert_eq!(vals.2, reffan_get(ch, 2));
+                    assert_eq!(vals.3, reffan_get(ch, 3));
+                    out += &format!("ch {ch} {vals:?}\n");
                 }
+                rec.add(out);
                 if cfg[0].mode == 2 && !fc.overheated(0) {
                     pid_steps += 1;
                 }
@@ -162,4 +179,5 @@ fn control_sequences() {
     // not vacuous: the PID path and the overheat path both ran a lot
     assert!(pid_steps > 20_000, "{pid_steps}");
     assert!(overheats > 1_000, "{overheats}");
+    rec.finish();
 }

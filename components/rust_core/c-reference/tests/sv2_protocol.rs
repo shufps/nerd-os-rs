@@ -13,6 +13,10 @@ use c_reference as _;
 use rust_core::stratum_v2::protocol::FrameHeader;
 use rust_core::stratum_v2::ExtJob;
 
+#[path = "../../tests/golden/mod.rs"]
+mod golden;
+use golden::Rec;
+
 // The reference symbols carry a ref_ prefix; declare them separately.
 extern "C" {
     fn ref_sv2_parse_frame_header(data: *const u8, h: *mut FrameHeader) -> c_int;
@@ -304,10 +308,39 @@ impl Rng {
     }
 }
 
+/// Fixed (the golden file records the outputs for exactly these inputs).
 fn iterations() -> (usize, u64) {
-    let n = std::env::var("DIFF_ITERATIONS").map_or(100_000, |v| v.parse().unwrap());
-    let seed = std::env::var("DIFF_SEED").map_or(0x05f2_c0de_c0de_0004, |v| v.parse().unwrap());
-    (n, seed)
+    (100_000, 0x05f2_c0de_c0de_0004)
+}
+
+fn hex(b: &[u8]) -> String {
+    b.iter().map(|b| format!("{b:02x}")).collect()
+}
+
+/// The fields of a parsed extended job as compared.
+type ExtFields = (
+    (u32, u32, bool, [u8; 32], u32, u32, bool),
+    Vec<[u8; 32]>,
+    bool,
+    (bool, Vec<u8>),
+    (bool, Vec<u8>),
+    ([u8; 32], u8),
+);
+
+fn ext_fields_text(f: &ExtFields) -> String {
+    let merkle: Vec<String> = f.1.iter().map(|h| hex(h)).collect();
+    format!(
+        "{:?} merkle=[{}] rest_zero={} prefix={}:{} suffix={}:{} en={}:{}",
+        f.0,
+        merkle.join(","),
+        f.2,
+        f.3 .0,
+        hex(&f.3 .1),
+        f.4 .0,
+        hex(&f.4 .1),
+        hex(&f.5 .0),
+        f.5 .1
+    )
 }
 
 // ---- payload generators: well-formed, then mutated ----
@@ -419,6 +452,7 @@ fn parsers_match_reference() {
     let (n, seed) = iterations();
     let rng = Rng(Cell::new(seed));
     let (mut ok, mut total) = (0usize, 0usize);
+    let mut rec = Rec::new("sv2_protocol", "parsers_match_reference");
     for i in 0..n {
         let kind = rng.below(11);
         let p = payload(&rng, kind);
@@ -480,6 +514,11 @@ fn parsers_match_reference() {
                         )
                     };
                     compare!(i, "open channel result", ra, rb);
+                    rec.add(if rb == 0 {
+                        format!("{i} {kind} 0 {b:?}")
+                    } else {
+                        format!("{i} {kind} {rb}")
+                    });
                     if ra == 0 {
                         compare!(i, "open channel success", a, b);
                         ok += 1;
@@ -509,6 +548,11 @@ fn parsers_match_reference() {
                         b.5.as_mut_ptr(),
                     );
                     compare!(i, "new mining job result", ra, rb);
+                    rec.add(if rb == 0 {
+                        format!("{i} {kind} 0 {b:?}")
+                    } else {
+                        format!("{i} {kind} {rb}")
+                    });
                     if ra == 0 {
                         compare!(i, "new mining job", a, b);
                         ok += 1;
@@ -520,6 +564,9 @@ fn parsers_match_reference() {
                     let jb = sv2_parse_new_extended_mining_job(ptr, len, &mut cb);
                     compare!(i, "extended job channel id", ca, cb);
                     compare!(i, "extended job result", ja.is_null(), jb.is_null());
+                    if jb.is_null() {
+                        rec.add(format!("{i} 3 {cb:#x} null"));
+                    }
                     if !ja.is_null() {
                         let (a, b) = (&*ja, &*jb);
                         let fields = |j: &ExtJob| {
@@ -555,6 +602,7 @@ fn parsers_match_reference() {
                             )
                         };
                         compare!(i, "extended job", fields(a), fields(b));
+                        rec.add(format!("{i} 3 {cb:#x} {}", ext_fields_text(&fields(b))));
                         ref_sv2_ext_job_free(ja);
                         sv2_ext_job_free(jb);
                         ok += 1;
@@ -583,6 +631,13 @@ fn parsers_match_reference() {
                         size,
                     );
                     compare!(i, "submit error result", ra, rb);
+                    rec.add(if rb == 0 {
+                        // the code buffer as bytes (c_char is signed on x86)
+                        let code: Vec<u8> = b.2.iter().map(|&c| c as u8).collect();
+                        format!("{i} {kind} 0 {} {} {} {}", b.0, b.1, size, hex(&code))
+                    } else {
+                        format!("{i} {kind} {rb}")
+                    });
                     if ra == 0 {
                         compare!(i, "submit error", a, b);
                         ok += 1;
@@ -606,6 +661,11 @@ fn parsers_match_reference() {
                         &mut b.2,
                     );
                     compare!(i, "extranonce prefix result", ra, rb);
+                    rec.add(if rb == 0 {
+                        format!("{i} {kind} 0 {b:?}")
+                    } else {
+                        format!("{i} {kind} {rb}")
+                    });
                     if ra == 0 {
                         compare!(i, "extranonce prefix", a, b);
                         ok += 1;
@@ -616,6 +676,11 @@ fn parsers_match_reference() {
                     let ra = ref_sv2_parse_setup_connection_success(ptr, len, &mut a.0, &mut a.1);
                     let rb = sv2_parse_setup_connection_success(ptr, len, &mut b.0, &mut b.1);
                     compare!(i, "setup success result", ra, rb);
+                    rec.add(if rb == 0 {
+                        format!("{i} {kind} 0 {b:?}")
+                    } else {
+                        format!("{i} {kind} {rb}")
+                    });
                     if ra == 0 {
                         compare!(i, "setup success", a, b);
                     }
@@ -642,6 +707,11 @@ fn parsers_match_reference() {
                         &mut b.4,
                     );
                     compare!(i, "prev hash result", ra, rb);
+                    rec.add(if rb == 0 {
+                        format!("{i} {kind} 0 {b:?}")
+                    } else {
+                        format!("{i} {kind} {rb}")
+                    });
                     if ra == 0 {
                         compare!(i, "prev hash", a, b);
                     }
@@ -651,6 +721,11 @@ fn parsers_match_reference() {
                     let ra = ref_sv2_parse_set_target(ptr, len, &mut a.0, a.1.as_mut_ptr());
                     let rb = sv2_parse_set_target(ptr, len, &mut b.0, b.1.as_mut_ptr());
                     compare!(i, "set target result", ra, rb);
+                    rec.add(if rb == 0 {
+                        format!("{i} {kind} 0 {b:?}")
+                    } else {
+                        format!("{i} {kind} {rb}")
+                    });
                     if ra == 0 {
                         compare!(i, "set target", a, b);
                     }
@@ -660,6 +735,11 @@ fn parsers_match_reference() {
                     let ra = ref_sv2_parse_submit_shares_success(ptr, len, &mut a.0, &mut a.1);
                     let rb = sv2_parse_submit_shares_success(ptr, len, &mut b.0, &mut b.1);
                     compare!(i, "submit success result", ra, rb);
+                    rec.add(if rb == 0 {
+                        format!("{i} {kind} 0 {b:?}")
+                    } else {
+                        format!("{i} {kind} {rb}")
+                    });
                     if ra == 0 {
                         compare!(i, "submit success", a, b);
                     }
@@ -670,29 +750,28 @@ fn parsers_match_reference() {
                     for (j, b) in t.iter_mut().enumerate() {
                         *b = if j >= 32 - lead { 0 } else { rng.next() as u8 };
                     }
-                    compare!(
-                        i,
-                        "pdiff",
-                        ref_sv2_target_to_pdiff(t.as_ptr()),
-                        sv2_target_to_pdiff(t.as_ptr())
-                    );
+                    let pdiff = sv2_target_to_pdiff(t.as_ptr());
+                    compare!(i, "pdiff", ref_sv2_target_to_pdiff(t.as_ptr()), pdiff);
                     let h = rng.bytes(6);
                     let (mut ha, mut hb) = (FrameHeader::default(), FrameHeader::default());
                     ref_sv2_parse_frame_header(h.as_ptr(), &mut ha);
                     sv2_parse_frame_header(h.as_ptr(), &mut hb);
                     compare!(i, "frame header", ha, hb);
+                    rec.add(format!("{i} {kind} {pdiff} {hb:?}"));
                 }
             }
         }
     }
     eprintln!("{total} payloads, {ok} parsed successfully by both");
     assert!(ok > total / 5, "generator coverage too low");
+    rec.finish();
 }
 
 #[test]
 fn builders_match_reference() {
     let (n, seed) = iterations();
     let rng = Rng(Cell::new(seed ^ 0x77));
+    let mut rec = Rec::new("sv2_protocol", "builders_match_reference");
     for i in 0..n / 2 {
         let buf_len = if rng.chance(20) { rng.below(80) } else { 1200 };
         let (mut a, mut b) = (vec![0xaau8; 1200], vec![0xaau8; 1200]);
@@ -829,5 +908,7 @@ fn builders_match_reference() {
                 "case {i} kind {kind}: frame"
             );
         }
+        rec.add(format!("{i} {kind} {rb} {}", hex(&b[..rb.max(0) as usize])));
     }
+    rec.finish();
 }

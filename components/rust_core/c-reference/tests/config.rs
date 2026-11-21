@@ -7,6 +7,10 @@ use std::ffi::{c_char, CStr, CString};
 
 use c_reference as _;
 
+#[path = "../../tests/golden/mod.rs"]
+mod golden;
+use golden::Rec;
+
 extern "C" {
     fn ref_cfg_load(json: *const c_char) -> bool;
     fn ref_cfg_get_u16(key: *const c_char, def: u16) -> u16;
@@ -115,50 +119,55 @@ unsafe fn ref_saved() -> String {
     String::from_utf8_lossy(&buf[..n]).into_owned()
 }
 
-unsafe fn compare_getters(doc: &str) {
+/// The getters compared; returns the Rust values, one line per key.
+unsafe fn compare_getters(doc: &str) -> String {
+    let mut out = String::new();
     for k in KEYS {
         let key = CString::new(*k).unwrap();
         let p = key.as_ptr();
+        let mut u16s = Vec::new();
         for def in [0u16, 7, 65535] {
-            assert_eq!(
-                config_get_u16(p, def),
-                ref_cfg_get_u16(p, def),
-                "u16 {k} in {doc}"
-            );
+            let v = config_get_u16(p, def);
+            assert_eq!(v, ref_cfg_get_u16(p, def), "u16 {k} in {doc}");
+            u16s.push(v);
         }
+        let mut u64s = Vec::new();
         for def in [0u64, 9, u64::MAX] {
-            assert_eq!(
-                config_get_u64(p, def),
-                ref_cfg_get_u64(p, def),
-                "u64 {k} in {doc}"
-            );
+            let v = config_get_u64(p, def);
+            assert_eq!(v, ref_cfg_get_u64(p, def), "u64 {k} in {doc}");
+            u64s.push(v);
         }
+        let mut bools = Vec::new();
         for def in [false, true] {
-            assert_eq!(
-                config_get_bool(p, def),
-                ref_cfg_get_bool(p, def),
-                "bool {k} in {doc}"
-            );
+            let v = config_get_bool(p, def);
+            assert_eq!(v, ref_cfg_get_bool(p, def), "bool {k} in {doc}");
+            bools.push(v);
         }
-        assert_eq!(config_has(p), ref_cfg_has(p), "has {k} in {doc}");
+        let has = config_has(p);
+        assert_eq!(has, ref_cfg_has(p), "has {k} in {doc}");
         let ours = config_get_str(p, std::ptr::null());
         let theirs = ref_cfg_get_str(p);
         assert_eq!(ours.is_null(), theirs.is_null(), "str {k} in {doc}");
+        let mut st = None;
         if !ours.is_null() {
             assert_eq!(
                 CStr::from_ptr(ours),
                 CStr::from_ptr(theirs),
                 "str {k} in {doc}"
             );
+            st = Some(CStr::from_ptr(ours).to_bytes().to_vec());
             free(ours as *mut _);
         }
+        out += &format!("{k}: {u16s:?} {u64s:?} {bools:?} {has} {st:?}\n");
     }
+    out
 }
 
 #[test]
 fn getters_on_random_documents() {
     let _g = LOCK.lock().unwrap_or_else(|e| e.into_inner());
     let mut r = Rng(0xdead_beef_1234_5678);
+    let mut rec = Rec::new("config", "getters_on_random_documents");
     for _ in 0..20_000 {
         let mut doc = String::from("{");
         for i in 0..r.next() % 5 {
@@ -170,21 +179,22 @@ fn getters_on_random_documents() {
         doc.push('}');
         let c = CString::new(doc.clone()).unwrap();
         unsafe {
-            assert_eq!(
-                config_load(doc.as_ptr(), doc.len()),
-                ref_cfg_load(c.as_ptr()),
-                "{doc}"
-            );
-            compare_getters(&doc);
-            assert_eq!(rust_saved(), ref_saved(), "saved {doc}");
+            let ok = config_load(doc.as_ptr(), doc.len());
+            assert_eq!(ok, ref_cfg_load(c.as_ptr()), "{doc}");
+            let got = compare_getters(&doc);
+            let saved = rust_saved();
+            assert_eq!(saved, ref_saved(), "saved {doc}");
+            rec.add(format!("{doc} {ok}\n{got}{saved}"));
         }
     }
+    rec.finish();
 }
 
 #[test]
 fn random_set_sequences() {
     let _g = LOCK.lock().unwrap_or_else(|e| e.into_inner());
     let mut r = Rng(0x0123_4567_89ab_cdef);
+    let mut rec = Rec::new("config", "random_set_sequences");
     let strings = [
         "",
         "x",
@@ -196,6 +206,7 @@ fn random_set_sequences() {
     for _ in 0..5_000 {
         unsafe {
             let doc = "{\"b\":1,\"fanspeed\":\"old\"}";
+            let mut ops = String::new();
             let c = CString::new(doc).unwrap();
             config_load(doc.as_ptr(), doc.len());
             ref_cfg_load(c.as_ptr());
@@ -207,30 +218,38 @@ fn random_set_sequences() {
                         let v = CString::new(*r.pick(&strings)).unwrap();
                         config_set_str(k, v.as_ptr());
                         ref_cfg_set_str(k, v.as_ptr());
+                        ops += &format!("str {key:?} {v:?}\n");
                     }
                     1 => {
                         config_set_str(k, std::ptr::null());
                         ref_cfg_set_str(k, std::ptr::null());
+                        ops += &format!("null {key:?}\n");
                     }
                     2 => {
                         let v = r.next() as u16;
                         config_set_u16(k, v);
                         ref_cfg_set_u16(k, v);
+                        ops += &format!("u16 {key:?} {v}\n");
                     }
                     3 => {
                         let v = r.next() % 2 == 0;
                         config_set_bool(k, v);
                         ref_cfg_set_bool(k, v);
+                        ops += &format!("bool {key:?} {v}\n");
                     }
                     _ => {
                         let v = r.next();
                         config_set_u64(k, v);
                         ref_cfg_set_u64(k, v);
+                        ops += &format!("u64 {key:?} {v}\n");
                     }
                 }
             }
-            assert_eq!(rust_saved(), ref_saved());
-            compare_getters("after sets");
+            let saved = rust_saved();
+            assert_eq!(saved, ref_saved());
+            let got = compare_getters("after sets");
+            rec.add(format!("{ops}{saved}\n{got}"));
         }
     }
+    rec.finish();
 }

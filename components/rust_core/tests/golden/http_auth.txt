@@ -1,0 +1,142 @@
+# Golden outputs (the former C/C++ code), see tests/golden/mod.rs
+=== base32_matches_reference
+count 20000
+sha256 841c98888fac2a3a0b9eccade2ee61bc9a808ef880d7b1a7ea71845b8ee31f5c
+--- sample 0
+| \xb9\x11u3u,\xeff@f\xf5/\x18f -> XEIXKM3VFTXWMQDG6UXRQZQ
+| "F--.dPae5D\xffUBR\x01DbKHcEfLfLfJQD\xffVV6XV =17cJcKC\x018K.MgUS6MC4Y\x015" cap 38 -> 28 (\xde\x02tt\x0cF\x15\x1cD*\xca\xb2\xa6\x03\xad}z\xfcI\x12\x84\xa6\x1a\x92\xf3\x05\xcc
+--- sample 1
+| \x00\x84\x8b} -> ACCIW7I
+| "5H" cap 15 -> 1 \xe9
+--- sample 2
+| QJ\xf1\xbb\x13Y4^F\xa2\x92\x1dl\xd7\x9e4Cg\xed\xb0\x0e!=&\xe7\x94 -> KFFPDOYTLE2F4RVCSIOWZV46GRBWP3NQBYQT2JXHSQ
+| "8" cap 27 -> 0 
+--- sample 3
+| \xe8V#\xf17\xdf\xc0<m\xf6M\xcf\xe29\xd8\x14\x05\x0f\xef\xa1\xcc<z\x05\xa8\x96\x92\xa9%\xc3\x83QK -> 5BLCH4JX37ADY3PWJXH6EOOYCQCQ735BZQ6HUBNIS2JKSJODQNIUW
+| "RFGH\x01HPOQ=XMdJSzcG=YPDUZ SL3MHd\x01gfacFJOHdbYIEZPZI3=TOVX8YfF2DfPb=R7A" cap 31 -> 0 
+--- sample 4
+| \xb4@`\xa5\xc9b\x1etu\x9dM\xdeotS\xc4nO\x8c~\x02\xc3\xe2j5\xbbT\xf7\xfcSMJ -> WRAGBJOJMIPHI5M5JXPG65CTYRXE7DD6ALB6E2RVXNKPP7CTJVFA
+| "XJ.eXZzcTPecFDTbYNX4EERJ.cIfR1ODQ cLKDXX7z\x01FLZS=CF.VIS SZYX=a1" cap 29 -> 0 
+--- sample 5
+| \x90\xa4\x95\x16b\x1d1=\xa0oKSl\x07\xc6\xfd\x1aC\x0f\xed\x02\x9b\x95\xcf\xa3\x0f5 -> SCSJKFTCDUYT3IDPJNJWYB6G7UNEGD7NAKNZLT5DB42Q
+| "b4\x01I3E2\xff3KROMX3" cap 36 -> 8 \x0f\x11\xb2kj\x8b\x99}
+--- sample 6
+| \x05\x13\xdd>\xca4\x17\x01Y\xba\x84\xd3 -> AUJ52PWKGQLQCWN2QTJQ
+| "\x01cAJXVWR86cdgQD\xffLKaX=NSCQZ8EC=dMa" cap 12 -> 0 
+--- sample 7
+| \xc3b\xe1l\xfe~ns\xfb\xac*\xfb\xa3\xe6\x97#\x02\xf4\x87/u\xef\xa6\xf7x -> YNROC3H6PZXHH65MFL52HZUXEMBPJBZPOXX2N53Y
+| ".IX2ZWZ.SF4668dzVbJY7LT" cap 32 -> 12 E\xf5\x9bfE\xe7\xbc<\xd4)\xc7\xd7
+=== inet_addr_matches_lwip
+count 100000
+sha256 1bb8be85fb34a6ba8a843c14bc349418960cf4ad87eaff04666479ea71a43e8e
+--- sample 0
+| "1 fx 2830062f2a" -> Some(1)
+--- sample 1
+| "012.65535 \t" -> Some(a00ffff)
+--- sample 2
+| "0254.021755137407.077777777" -> None
+--- sample 3
+| "0xffffff.10.0254.0x100" -> None
+--- sample 4
+| "xFF\t" -> None
+--- sample 5
+| "\t1\t1.54\t" -> None
+--- sample 6
+| "077777777.077777777" -> None
+--- sample 7
+| "fXgg0\t\tX1g7AxGaA" -> None
+=== network_check_matches_reference_except_origin
+count 100000
+sha256 b0c4078c4adf6413cf31d0ed00713f3c34fbe476a5ce30654ad4bbd6d9944e18
+--- sample 0
+| ap false ip 0b000000 origin None -> false
+--- sample 1
+| ap false ip 08080808 origin Some("http://localhost/x") -> false
+--- sample 2
+| ap false ip aa357980 origin Some("http://0xffffff.127:8080/a:b") -> false
+--- sample 3
+| ap false ip 0a000001 origin None -> true
+--- sample 4
+| ap false ip 0a000001 origin None -> true
+--- sample 5
+| ap false ip c0a90000 origin Some("https://0100000000:8080/a:b") -> false
+--- sample 6
+| ap false ip 08080808 origin Some("http://localhost") -> false
+--- sample 7
+| ap true ip c0a90000 origin Some("l69eneox/nd9odann.ltep6eh6") -> true
+=== otp6_parsing_matches_reference
+count 50000
+sha256 060c28b26658bfb27debfa030c41b220139d8a032c81b7af9ebb3ecdae0c9561
+--- sample 0
+| " -" -> None
+--- sample 1
+| "" -> None
+--- sample 2
+| "9" -> None
+--- sample 3
+| "12" -> None
+--- sample 4
+| " 06a492\t" -> None
+--- sample 5
+| "+5939110 0" -> None
+--- sample 6
+| "9" -> None
+--- sample 7
+| "903\t\t+97" -> None
+=== rate_limit_matches_reference
+count 20000
+sha256 fcff4c817017b3648c2a4de1fc90d3fcabe20db385f5005e1fa9ca183197b4e3
+--- sample 0
+| t 26989148 blocked false
+--- sample 1
+| t 27004147 blocked false failure true
+--- sample 2
+| t 27019147 blocked false failure true
+--- sample 3
+| t 27419147 blocked false
+--- sample 4
+| t 27434147 blocked false failure true
+--- sample 5
+| t 27434647 blocked false failure true
+--- sample 6
+| t 27435147 blocked false
+--- sample 7
+| t 27495146 blocked false failure true
+=== session_tokens_match_reference
+count 27000
+sha256 4dbf67489e5495d7c3d1cb5e6a7045624816572854cdd33c30e506f702debd59
+--- sample 0
+| key [34, 31, 1f, 22, 85, e0, 85, 3f, 29, bc, 2a, 45, a8, 0d, f0, 24, 53, 87, 1f, 5b, ab, bb, 0f, 08, 08, 9d, 35, a2, 2e, 5f, 89, 5f] boot 2114604397 now 1704994747 ttl 1 -> Some("XMT2AZN4E6QGK3KNBJ7A.4MJ4NYW6J2HX77WHXK2L3YADSMZMQRKHU46RVLDBEGMTJVKHAIKQ")
+--- sample 1
+| verify "XMT2AZN4E6QGK3KNBJ7A.4MJ4NYW6J2HX77WHXK2L3YADSMZMQRKHU46RVLDBEGMTJVKHAIKQ" key 34 boot 2114604397 at 1704994748 -> false
+--- sample 2
+| verify "3EGAFGDGJG3F4C2J67.C7ED3H.F4IBHF.JA.BBC5EFG4IGEFIH6A" key 34 boot 2114604397 at 1704994748 -> false
+--- sample 3
+| verify "XMT2AZN4E6QGK3KNBJ7A.4MJ4NYW6J2HX77WHXK2L3YADSMZMQRKHU46RVLBBEGMTJVKHAIKQ" key 01 boot 2114604396 at 1704994746 -> false
+--- sample 4
+| verify "XMT2AZN4E6QGK3KNBJ7A.4MJ4NYW6J2HX77WHXK2L3YADSMZMQRKHU46RVLDBEGMTJVKHAIKQA.." key 01 boot 2114604396 at 1704995046 -> false
+--- sample 5
+| verify "XMT2AZN4E6QGK3KNBJ7A.4MJ4NYW6J2HX77WHXK2L3YADSMZMQRKHU46RVLDBEGMTJVKHAIKQ" key 34 boot 2114604397 at 1704994747 -> true
+--- sample 6
+| verify "XMT2AZN4E6QGK3KNBJ7A.4MJ4NYW6J2HX77WHXK2L3YADSMZMQRKHU46" key 34 boot 2114604397 at 1704995047 -> false
+--- sample 7
+| verify "XMT2AZN4E6QGK3KNBJ7A.4MJ4NYW6J2HX77WHXK2L3YADSMZMQRKHU46RVLDBEGMTJVKHAIKQ" key 34 boot 2114604397 at 10294929339 -> false
+=== totp_matches_reference
+count 12000
+sha256 4c0f0332ccad3e2db3733656daa0435fcb32a8a7efe2463d0c8e8ddbae1d2b6f
+--- sample 0
+| key [59, ab, ae, 14, 1c, e6, 8b, 20, 53, 9b, 4f, 2b, ff, b4, 80, 3a, df, aa, 24, bb, 79, 6e, 44, 6c, 41, f7, 00, f1, 46] t 1700298130 code 44594 -> true base 56676604 mask 0x02
+--- sample 1
+| key [59, ab, ae, 14, 1c, e6, 8b, 20, 53, 9b, 4f, 2b, ff, b4, 80, 3a, df, aa, 24, bb, 79, 6e, 44, 6c, 41, f7, 00, f1, 46] t 1700298130 code 929846 -> true base 56676604 mask 0x06
+--- sample 2
+| key [59, ab, ae, 14, 1c, e6, 8b, 20, 53, 9b, 4f, 2b, ff, b4, 80, 3a, df, aa, 24, bb, 79, 6e, 44, 6c, 41, f7, 00, f1, 46] t 1700298161 code 929846 -> false base 56676604 mask 0x06
+--- sample 3
+| key [59, ab, ae, 14, 1c, e6, 8b, 20, 53, 9b, 4f, 2b, ff, b4, 80, 3a, df, aa, 24, bb, 79, 6e, 44, 6c, 41, f7, 00, f1, 46] t 1700298131 code 44594 -> false base 56676604 mask 0x06
+--- sample 4
+| key [59, ab, ae, 14, 1c, e6, 8b, 20, 53, 9b, 4f, 2b, ff, b4, 80, 3a, df, aa, 24, bb, 79, 6e, 44, 6c, 41, f7, 00, f1, 46] t 1700298191 code 44594 -> false base 56676606 mask 0x00
+--- sample 5
+| key [59, ab, ae, 14, 1c, e6, 8b, 20, 53, 9b, 4f, 2b, ff, b4, 80, 3a, df, aa, 24, bb, 79, 6e, 44, 6c, 41, f7, 00, f1, 46] t 1700298130 code 895690 -> false base 56676606 mask 0x00
+--- sample 6
+| key [59, ab, ae, 14, 1c, e6, 8b, 20, 53, 9b, 4f, 2b, ff, b4, 80, 3a, df, aa, 24, bb, 79, 6e, 44, 6c, 41, f7, 00, f1, 46] t 1700298100 code 625193 -> false base 56676606 mask 0x00
+--- sample 7
+| key [59, ab, ae, 14, 1c, e6, 8b, 20, 53, 9b, 4f, 2b, ff, b4, 80, 3a, df, aa, 24, bb, 79, 6e, 44, 6c, 41, f7, 00, f1, 46] t 1700298039 code 461863 -> false base 56676606 mask 0x00

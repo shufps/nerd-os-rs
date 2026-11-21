@@ -1,0 +1,83 @@
+# Golden outputs (the former C/C++ code), see tests/golden/mod.rs
+=== init_polarity_and_speeds
+count 44008
+sha256 db06b609a33ac1042b6549ea5f79c69f1f616432fd22c5c941ce1a9e4a6f5c6e
+--- sample 0
+| fail false invert false: true true
+| wr 2e 2a 00
+| wr 2e 2b 03
+| wr 2e 2d 09
+| wr 2e 32 08
+| wr 2e 42 08
+| wr 2e 2a 00
+| 
+--- sample 1
+| fail false invert true: true true
+| wr 2e 2a 03
+| wr 2e 2b 03
+| wr 2e 2d 09
+| wr 2e 32 08
+| wr 2e 42 08
+| wr 2e 2a 03
+| 
+--- sample 2
+| fail true invert false: false false
+| wr 2e 2a 00
+| wr 2e 2a 00
+| 
+--- sample 3
+| fail true invert true: false false
+| wr 2e 2a 03
+| wr 2e 2a 03
+| 
+--- sample 4
+| 0x0 ch 0: true
+| wr 2e 40 00
+| 
+--- sample 5
+| 0x0 ch 1: true
+| wr 2e 30 00
+| 
+--- sample 6
+| 0x0 ch 2: true
+| wr 2e 30 00
+| 
+--- sample 7
+| 0x0 ch -1: true
+| wr 2e 30 00
+| 
+=== rpm_readings
+count 44027
+sha256 bd36ed78d1c045b855a99e42b9dd1d71362d2cfa39866680be159c992850299c
+--- sample 0
+| ch 0 00 09: Some(0) rr 2e 4e 1
+| rr 2e 4f 1
+| 
+--- sample 1
+| ch 1 00 09: Some(0) rr 2e 3e 1
+| rr 2e 3f 1
+| 
+--- sample 2
+| ch 0 00 0c: Some(0) rr 2e 4e 1
+| rr 2e 4f 1
+| 
+--- sample 3
+| ch 1 00 0c: Some(0) rr 2e 3e 1
+| rr 2e 3f 1
+| 
+--- sample 4
+| ch 0 00 0f: Some(0) rr 2e 4e 1
+| rr 2e 4f 1
+| 
+--- sample 5
+| ch 1 00 0f: Some(0) rr 2e 3e 1
+| rr 2e 3f 1
+| 
+--- sample 6
+| ch 0 00 12: Some(0) rr 2e 4e 1
+| rr 2e 4f 1
+| 
+--- sample 7
+| ch 1 00 12: Some(0) rr 2e 3e 1
+| rr 2e 3f 1
+| 

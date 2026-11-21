@@ -9,6 +9,10 @@ use c_reference as _;
 use rust_core::emc2302;
 use rust_core::i2c::RegBus;
 
+#[path = "../../tests/golden/mod.rs"]
+mod golden;
+use golden::Rec;
+
 extern "C" {
     fn i2c_stub_reset();
     fn i2c_stub_set(reg: u8, value: u16);
@@ -61,6 +65,7 @@ unsafe fn ref_trace() -> String {
 #[test]
 fn init_polarity_and_speeds() {
     let _g = LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    let mut rec = Rec::new("emc2302", "init_polarity_and_speeds");
     unsafe {
         for fail in [false, true] {
             for invert in [false, true] {
@@ -71,12 +76,15 @@ fn init_polarity_and_speeds() {
                     trace: String::new(),
                     fail,
                 };
-                assert_eq!(emc2302::init(&mut f, invert), ref_emc_init(invert));
-                assert_eq!(
-                    emc2302::set_polarity(&mut f, invert),
-                    ref_emc_polarity(invert)
-                );
+                let init = emc2302::init(&mut f, invert);
+                assert_eq!(init, ref_emc_init(invert));
+                let pol = emc2302::set_polarity(&mut f, invert);
+                assert_eq!(pol, ref_emc_polarity(invert));
                 assert_eq!(f.trace, ref_trace());
+                rec.add(format!(
+                    "fail {fail} invert {invert}: {init} {pol}\n{}",
+                    f.trace
+                ));
             }
         }
         i2c_stub_reset();
@@ -90,17 +98,25 @@ fn init_polarity_and_speeds() {
         for i in 0..=11_000 {
             let p = i as f32 / 10_000.0;
             for ch in [0, 1, 2, -1] {
+                let at = f.trace.len();
                 let ok = emc2302::set_speed(&mut f, ch, p);
                 assert_eq!(ok, ref_emc_set_speed(ch, p) == 0);
+                rec.add(format!(
+                    "{:#x} ch {ch}: {ok}\n{}",
+                    p.to_bits(),
+                    &f.trace[at..]
+                ));
             }
         }
         assert_eq!(f.trace, ref_trace());
     }
+    rec.finish();
 }
 
 #[test]
 fn rpm_readings() {
     let _g = LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    let mut rec = Rec::new("emc2302", "rpm_readings");
     unsafe {
         i2c_stub_reset();
         let mut f = Fake {
@@ -121,9 +137,14 @@ fn rpm_readings() {
                     f.regs[(base + 0x0f) as usize] = lsb;
                     let mut theirs = 0xffffu16;
                     let err = ref_emc_get_speed(ch, &mut theirs);
+                    let at = f.trace.len();
                     let ours = emc2302::speed(&mut f, ch);
                     assert_eq!(err == 0, ours.is_some());
                     assert_eq!(ours, Some(theirs), "msb {msb:02x} lsb {lsb:02x}");
+                    rec.add(format!(
+                        "ch {ch} {msb:02x} {lsb:02x}: {ours:?} {}",
+                        &f.trace[at..]
+                    ));
                 }
             }
         }
@@ -133,6 +154,9 @@ fn rpm_readings() {
         f.fail = true;
         let mut theirs = 7u16;
         assert_ne!(ref_emc_get_speed(0, &mut theirs), 0);
-        assert_eq!((theirs, emc2302::speed(&mut f, 0)), (0, None));
+        let ours = emc2302::speed(&mut f, 0);
+        assert_eq!((theirs, ours), (0, None));
+        rec.add(format!("bus error: {ours:?}"));
     }
+    rec.finish();
 }

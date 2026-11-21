@@ -13,6 +13,10 @@ use c_reference as _;
 use rust_core::stratum_v1::{method, Message, MiningNotify, EXTRANONCE2_LEN};
 use serde_json::{json, Value};
 
+#[path = "../../tests/golden/mod.rs"]
+mod golden;
+use golden::Rec;
+
 // ---- C interface (c-reference/cpp-shim) ----
 
 macro_rules! api {
@@ -430,10 +434,24 @@ fn zero_uninitialized(p: &mut Parsed, doc: &Value) {
     }
 }
 
+/// Fixed (the golden file records the outputs for exactly these inputs).
 fn iterations() -> (usize, u64) {
-    let n = std::env::var("DIFF_ITERATIONS").map_or(100_000, |v| v.parse().unwrap());
-    let seed = std::env::var("DIFF_SEED").map_or(0x5742_a7c0_de00_0001, |v| v.parse().unwrap());
-    (n, seed)
+    (100_000, 0x5742_a7c0_de00_0001)
+}
+
+/// Bytes as recorded: the text, or for long ones length and digest.
+fn shown(b: &[u8]) -> String {
+    use sha2::{Digest, Sha256};
+    if b.len() <= 200 {
+        format!("{:?}", String::from_utf8_lossy(b))
+    } else {
+        let d: String = Sha256::digest(b)
+            .iter()
+            .take(8)
+            .map(|b| format!("{b:02x}"))
+            .collect();
+        format!("<{} bytes, sha256 {d}..>", b.len())
+    }
 }
 
 #[test]
@@ -442,6 +460,7 @@ fn parse_matches_reference() {
     let rng = Rng(Cell::new(seed));
     let (mut compared, mut ok, mut notifies, mut skipped_null, mut extranonce_rejected) =
         (0, 0, 0, 0, 0);
+    let mut rec = Rec::new("stratum_v1", "parse_matches_reference");
 
     for i in 0..n {
         let doc = message(&rng);
@@ -450,6 +469,7 @@ fn parse_matches_reference() {
 
         if reference_dereferences_null(&doc) {
             assert!(!new.ok, "case {i}: must be rejected: {json}");
+            rec.add(format!("{i} rejected (undefined in C)"));
             skipped_null += 1;
             continue;
         }
@@ -471,11 +491,15 @@ fn parse_matches_reference() {
                 "case {i}: extranonce2_size must be rejected: {json}"
             );
             assert_eq!(new.m.method, reference.m.method);
+            // recorded as the other cases (the golden test cannot tell them
+            // apart); only the rejection and the method are compared with C
+            rec.add(format!("{i} {}", summary(&new)));
             extranonce_rejected += 1;
             continue;
         }
 
         assert_eq!(summary(&new), summary(&reference), "case {i}: {json}");
+        rec.add(format!("{i} {}", summary(&new)));
         compared += 1;
         ok += new.ok as usize;
         notifies += (new.ok && new.m.method == method::MINING_NOTIFY) as usize;
@@ -488,6 +512,7 @@ fn parse_matches_reference() {
         ok > compared / 5 && notifies > compared / 50,
         "generator coverage too low"
     );
+    rec.finish();
 }
 
 /// Runs `request` against a fresh API object of each implementation and
@@ -522,6 +547,7 @@ fn sent_by(request: impl Fn(bool, *mut c_void, *mut c_void) -> bool) -> [(bool, 
 fn requests_match_reference() {
     let (n, seed) = iterations();
     let rng = Rng(Cell::new(seed ^ 0xabcd));
+    let mut rec = Rec::new("stratum_v1", "requests_match_reference");
     for i in 0..n / 10 {
         let c = |s: String| CString::new(s).unwrap();
         let (user, pass, job, en2) = (
@@ -569,7 +595,9 @@ fn requests_match_reference() {
             "case {i} kind {kind}: {:?}",
             String::from_utf8_lossy(&reference.1)
         );
+        rec.add(format!("{i} {kind} {} {}", current.0, shown(&current.1)));
     }
+    rec.finish();
 }
 
 #[test]
@@ -583,6 +611,8 @@ fn requests_escape_strings_and_reject_oversized() {
         }
     });
     assert!(ok);
+    let mut rec = Rec::new("stratum_v1", "requests_escape_strings_and_reject_oversized");
+    rec.add(format!("{ok} {}", shown(&sent)));
     let v: Value = serde_json::from_slice(&sent).unwrap();
     assert_eq!(v["params"], json!(["we\"ird\\user\n", "pa\"ss"]));
 
@@ -597,6 +627,8 @@ fn requests_escape_strings_and_reject_oversized() {
     // The reference sends it truncated to 1023 bytes; Rust refuses it.
     assert!(ref_ok && ref_sent.len() == 1023 && !ref_sent.ends_with(b"\n"));
     assert!(!ok && sent.is_empty());
+    rec.add(format!("{ok} {}", shown(&sent)));
+    rec.finish();
 }
 
 /// Feeds the same chunked byte stream to both and collects the lines until
@@ -641,6 +673,7 @@ fn receive_all(current: bool, chunks: &[Vec<u8>]) -> Vec<Option<Vec<u8>>> {
 fn line_framing_matches_reference() {
     let (n, seed) = iterations();
     let rng = Rng(Cell::new(seed ^ 0x1234));
+    let mut rec = Rec::new("stratum_v1", "line_framing_matches_reference");
     for i in 0..n / 100 {
         // Lines of JSON-ish text (no NUL bytes), sometimes very long.
         let mut stream = Vec::new();
@@ -660,12 +693,15 @@ fn line_framing_matches_reference() {
             chunks.push(rest[..n].to_vec());
             rest = &rest[n..];
         }
-        assert_eq!(
-            receive_all(true, &chunks),
-            receive_all(false, &chunks),
-            "case {i}"
-        );
+        let lines = receive_all(true, &chunks);
+        assert_eq!(lines, receive_all(false, &chunks), "case {i}");
+        let lines: Vec<String> = lines
+            .iter()
+            .map(|l| l.as_deref().map_or("<end>".into(), shown))
+            .collect();
+        rec.add(format!("{i}\n{}", lines.join("\n")));
     }
+    rec.finish();
 }
 
 /// Session bookkeeping: without `mining.extranonce.subscribe`, the first share
@@ -696,9 +732,8 @@ fn share_result_with_setup_id() {
         }
         let mut len = 0;
         let sent = std::slice::from_raw_parts(stub_sent(t, &mut len) as *const u8, len).to_vec();
-        assert!(String::from_utf8(sent)
-            .unwrap()
-            .contains("{\"id\": 5, \"method\": \"mining.submit\""));
+        let sent = String::from_utf8(sent).unwrap();
+        assert!(sent.contains("{\"id\": 5, \"method\": \"mining.submit\""));
 
         let json = c"{\"id\":5,\"result\":true,\"error\":null}";
         let mut m = Message::zeroed();
@@ -713,18 +748,25 @@ fn share_result_with_setup_id() {
         } else {
             ref_api_free(api)
         }
-        (ok, m.method, m.response_success)
+        (ok, m.method, m.response_success, sent)
     });
+    let results = results.map(|(ok, method, success, sent)| ((ok, method, success), sent));
     assert_eq!(
-        results[0],
+        results[0].0,
         (true, method::STRATUM_RESULT_SETUP, true),
         "former code"
     );
     assert_eq!(
-        results[1],
+        results[1].0,
         (true, method::STRATUM_RESULT, true),
         "current code"
     );
+    // the requests the same
+    assert_eq!(results[1].1, results[0].1);
+    let mut rec = Rec::new("stratum_v1", "share_result_with_setup_id");
+    rec.add(&results[1].1);
+    rec.add(format!("{:?}", results[1].0));
+    rec.finish();
 }
 
 /// `doc` in the looser syntax ArduinoJson reads as the same document:
@@ -791,6 +833,7 @@ fn lenient_syntax_matches_reference() {
     let (n, seed) = iterations();
     let rng = Rng(Cell::new(seed ^ 0x1e41));
     let mut compared = 0;
+    let mut rec = Rec::new("stratum_v1", "lenient_syntax_matches_reference");
     for i in 0..n / 2 {
         let doc = message(&rng);
         if reference_dereferences_null(&doc) {
@@ -814,7 +857,16 @@ fn lenient_syntax_matches_reference() {
             && extranonce_result
             && !EXTRANONCE2_LEN.contains(&reference.m.extranonce_2_len)
         {
-            continue; // deliberate difference, see parse_matches_reference
+            // deliberate difference, see parse_matches_reference; recorded
+            // as the other cases (the golden test cannot tell them apart)
+            assert!(!new.ok, "case {i}: {loose}");
+            assert_eq!(
+                summary(&new),
+                summary(&parse_with(new_parse, &strict)),
+                "case {i}: {loose}"
+            );
+            rec.add(format!("{i} {}", summary(&new)));
+            continue;
         }
         assert_eq!(summary(&new), summary(&reference), "case {i}: {loose}");
         // the same document as the strict text
@@ -823,7 +875,9 @@ fn lenient_syntax_matches_reference() {
             summary(&parse_with(new_parse, &strict)),
             "case {i}: {loose}"
         );
+        rec.add(format!("{i} {}", summary(&new)));
         compared += 1;
     }
     assert!(compared > n / 4, "coverage too low: {compared}");
+    rec.finish();
 }

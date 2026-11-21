@@ -1,0 +1,121 @@
+# Golden outputs (the former C/C++ code), see tests/golden/mod.rs
+=== can_node_bodies_match_reference
+count 30000
+sha256 024888a4a86c64e82b8dd5a13370a64881e9daf17467c16d3399b79fe84db025
+--- sample 0
+| "{\"flipScreen\":\"x\"}" slave 24 -> true
+| 
+--- sample 1
+| "65536" slave 23 -> true
+| 
+--- sample 2
+| "{}" slave 2 -> true
+| 
+--- sample 3
+| "{\"autoScreenOff\":-1,\"autoScreenOff\":256}" slave 26 -> true
+| 
+--- sample 4
+| "\"a\\u0000b\"" slave 2 -> true
+| 
+--- sample 5
+| "{\"flipScreen\":1,\"x\":1.5,\"fans\":[{},{\"targetTemp\":1e2}]}" slave 10 -> true
+| can=s:fan 10 0 0 0 0 0
+| can=s:fan 10 1 0 0 100 0
+| 
+--- sample 6
+| "{\"autoScreenOff\":4294967296,\"coreVoltage\":\"3.7\",\"flipScreen\":+7,\"coreVoltage\":{},\"flipScreen\":-1,\"fans\":[{},'s',{}]}" slave 11 -> true
+| can=s:fan 11 0 0 0 0 0
+| can=s:fan 11 1 0 0 0 0
+| 
+--- sample 7
+| "{\"frequency\":false,\"autoScreenOff\":1e2,\"x\":\"3.7\",\"frequency\":.5,\"fans\":[{\"overheatTemp\":-1,\"x\":65536},{\"overheatTemp\":false,\"x\":255,\"targetTemp\":\"12\",\"mode\":\"http://h:8086\"},{\"manualSpeed\":false}],\"x\":\"\"}" slave 8 -> true
+| can=s:fan 8 0 0 0 0 0
+| can=s:fan 8 1 0 0 12 0
+| 
+=== can_node_uris_match_reference
+count 50000
+sha256 b7a99aa6edcffe94a3b4f996b91dbde9f43127360f32bec6812bf020dc0f96d6
+--- sample 0
+| "" -> id -1 action -2
+--- sample 1
+| "nodes/a" -> id -2 action -2
+--- sample 2
+| "/" -> id -1 action -2
+--- sample 3
+| "nodes/identify/2?x=1/a" -> id -2 action -3
+--- sample 4
+| "/api/v2/can/nodes/+4/-99999999999" -> id -2 action -3
+--- sample 5
+| "/-99999999999" -> id -2 action -2
+--- sample 6
+| "nodes/Restart/-99999999999" -> id -2 action -2
+--- sample 7
+| "/a/b/" -> id -1 action -2
+=== influx_alert_otp_bodies_match_reference
+count 60000
+sha256 e1d1f7975cf41d5203c2a3ed6ff9c93621541991220cb6a26278f91a5c26aa0a
+--- sample 0
+| influx "{\"x\":{\"mode\":3},\"x\":0,\"bucket\":false,\"prefix\":1}" -> true
+| 
+--- sample 1
+| alert "{\"x\":\"12\",\"bestDiffEnable\":\"\",\"bestDiffEnable\":+7,\"coinbaseVerifyEnable\":\"a\\u0000b\"}" -> true
+| 
+--- sample 2
+| otp "{\"enabled\":0}" -> 2 false
+--- sample 3
+| influx "{\"x\":[1,2],\"org\":1,\"bucket\":0}" -> true
+| 
+--- sample 4
+| alert "{}" -> true
+| 
+--- sample 5
+| otp "{\"enabled\":\"12\",\"enabled\":.5,\"enabled\":false,\"enabled\":'s'}" -> 2 false
+--- sample 6
+| influx "{\"url\":65535,\"x\":2,\"token\":[1,2],\"enabled\":{},\"url\":[],\"enabled\":0,\"org\":null}" -> true
+| 
+--- sample 7
+| alert "{}" -> true
+| 
+=== query_parameters_match_reference
+count 100000
+sha256 b1770db6c9b45e1693fcf0398c44abc5e3a33da06efaf2c9c656c55597687d52
+--- sample 0
+| "historySpan&&TS=1000&&limit==10800001&&x=1000"
+| v2 false -> start 0 cur 0 span 3600000 limit 0 requested false
+| v2 true -> start 0 cur 0 span 3600000 limit 0 requested false
+| allTime false
+--- sample 1
+| "history_span=4294967295&ts=-1&limit= 7"
+| v2 false -> start 18446744073709551615 cur 0 span 10800000 limit 7 requested true
+| v2 true -> start 18446744073709551615 cur 0 span 3600000 limit 7 requested true
+| allTime false
+--- sample 2
+| "cur=10800001"
+| v2 false -> start 0 cur 10800001 span 3600000 limit 0 requested false
+| v2 true -> start 0 cur 10800001 span 3600000 limit 0 requested false
+| allTime false
+--- sample 3
+| "alltime==10800001"
+| v2 false -> start 0 cur 0 span 3600000 limit 0 requested false
+| v2 true -> start 0 cur 0 span 3600000 limit 0 requested false
+| allTime false
+--- sample 4
+| "allTime=18446744073709551615&x=18446744073709551616&limit=+5"
+| v2 false -> start 0 cur 0 span 3600000 limit 5 requested false
+| v2 true -> start 0 cur 0 span 3600000 limit 5 requested false
+| allTime false
+--- sample 5
+| "alltime==0"
+| v2 false -> start 0 cur 0 span 3600000 limit 0 requested false
+| v2 true -> start 0 cur 0 span 3600000 limit 0 requested false
+| allTime false
+--- sample 6
+| ""
+| v2 false -> start 0 cur 0 span 3600000 limit 0 requested false
+| v2 true -> start 0 cur 0 span 3600000 limit 0 requested false
+| allTime false
+--- sample 7
+| "ts=4294967295"
+| v2 false -> start 4294967295 cur 0 span 3600000 limit 0 requested true
+| v2 true -> start 4294967295 cur 0 span 3600000 limit 0 requested true
+| allTime false

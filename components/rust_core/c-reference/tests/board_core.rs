@@ -9,6 +9,10 @@ use std::ffi::c_int;
 use c_reference as _;
 use rust_core::board_core::{self, ChipTemps, Limits};
 
+#[path = "../../tests/golden/mod.rs"]
+mod golden;
+use golden::Rec;
+
 extern "C" {
     fn ref_board_validate_voltage(v: f32, maxf: c_int, minv: c_int, maxv: c_int) -> bool;
     fn ref_board_validate_frequency(f: f32, maxf: c_int, minv: c_int, maxv: c_int) -> bool;
@@ -60,6 +64,7 @@ const LIMITS: [Limits; 4] = [
 #[test]
 fn validation_and_clamping() {
     let mut r = Rng(0xb0a7);
+    let mut rec = Rec::new("board_core", "validation_and_clamping");
     let mut values: Vec<f32> = (0..=3000).map(|i| i as f32 / 1000.0).collect();
     values.extend((0..20_000).map(|_| (r.next() % 2_000_000) as f32 / 1000.0));
     // the neighbours of the limits
@@ -74,17 +79,12 @@ fn validation_and_clamping() {
         );
         for &v in &values {
             unsafe {
-                assert_eq!(
-                    board_core::validate_voltage(v, l),
-                    ref_board_validate_voltage(v, mf, mn, mx),
-                    "{v} {l:?}"
-                );
+                let vv = board_core::validate_voltage(v, l);
+                assert_eq!(vv, ref_board_validate_voltage(v, mf, mn, mx), "{v} {l:?}");
                 let f = v * 1000.0;
-                assert_eq!(
-                    board_core::validate_frequency(f, l),
-                    ref_board_validate_frequency(f, mf, mn, mx),
-                    "{f}"
-                );
+                let vf = board_core::validate_frequency(f, l);
+                assert_eq!(vf, ref_board_validate_frequency(f, mf, mn, mx), "{f}");
+                rec.add(format!("{mf} {mn} {mx} {:08x} {vv} {vf}", v.to_bits()));
             }
         }
         for _ in 0..20_000 {
@@ -99,13 +99,16 @@ fn validation_and_clamping() {
             } else {
                 assert_eq!(v, ov, "{volt} {l:?}");
             }
+            rec.add(format!("{mf} {mn} {mx} clamp {freq} {volt} -> {f} {v}"));
         }
     }
+    rec.finish();
 }
 
 #[test]
 fn chip_temperatures() {
     let mut r = Rng(0x7e3);
+    let mut rec = Rec::new("board_core", "chip_temperatures");
     let t = ChipTemps::new();
     for _ in 0..5000 {
         let n = (r.next() % 13) as usize;
@@ -121,8 +124,12 @@ fn chip_temperatures() {
             t.set(i as c_int, *v);
         }
         let reference = unsafe { ref_board_max_chip_temp(temps.as_mut_ptr(), n as c_int) };
-        assert_eq!(t.max().to_bits(), reference.to_bits(), "{temps:?}");
+        let max = t.max();
+        assert_eq!(max.to_bits(), reference.to_bits(), "{temps:?}");
+        let bits: Vec<u32> = temps.iter().map(|v| v.to_bits()).collect();
+        rec.add(format!("{bits:08x?} {:08x}", max.to_bits()));
     }
+    rec.finish();
 }
 
 #[test]
@@ -130,6 +137,7 @@ fn pmbus_faults() {
     // the bits that matter and 0xff/0x00 for each register: all combinations
     let values = [0x00u8, 0xff, 0x80, 0x10, 0x90, 0x04, 0x40, 0x7f, 0x14, 0x84];
     let mut faults = [0u32; 6];
+    let mut rec = Rec::new("board_core", "pmbus_faults");
     for &b in &values {
         for &i in &values {
             for &v in &values {
@@ -140,6 +148,7 @@ fn pmbus_faults() {
                         let e_ref = unsafe { ref_board_fault(regs.as_ptr(), &mut s_ref) };
                         let (e, s) = board_core::pmbus_fault(b, i, v, n, t);
                         assert_eq!((e, s), (e_ref, s_ref), "{regs:02x?}");
+                        rec.add(format!("{regs:02x?} {e} {s:08x}"));
                         faults[e as usize] += 1;
                     }
                 }
@@ -151,4 +160,5 @@ fn pmbus_faults() {
         faults.iter().enumerate().all(|(e, &n)| e == 1 || n > 0),
         "{faults:?}"
     );
+    rec.finish();
 }

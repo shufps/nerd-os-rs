@@ -10,6 +10,10 @@ use std::sync::Mutex;
 use c_reference as _;
 use rust_core::http_query::HistoryQuery;
 
+#[path = "../../tests/golden/mod.rs"]
+mod golden;
+use golden::Rec;
+
 #[repr(C)]
 #[derive(Debug, Default, PartialEq, Eq)]
 struct RefHistoryQuery {
@@ -162,6 +166,7 @@ fn body(rng: &Rng, keys: &[&str]) -> String {
 fn influx_alert_otp_bodies_match_reference() {
     let _g = CFG.lock().unwrap_or_else(|e| e.into_inner());
     let rng = Rng(Cell::new(0xb0d1));
+    let mut rec = Rec::new("http_bodies", "influx_alert_otp_bodies_match_reference");
     let influx = ["enabled", "url", "port", "token", "bucket", "org", "prefix"];
     let alert = [
         "webhookUrl",
@@ -174,18 +179,22 @@ fn influx_alert_otp_bodies_match_reference() {
     for i in 0..20_000 {
         let b = body(&rng, &influx);
         let c = CString::new(b.clone()).unwrap();
+        let new = logged(|| unsafe { new_influx(c.as_ptr()) });
         assert_eq!(
-            logged(|| unsafe { new_influx(c.as_ptr()) }),
+            new,
             logged(|| unsafe { ref_influx(c.as_ptr()) }),
             "influx {i}: {b}"
         );
+        rec.add(format!("influx {b:?} -> {}\n{}", new.0, new.1));
         let b = body(&rng, &alert);
         let c = CString::new(b.clone()).unwrap();
+        let new = logged(|| unsafe { new_alert(c.as_ptr()) });
         assert_eq!(
-            logged(|| unsafe { new_alert(c.as_ptr()) }),
+            new,
             logged(|| unsafe { ref_alert(c.as_ptr()) }),
             "alert {i}: {b}"
         );
+        rec.add(format!("alert {b:?} -> {}\n{}", new.0, new.1));
         let b = body(&rng, &["enabled"]);
         let c = CString::new(b.clone()).unwrap();
         let (mut e1, mut e2) = (false, false);
@@ -196,13 +205,16 @@ fn influx_alert_otp_bodies_match_reference() {
             (reference, reference == 0 && e2),
             "otp {i}: {b}"
         );
+        rec.add(format!("otp {b:?} -> {new} {}", new == 0 && e1));
     }
+    rec.finish();
 }
 
 #[test]
 fn can_node_bodies_match_reference() {
     let _g = CFG.lock().unwrap_or_else(|e| e.into_inner());
     let rng = Rng(Cell::new(0xca17));
+    let mut rec = Rec::new("http_bodies", "can_node_bodies_match_reference");
     let keys = [
         "frequency",
         "coreVoltage",
@@ -214,12 +226,15 @@ fn can_node_bodies_match_reference() {
         let b = body(&rng, &keys);
         let c = CString::new(b.clone()).unwrap();
         let slave = 1 + rng.below(31) as u8;
+        let new = logged(|| unsafe { new_can_body(c.as_ptr(), slave) });
         assert_eq!(
-            logged(|| unsafe { new_can_body(c.as_ptr(), slave) }),
+            new,
             logged(|| unsafe { ref_can_body(c.as_ptr(), slave) }),
             "case {i}: {b}"
         );
+        rec.add(format!("{b:?} slave {slave} -> {}\n{}", new.0, new.1));
     }
+    rec.finish();
 }
 
 fn uri(rng: &Rng) -> String {
@@ -270,20 +285,21 @@ fn uri(rng: &Rng) -> String {
 #[test]
 fn can_node_uris_match_reference() {
     let rng = Rng(Cell::new(0x0ad));
+    let mut rec = Rec::new("http_bodies", "can_node_uris_match_reference");
     for i in 0..50_000 {
         let u = uri(&rng);
         let c = CString::new(u.clone()).unwrap();
+        let id = unsafe { new_can_node_id(c.as_ptr()) };
+        assert_eq!(id, unsafe { ref_can_node_id(c.as_ptr()) }, "id {i}: {u:?}");
+        let action = unsafe { new_can_action(c.as_ptr()) };
         assert_eq!(
-            unsafe { new_can_node_id(c.as_ptr()) },
-            unsafe { ref_can_node_id(c.as_ptr()) },
-            "id {i}: {u:?}"
-        );
-        assert_eq!(
-            unsafe { new_can_action(c.as_ptr()) },
+            action,
             unsafe { ref_can_action(c.as_ptr()) },
             "action {i}: {u:?}"
         );
+        rec.add(format!("{u:?} -> id {id} action {action}"));
     }
+    rec.finish();
 }
 
 fn query(rng: &Rng) -> String {
@@ -335,11 +351,17 @@ fn query(rng: &Rng) -> String {
 #[test]
 fn query_parameters_match_reference() {
     let rng = Rng(Cell::new(0x9e7));
+    let mut rec = Rec::new("http_bodies", "query_parameters_match_reference");
     for i in 0..100_000 {
         let q = query(&rng);
         let c = CString::new(q.clone()).unwrap();
         let none = rng.below(20) == 0;
         let ptr = if none { std::ptr::null() } else { c.as_ptr() };
+        let mut out = if none {
+            "none".to_string()
+        } else {
+            format!("{q:?}")
+        };
         for v2 in [false, true] {
             let mut r = RefHistoryQuery::default();
             let mut n = HistoryQuery::default();
@@ -355,11 +377,14 @@ fn query_parameters_match_reference() {
                 requested: n.requested,
             };
             assert_eq!(new, r, "case {i} v2 {v2}: {q:?}");
+            out += &format!(
+                "\nv2 {v2} -> start {} cur {} span {} limit {} requested {}",
+                new.start, new.current, new.span_ms, new.limit, new.requested
+            );
         }
-        assert_eq!(
-            unsafe { new_all_time(ptr) },
-            unsafe { ref_all_time(ptr) },
-            "allTime {i}: {q:?}"
-        );
+        let all = unsafe { new_all_time(ptr) };
+        assert_eq!(all, unsafe { ref_all_time(ptr) }, "allTime {i}: {q:?}");
+        rec.add(format!("{out}\nallTime {all}"));
     }
+    rec.finish();
 }

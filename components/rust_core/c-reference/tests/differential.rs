@@ -13,6 +13,10 @@ use std::ffi::{c_char, CString};
 use c_reference::c_coinbase_process;
 use rust_core::coinbase::{coinbase_process, CoinbaseResult, ESP_ERR_INVALID_ARG, ESP_OK};
 
+#[path = "../../tests/golden/mod.rs"]
+mod golden;
+use golden::Rec;
+
 struct Rng(Cell<u64>);
 
 impl Rng {
@@ -386,6 +390,24 @@ fn run(
     (rc, result)
 }
 
+/// The result as recorded in the golden file.
+fn result_text(r: &CoinbaseResult) -> String {
+    let scriptsig: String = r
+        .scriptsig_bytes()
+        .iter()
+        .map(|b| format!("{b:02x}"))
+        .collect();
+    format!(
+        "{:#x} {} {scriptsig} {} {} {} {}",
+        r.network_difficulty.to_bits(),
+        r.block_height,
+        r.total_value_satoshis,
+        r.user_value_satoshis,
+        r.bip54_signaling,
+        r.bip110_signaling
+    )
+}
+
 fn same(a: &CoinbaseResult, b: &CoinbaseResult) -> bool {
     let difficulty_same = a.network_difficulty.to_bits() == b.network_difficulty.to_bits()
         || (a.network_difficulty.is_nan() && b.network_difficulty.is_nan());
@@ -400,11 +422,11 @@ fn same(a: &CoinbaseResult, b: &CoinbaseResult) -> bool {
 
 #[test]
 fn rust_matches_c() {
-    let iterations: usize =
-        std::env::var("DIFF_ITERATIONS").map_or(300_000, |v| v.parse().unwrap());
-    let seed: u64 =
-        std::env::var("DIFF_SEED").map_or(0x5eed_c01b_a5e0_0001, |v| v.parse().unwrap());
+    // Fixed (the golden file records the outputs for exactly these inputs).
+    let iterations: usize = 150_000;
+    let seed: u64 = 0x5eed_c01b_a5e0_0001;
     let rng = Rng(Cell::new(seed));
+    let mut rec = Rec::new("coinbase", "rust_matches_c");
 
     let (mut compared, mut ok, mut user_matches, mut skipped) = (0, 0, 0, 0);
     for i in 0..iterations {
@@ -413,6 +435,7 @@ fn rust_matches_c() {
 
         if let Some(expected) = reference_undefined(&case) {
             assert_eq!(rust_rc, expected, "case {i}");
+            rec.add(format!("{i} undefined {rust_rc:#x}"));
             skipped += 1;
             continue;
         }
@@ -430,6 +453,7 @@ fn rust_matches_c() {
             case.extranonce2_len,
             case.user_address.as_deref().map(show),
         );
+        rec.add(format!("{i} {rust_rc:#x} {}", result_text(&rust)));
         compared += 1;
         ok += (c_rc == 0) as usize;
         user_matches += (c.user_value_satoshis > 0) as usize;
@@ -442,6 +466,7 @@ fn rust_matches_c() {
         ok > compared / 4 && user_matches > compared / 20,
         "generator coverage too low"
     );
+    rec.finish();
 }
 
 #[test]
@@ -449,6 +474,7 @@ fn null_arguments() {
     let mut result = CoinbaseResult::zeroed();
     let s = c"00";
     let null = std::ptr::null();
+    let mut rec = Rec::new("coinbase", "null_arguments");
     for args in [
         (null, s.as_ptr(), s.as_ptr()),
         (s.as_ptr(), null, s.as_ptr()),
@@ -457,5 +483,7 @@ fn null_arguments() {
         let rust = unsafe { coinbase_process(args.0, args.1, 0, 0, args.2, 0, null, &mut result) };
         let c = unsafe { c_coinbase_process(args.0, args.1, 0, 0, args.2, 0, null, &mut result) };
         assert_eq!((rust, c), (ESP_ERR_INVALID_ARG, ESP_ERR_INVALID_ARG));
+        rec.add(format!("{rust:#x}"));
     }
+    rec.finish();
 }

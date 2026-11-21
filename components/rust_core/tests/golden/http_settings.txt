@@ -1,0 +1,128 @@
+# Golden outputs (the former C/C++ code), see tests/golden/mod.rs
+=== nesting_limit_matches_reference
+count 42
+sha256 98efe55fe4785193e99a4cd28206d9b7206999ba242248350525fe1c3180fc63
+--- sample 0
+| "{\"ssid\":\"x\",\"fans\":1}" -> true
+| wifissid=s:x
+| 
+--- sample 1
+| "{\"fans\":[{\"pid\":{\"p\":1}}]}" -> true
+| pid_p=u16:100
+| 
+--- sample 2
+| "1" -> true
+| 
+--- sample 3
+| "{\"ssid\":\"x\",\"fans\":[1]}" -> true
+| wifissid=s:x
+| 
+--- sample 4
+| "{\"fans\":[{\"pid\":{\"p\":[1]}}]}" -> true
+| 
+--- sample 5
+| "[1]" -> true
+| 
+--- sample 6
+| "{\"ssid\":\"x\",\"fans\":[[1]]}" -> true
+| wifissid=s:x
+| 
+--- sample 7
+| "{\"fans\":[{\"pid\":{\"p\":[[1]]}}]}" -> true
+| 
+=== unusual_syntax_matches_reference
+count 50000
+sha256 50feff80be8d55662b4420d08ffe55d8939537642c439bfed1fa4f64a273a229
+--- sample 0
+| " {\nssid : 1E-2}}" dual false -> true
+| v2 -> (true, [false, false])
+| 
+--- sample 1
+| " {\n\'ssid\':1.,,frequency=false,pools=+1,pidTargetTemp:1E-2 , ssid:1.} " dual true -> false
+| v2 -> (false, [false, false])
+| 
+--- sample 2
+| "frequency:+1" dual true -> false
+| v2 -> (false, [false, false])
+| 
+--- sample 3
+| "{stratumPort:0.05,,\"ssid\":\"\\udc00\",\'fans\'=\'it\\\'s\';ssid:[],`k`:--1]" dual true -> false
+| v2 -> (false, [false, false])
+| 
+--- sample 4
+| "{ \'ssid\' : 01;\"ssid\":\'it\\\'s\',stratumPort : 0.29,x_1:tru;pidTargetTemp=1e400}" dual true -> false
+| v2 -> (false, [false, false])
+| 
+--- sample 5
+| " {\n\"ssid\" : 65535,pools:truex}" dual false -> false
+| v2 -> (false, [false, false])
+| 
+--- sample 6
+| "{`k`=123456789012345678901234567890123456789012345678901234567890123456789 , ssid:5" dual true -> false
+| v2 -> (false, [false, false])
+| 
+--- sample 7
+| "{ frequency : false]" dual true -> false
+| v2 -> (false, [false, false])
+| 
+=== v1_bodies_match_reference
+count 30000
+sha256 d538a4f6c6ae7914541d15a04eb354c405dca86e3c01025f549fc4615e64ccbc
+--- sample 0
+| "{\"p" dual false -> false
+| 
+--- sample 1
+| "{\"jobInterval\":true,\"pidTargetTemp\":3e9,\"coreVoltage\":[-0.5,true,null],\"fans\":[],\"invertscreen\":\"-5\",\"fallbackSv2AuthorityPubkey\":[{\"x\":1e2},12345678901234567890123,true],\"autoscreenoff\":\"\\n\\t\\u0000cutpool.example.com\",\"flipscreen\":true}" dual false -> true
+| flipscreen=u16:1
+| 
+--- sample 2
+| "{\"ssid\":4294967296,\"fallbackStratumTLS\":\"true123\\n\\t\",\"stratum_keep\":\"pool.example.com\\u00ff0x10\",\"fallbackStratumUser\":[],\"poolMode\":65536,\"fallbackStratumEnonceSubscribe\":\"caf\\u00e9caf\\u00e9123\"}" dual true -> true
+| 
+--- sample 3
+| " \t\r\n{\"stratum_keep\":\"x\\u0000a\\\"b\",\"fan\":null,\"autoscreenoff\":null,\"stratumPassword\":\"0x10\",\"fallbackSv2ChannelType\":18446744073709551615}" dual false -> true
+| stratumpass=s:0x10
+| 
+--- sample 4
+| "655.35" dual false -> true
+| 
+--- sample 5
+| "{\"\":{},\"fallbackSv2ChannelType\":true,\"jobInterval\":\"pool.example.com\",\"fallbackStratumEnonceSubscribe\":1e20,\"pidI\":\"\\u00ffbc1qxyz.worker\\n\\t\",\"fan\":\"\\ud83d\\ude00\",\"fallbackStratumProtocol\":12345678901234567890123,\"autoscreenoff\":1e2,\"ssid\":2147483647,\"invertfanpolarity\":\"\\n\\ta\\\"b\",\"stratumEnonceSubscribe\":\"caf\\u00e9\"}x" dual false -> true
+| 
+--- sample 6
+| "{\"wifiPass\":12345678901234567890123,\"poolBalance\":true,\"Ssid\":{\"x\":\"\\ud83d\\ude00bc1qxyz.worker\"},\"fallbackStratumPassword\":{},\"stratumUser\":{},\"fallbackStratumURL\":1.5,\"fallbackStratumPassword\":null,\"fallbackStratumProtocol\":\"\\ud83d\\ude00\",\"frequency\":1e2,\"fallbackStratumEnonceSubscribe\":true}" dual false -> true
+| fbstratumesub=u16:1
+| 
+--- sample 7
+| "{\"invertfanpolarity\":null,\"autoscreenoff\":null,\"fan\":3e9,\"stratumTLS\":\"\\n\\t\\u0000cut\",\"stratumURL\":[],\"overheat_temp\":[255,\"\\ud83d\\ude001e2\",2147483647],\"fallbackStratumUser\":[1.0,[],[-1]]}" dual false -> true
+| 
+=== v2_bodies_match_reference
+count 30000
+sha256 a1ba304f7a46b585190939a21c574eba346231442f5072626f9431ffe743b61f
+--- sample 0
+| "{\"autoScreenOff\":18446744073709551616,\"hostname\":false}" -> (true, [false, false])
+| 
+--- sample 1
+| "{\"autoScreenOff\":-2147483648,\"hostname\":[0.000001,[18446744073709551615,\"123\",0],\"123\"],\"canMaster\":\"\\u0000cut123true\",\"canMaster\":[null],\"ssid\":-2147483649,\"wifiPass\":{},\"hostname\":1e2}" -> (true, [false, false])
+| 
+--- sample 2
+| "{\"fan\":18446744073709551616,\"poolMode\":null,\"ssid\":{\"pool\":{}},\"canMaster\":true,\"invertScreen\":false,\"x\":\"caf\\u00e9bc1qxyz.worker\",\"jobInterval\":\"\\ud83d\\ude00\",\"autoScreenOff\":0.000001,\"jobInterval\":false}" -> (true, [false, false])
+| invertscreen=u16:0
+| can_enabled=u16:1
+| 
+--- sample 3
+| "{\"\":null}" -> (true, [false, false])
+| 
+--- sample 4
+| "{\"x\":true,\"stratumDifficulty\":[\"x\\u00000x10\"],\"fans\":[{\"manualSpeed\":\"\\ud83d\\ude00\",\"pid\":true},{\"manualSpeed\":[4294967296,false],\"mode\":false,\"manualSpeed\":{\"Ssid\":\"-5pool.example.comtrue\",\"pool\":null},\"overheatTemp\":null,\"overheatTemp\":[\"\\n\\t\",\"\\u0000cut\\u00ff-5\"],\"mode\":\"a\\\"b1e2\",\"overheatTemp\":{\"pool\":\"a\\\"bcaf\\u00e9\",\"Ssid\":null},\"\":{\"Ssid\":\"1231e2\"}},[{\"\":-2147483648,\"Ssid\":\"a\\\"b\"},null]],\"coreVoltage\":-2147483648,\"invertScreen\":\"\\u00ff\",\"coreVoltage\":-2147483649}" -> (true, [false, false])
+| 
+--- sample 5
+| "{\"pools\":[{\"sv2RequireAuth\":[],\"coinbaseVerifyForce\":\"pool.example.comcaf\\u00e9bc1qxyz.worker\",\"sv2AuthorityPubkey\":\"true\",\"coinbaseVerifyForce\":[\"bc1qxyz.worker\",65536,\"-5\"],\"url\":false,\"protocol\":255,\"password\":[1e20,3e9,\"1e2x\\u0000123\"]},{\"coinbaseVerifyMode\":true},{\"sv2AuthorityPubkey\":\"123\",\"coinbaseVerifyForce\":[],\"Ssid\":[18446744073709551616],\"sv2AuthorityPubkey\":18446744073709551615,\"x\":[18446744073709551615],\"protocol\":[-0,12345678901234567890123],\"user\":\"pool.example.com\",\"\":1e2,\"coinbaseVerifyMode\":false,\"url\":{\"fan\":655.35,\"\":\"caf\\u00e9\"}}],\"flipScreen\":0.000001,\"fan\":\"-5\",\"flipScreen\":1.0,\"pidUseMax\":null,\"stratumKeep\":[],\"mempoolUrl\":true,\"vrFrequency\":null,\"poolMode\":null,\"canMaster\":null}" -> (true, [false, false])
+| sv2_proto=u16:255
+| sv2_auth_pk=s:true
+| 
+--- sample 6
+| "null" -> (true, [false, false])
+| 
+--- sample 7
+| "{\"fan\":[-1,\"0x10\",-0],\"frequency\":[[\"pool.example.com\\ud83d\\ude00\"]],\"coreVoltage\":{},\"invertScreen\":{}}" -> (true, [false, false])
+| 

@@ -18,6 +18,10 @@ use rust_core::secp::{self, Context, Keypair, Opaque64};
 use rust_core::stratum_v2::noise::PROTOCOL_NAME;
 use rust_core::stratum_v2::protocol::encode_frame_header;
 
+#[path = "../../tests/golden/mod.rs"]
+mod golden;
+use golden::Rec;
+
 type Ctx = c_void;
 type Transport = *mut c_void;
 
@@ -291,6 +295,22 @@ struct Outcome {
     received: Vec<(c_int, Vec<u8>, Vec<u8>)>,
 }
 
+fn hex(b: &[u8]) -> String {
+    b.iter().map(|b| format!("{b:02x}")).collect()
+}
+
+/// The outcome as recorded in the golden file.
+fn outcome_text(o: &Outcome) -> String {
+    let mut s = format!("handshake {}\nact1 {}", o.handshake, hex(&o.act1));
+    for (r, bytes) in &o.sent {
+        s += &format!("\nsent {r} {}", hex(bytes));
+    }
+    for (r, hdr, payload) in &o.received {
+        s += &format!("\nreceived {r} {} {}", hex(hdr), hex(payload));
+    }
+    s
+}
+
 fn keys(seed: u8) -> ResponderKeys {
     ResponderKeys {
         e_priv: [seed.wrapping_add(10); 32],
@@ -385,6 +405,7 @@ fn frame(seed: u64, i: usize) -> Vec<u8> {
 #[test]
 fn handshake_and_frames_match_reference() {
     let secp = Context::new(&[9; 32]).unwrap();
+    let mut rec = Rec::new("sv2_noise", "handshake_and_frames_match_reference");
     for seed in 1..40u64 {
         let authority = authority_xonly(&secp, &keys(seed as u8).authority_priv);
         let frames: Vec<Vec<u8>> = (0..5).map(|i| frame(seed, i)).collect();
@@ -401,17 +422,24 @@ fn handshake_and_frames_match_reference() {
                 "seed {seed}, authority {}",
                 auth.is_some()
             );
+            rec.add(format!(
+                "seed {seed} authority {}\n{}",
+                auth.is_some(),
+                outcome_text(&current)
+            ));
             // The frames came back intact.
             for ((r, hdr, payload), f) in current.received.iter().zip(&frames) {
                 assert_eq!((*r, &hdr[..], &payload[..]), (0, &f[..6], &f[6..]));
             }
         }
     }
+    rec.finish();
 }
 
 #[test]
 fn handshake_failures_match_reference() {
     let secp = Context::new(&[9; 32]).unwrap();
+    let mut rec = Rec::new("sv2_noise", "handshake_failures_match_reference");
     for seed in 1..20u64 {
         let authority = authority_xonly(&secp, &keys(seed as u8).authority_priv);
         let wrong = authority_xonly(&secp, &[0x55; 32]);
@@ -428,12 +456,18 @@ fn handshake_failures_match_reference() {
             let reference = session(&REFERENCE, seed, auth, corrupt, &[]);
             let current = session(&CURRENT, seed, auth, corrupt, &[]);
             assert_eq!(current, reference, "seed {seed}, case {auth:?} {corrupt:?}");
+            rec.add(format!(
+                "seed {seed} authority {:?} corrupt {corrupt:?}\n{}",
+                auth.map(|a| hex(&a)),
+                outcome_text(&current)
+            ));
             assert_eq!(
                 current.handshake, -1,
                 "seed {seed}, case {corrupt:?}: must fail"
             );
         }
     }
+    rec.finish();
 }
 
 /// Writes: a write timeout (0) is an error, and a partial write is followed
@@ -471,6 +505,9 @@ fn send_handles_timeouts_and_partial_writes() {
             assert_eq!(results, vec![(0, 0), (0, 14)], "{name}");
         } else {
             assert_eq!(results, vec![(-1, 0), (0, expected_len)], "{name}");
+            let mut rec = Rec::new("sv2_noise", "send_handles_timeouts_and_partial_writes");
+            rec.add(format!("{results:?}"));
+            rec.finish();
         }
     }
 }
@@ -504,6 +541,7 @@ fn certificate_validity_period_is_checked() {
         }
     };
     let skew = rust_core::stratum_v2::noise::CLOCK_SKEW_S;
+    let mut rec = Rec::new("sv2_noise", "certificate_validity_period_is_checked");
     for (now, ok) in [
         (from, true),
         (until, true),
@@ -512,14 +550,14 @@ fn certificate_validity_period_is_checked() {
         (from - skew - 1, false),
         (until + skew + 1, false),
     ] {
-        assert_eq!(
-            handshake(&CURRENT, Some(&authority), Some(now)) == 0,
-            ok,
-            "now {now}"
-        );
+        let with = handshake(&CURRENT, Some(&authority), Some(now));
+        assert_eq!(with == 0, ok, "now {now}");
         // without an authority key the certificate is not trusted anyway
-        assert_eq!(handshake(&CURRENT, None, Some(now)), 0, "now {now}");
+        let without = handshake(&CURRENT, None, Some(now));
+        assert_eq!(without, 0, "now {now}");
+        rec.add(format!("now {now}: {with} {without}"));
     }
+    rec.finish();
     // the reference accepts an expired certificate
     assert_eq!(handshake(&REFERENCE, Some(&authority), None), 0);
 }

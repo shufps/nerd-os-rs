@@ -10,6 +10,10 @@ use std::sync::Mutex;
 use c_reference as _;
 use rust_core::tps536x7::{Bus, Chip, Tps536x7};
 
+#[path = "../../tests/golden/mod.rs"]
+mod golden;
+use golden::Rec;
+
 extern "C" {
     fn i2c_stub_reset();
     fn i2c_stub_set(reg: u8, value: u16);
@@ -150,6 +154,7 @@ unsafe fn setup(regs: &[u16; 256]) {
 fn init_sequences() {
     let _g = LOCK.lock().unwrap_or_else(|e| e.into_inner());
     let mut r = Rng(0x5eed_1234);
+    let mut rec = Rec::new("tps536x7", "init_sequences");
     for (chip_idx, chip, rf) in variants() {
         for device_code in [0x01f0u16, 0x01f8, 0x0000, 0xffff] {
             for _ in 0..200 {
@@ -180,6 +185,11 @@ fn init_sequences() {
                         fake.trace, t_ref,
                         "{chip:?} phases {phases} imax {imax} ifault {ifault}"
                     );
+                    rec.add(format!(
+                        "{chip:?} {chip_idx} code {device_code:04x} phases {phases} imax {imax} ifault {:#x}: {ok}\n{}",
+                        ifault.to_bits(),
+                        fake.trace
+                    ));
                     // not vacuous: a found chip gets the whole sequence
                     if ok {
                         assert!(
@@ -193,12 +203,14 @@ fn init_sequences() {
             }
         }
     }
+    rec.finish();
 }
 
 #[test]
 fn set_vout_over_the_range() {
     let _g = LOCK.lock().unwrap_or_else(|e| e.into_inner());
     let mut r = Rng(0xabcdef);
+    let mut rec = Rec::new("tps536x7", "set_vout_over_the_range");
     for (chip_idx, chip, rf) in variants() {
         let mut regs = [0u16; 256];
         regs[0xfc] = if chip_idx == 0 { 0x01f0 } else { 0x01f8 };
@@ -224,16 +236,23 @@ fn set_vout_over_the_range() {
                 assert_eq!(ok, ok_ref, "{chip:?} {v}");
                 let t_ref = ref_trace();
                 assert_eq!(fake.trace, t_ref, "{chip:?} {v} ({:#x})", v.to_bits());
+                rec.add(format!(
+                    "{chip:?} {chip_idx} {:#x}: {ok}\n{}",
+                    v.to_bits(),
+                    fake.trace
+                ));
                 assert_eq!(t_ref.starts_with("ww 71 21 "), ok && v != 0.0);
             }
         }
     }
+    rec.finish();
 }
 
 #[test]
 fn getters_and_status() {
     let _g = LOCK.lock().unwrap_or_else(|e| e.into_inner());
     let mut r = Rng(0x77);
+    let mut rec = Rec::new("tps536x7", "getters_and_status");
     for (chip_idx, chip, rf) in variants() {
         for _ in 0..2000 {
             let mut regs = [0u16; 256];
@@ -266,7 +285,8 @@ fn getters_and_status() {
                 for (a, b) in ours.iter().zip(&theirs) {
                     assert_eq!(a.to_bits(), b.to_bits(), "{chip:?} {ours:?} {theirs:?}");
                 }
-                assert_eq!(d.vout_vid(&mut fake), (rf.vid)());
+                let vid = d.vout_vid(&mut fake);
+                assert_eq!(vid, (rf.vid)());
                 let regs_ours =
                     [0x78u8, 0x7b, 0x7a, 0x7c, 0x7d].map(|reg| d.status_reg(&mut fake, reg));
                 let regs_ref: Vec<u8> = (0..5).map(|w| (rf.status_reg)(w)).collect();
@@ -276,7 +296,13 @@ fn getters_and_status() {
                 d.clear_faults(&mut fake);
                 (rf.clear)();
                 assert_eq!(fake.trace, ref_trace(), "{chip:?}");
+                let bits = ours.map(|v| v.to_bits());
+                rec.add(format!(
+                    "{chip:?} {chip_idx} {bits:x?} {vid:#x} {regs_ours:x?}\n{}",
+                    fake.trace
+                ));
             }
         }
     }
+    rec.finish();
 }

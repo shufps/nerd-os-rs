@@ -12,6 +12,10 @@ use rust_core::http_json::{
     WifiNetwork,
 };
 
+#[path = "../../tests/golden/mod.rs"]
+mod golden;
+use golden::Rec;
+
 extern "C" {
     fn ref_system_info(
         snap: *const SystemInfo,
@@ -297,21 +301,20 @@ unsafe fn take(p: *mut c_char) -> String {
 
 #[test]
 fn struct_layouts() {
+    let mut rec = Rec::new("http_json", "struct_layouts");
     for which in 0..13 {
-        unsafe {
-            assert_eq!(
-                http_json_sizeof(which),
-                ref_http_json_sizeof(which),
-                "{which}"
-            )
-        };
+        let size = unsafe { http_json_sizeof(which) };
+        assert_eq!(size, unsafe { ref_http_json_sizeof(which) }, "{which}");
+        rec.add(format!("{which} {size}"));
     }
+    rec.finish();
 }
 
 #[test]
 fn system_info() {
     let _g = LOCK.lock().unwrap_or_else(|e| e.into_inner());
     let mut r = Rng(0x5157);
+    let mut rec = Rec::new("http_json", "system_info");
     // a history with samples: 1 h of 5 s samples ending at 10 h
     unsafe {
         assert!(history_init(4));
@@ -344,6 +347,15 @@ fn system_info() {
             ))
         };
         same(&rust, &reference, &format!("round {round}"));
+        rec.add(format!(
+            "start {} cur {} span {} limit {} requested {} now {}\n{rust}",
+            s.history_start,
+            s.history_current,
+            s.history_span_ms,
+            s.history_limit,
+            s.history_requested,
+            s.now_ms
+        ));
         if rust.contains("\"history\":{\"hashrate_1m\":[") && !rust.contains("\"hashrate_1m\":[]") {
             checked_history += 1;
         }
@@ -358,12 +370,14 @@ fn system_info() {
     assert!(rust.contains("\"coreVoltageActual\":0,"));
     // not vacuous: histories with rows were compared
     assert!(checked_history > 100, "{checked_history}");
+    rec.finish();
 }
 
 #[test]
 fn asic_info() {
     let _g = LOCK.lock().unwrap_or_else(|e| e.into_inner());
     let mut r = Rng(0xa51c);
+    let mut rec = Rec::new("http_json", "asic_info");
     for _ in 0..500 {
         let mut st = Strings(Vec::new());
         let freqs: Vec<u32> = (0..r.below(25)).map(|_| r.next() as u32 % 2000).collect();
@@ -389,7 +403,9 @@ fn asic_info() {
         let rust = String::from_utf8(unsafe { http_json::asic_info(&a) }.serialize()).unwrap();
         let reference = unsafe { take(ref_asic_info(&a)) };
         same(&rust, &reference, "asic");
+        rec.add(rust);
     }
+    rec.finish();
 }
 
 /// The history used by the tests with history exports.
@@ -410,6 +426,7 @@ fn with_history(r: &mut Rng) {
 fn dashboard() {
     let _g = LOCK.lock().unwrap_or_else(|e| e.into_inner());
     let mut r = Rng(0xda5b);
+    let mut rec = Rec::new("http_json", "dashboard");
     with_history(&mut r);
     let mut seen = [0u32; 3];
     for round in 0..4000 {
@@ -516,15 +533,26 @@ fn dashboard() {
             ))
         };
         same(&rust, &reference, &format!("dashboard round {round}"));
+        rec.add(format!(
+            "start {} cur {} span {} limit {} requested {} now {}\n{rust}",
+            d.history_start,
+            d.history_current,
+            d.history_span_ms,
+            d.history_limit,
+            d.history_requested,
+            d.now_ms
+        ));
         seen[d.manager.pool_mode as usize] += 1;
     }
     assert!(seen.iter().all(|&n| n > 1000), "{seen:?}");
+    rec.finish();
 }
 
 #[test]
 fn v2_system_and_identify() {
     let _g = LOCK.lock().unwrap_or_else(|e| e.into_inner());
     let mut r = Rng(0x2525);
+    let mut rec = Rec::new("http_json", "v2_system_and_identify");
     for _ in 0..1000 {
         let mut st = Strings(Vec::new());
         let v = V2System {
@@ -545,6 +573,7 @@ fn v2_system_and_identify() {
         // SAFETY: the test's snapshot points at its own live strings and arrays
         let rust = String::from_utf8(unsafe { http_json::v2_system(&v) }.serialize()).unwrap();
         same(&rust, &unsafe { take(ref_v2_system(&v)) }, "v2 system");
+        rec.add(rust);
         let i = V2Identify {
             device_model: st.pick(&mut r),
             default_theme: st.pick(&mut r),
@@ -557,6 +586,7 @@ fn v2_system_and_identify() {
         // SAFETY: the test's snapshot points at its own live strings and arrays
         let rust = String::from_utf8(unsafe { http_json::v2_identify(&i) }.serialize()).unwrap();
         same(&rust, &unsafe { take(ref_v2_identify(&i)) }, "v2 identify");
+        rec.add(rust);
         let without = V2Identify {
             core_dump_download: false,
             ..i
@@ -566,12 +596,14 @@ fn v2_system_and_identify() {
             String::from_utf8(unsafe { http_json::v2_identify(&without) }.serialize()).unwrap();
         assert!(rust.contains("\"coreDumpDownload\":false,"));
     }
+    rec.finish();
 }
 
 #[test]
 fn small_documents() {
     let _g = LOCK.lock().unwrap_or_else(|e| e.into_inner());
     let mut r = Rng(0x5a11);
+    let mut rec = Rec::new("http_json", "small_documents");
     for _ in 0..2000 {
         let mut st = Strings(Vec::new());
         // the C++ side reports hasWebhook from the webhook string
@@ -585,6 +617,7 @@ fn small_documents() {
         };
         let rust = String::from_utf8(http_json::alert_info(&a).serialize()).unwrap();
         same(&rust, &unsafe { take(ref_alert_info(&a)) }, "alert");
+        rec.add(rust);
 
         let i = InfluxInfo {
             url: st.pick(&mut r),
@@ -597,10 +630,12 @@ fn small_documents() {
         // SAFETY: the test's snapshot points at its own live strings and arrays
         let rust = String::from_utf8(unsafe { http_json::influx_info(&i) }.serialize()).unwrap();
         same(&rust, &unsafe { take(ref_influx_info(&i)) }, "influx");
+        rec.add(rust);
 
         let e = r.bool();
         let rust = String::from_utf8(http_json::otp_status(e).serialize()).unwrap();
         same(&rust, &unsafe { take(ref_otp_status(e)) }, "otp status");
+        rec.add(rust);
 
         let token = CString::new(format!("tok.{:x}.\"\\{}", r.next(), r.below(1000))).unwrap();
         let ttl = [24 * 3600, 1, 0, u32::MAX, r.next() as u32][r.below(5) as usize];
@@ -613,6 +648,7 @@ fn small_documents() {
             &unsafe { take(ref_otp_session(token.as_ptr(), ttl, expires)) },
             "otp session",
         );
+        rec.add(rust);
 
         // ssids are char[33] in the scan records: never NULL, at most 32 bytes
         let nets: Vec<WifiNetwork> = (0..r.below(21))
@@ -632,13 +668,16 @@ fn small_documents() {
             &unsafe { take(ref_wifi_scan(nets.as_ptr(), nets.len() as u16)) },
             "wifi",
         );
+        rec.add(rust);
     }
+    rec.finish();
 }
 
 #[test]
 fn v2_settings() {
     let _g = LOCK.lock().unwrap_or_else(|e| e.into_inner());
     let mut r = Rng(0x5e77);
+    let mut rec = Rec::new("http_json", "v2_settings");
     for round in 0..3000 {
         let mut st = Strings(Vec::new());
         let freqs: Vec<u32> = (0..r.below(25)).map(|_| r.next() as u32 % 2000).collect();
@@ -707,6 +746,7 @@ fn v2_settings() {
             &unsafe { take(ref_v2_settings(&s)) },
             &format!("settings round {round}"),
         );
+        rec.add(rust);
         s.has_pid_use_max = true;
         // SAFETY: the test's snapshot points at its own live strings and arrays
         let rust = String::from_utf8(unsafe { http_json::v2_settings(&s) }.serialize()).unwrap();
@@ -715,8 +755,10 @@ fn v2_settings() {
             &unsafe { take(ref_v2_settings_nerdaxe(&s)) },
             &format!("settings (NerdAxe) round {round}"),
         );
+        rec.add(format!("NerdAxe\n{rust}"));
         assert!(rust.contains("\"pidUseMax\":"));
     }
+    rec.finish();
 }
 
 /// A multi-frame message (7 payload bytes per frame, the last one SEQ_LAST).
@@ -741,6 +783,7 @@ unsafe fn send_message(base: u32, slave: u8, msg: &[u8], now: i64) {
 fn can_swarm() {
     let _g = LOCK.lock().unwrap_or_else(|e| e.into_inner());
     let mut r = Rng(0xca25);
+    let mut rec = Rec::new("http_json", "can_swarm");
     let mut slaves_seen = 0;
     for round in 0..1500 {
         let now = 1_000_000_000 + round as i64 * 100_000_000;
@@ -837,6 +880,13 @@ fn can_swarm() {
             );
             panic!("can swarm round {round}: bytes differ");
         }
+        rec.add(text_or_bytes(rust));
     }
     assert!(slaves_seen > 5000, "{slaves_seen}");
+    rec.finish();
+}
+
+/// The document as text, or escaped if it is not UTF-8.
+fn text_or_bytes(doc: Vec<u8>) -> String {
+    String::from_utf8(doc).unwrap_or_else(|e| format!("bytes: {}", e.into_bytes().escape_ascii()))
 }

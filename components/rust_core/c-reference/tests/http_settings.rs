@@ -9,6 +9,10 @@ use std::sync::Mutex;
 
 use c_reference as _;
 
+#[path = "../../tests/golden/mod.rs"]
+mod golden;
+use golden::Rec;
+
 extern "C" {
     fn ref_settings_v1(body: *const c_char, dual_pool: bool) -> bool;
     fn ref_settings_v2(body: *const c_char, verify_changed: *mut bool) -> bool;
@@ -310,6 +314,7 @@ fn run_ref<T>(f: impl FnOnce() -> T) -> (T, String) {
 fn v1_bodies_match_reference() {
     let _g = CFG.lock().unwrap_or_else(|e| e.into_inner());
     let rng = Rng(Cell::new(0x0001));
+    let mut rec = Rec::new("http_settings", "v1_bodies_match_reference");
     for i in 0..30_000 {
         let b = body(&rng, V1_KEYS);
         let c = CString::new(b.clone()).unwrap();
@@ -317,13 +322,16 @@ fn v1_bodies_match_reference() {
         let reference = run_ref(|| unsafe { ref_settings_v1(c.as_ptr(), dual) });
         let current = run(|| unsafe { new_settings_v1(c.as_ptr(), dual) });
         assert_eq!(current, reference, "case {i} (dual {dual}): {b}");
+        rec.add(format!("{b:?} dual {dual} -> {}\n{}", current.0, current.1));
     }
+    rec.finish();
 }
 
 #[test]
 fn v2_bodies_match_reference() {
     let _g = CFG.lock().unwrap_or_else(|e| e.into_inner());
     let rng = Rng(Cell::new(0x0002));
+    let mut rec = Rec::new("http_settings", "v2_bodies_match_reference");
     for i in 0..30_000 {
         let b = body(&rng, V2_KEYS);
         let c = CString::new(b.clone()).unwrap();
@@ -332,12 +340,15 @@ fn v2_bodies_match_reference() {
         let reference = run_ref(|| unsafe { (ref_settings_v2(c.as_ptr(), vr.as_mut_ptr()), vr) });
         let current = run(|| unsafe { (new_settings_v2(c.as_ptr(), vc.as_mut_ptr()), vc) });
         assert_eq!(current, reference, "case {i}: {b}");
+        rec.add(format!("{b:?} -> {:?}\n{}", current.0, current.1));
     }
+    rec.finish();
 }
 
 #[test]
 fn nesting_limit_matches_reference() {
     let _g = CFG.lock().unwrap_or_else(|e| e.into_inner());
+    let mut rec = Rec::new("http_settings", "nesting_limit_matches_reference");
     for depth in 0..14 {
         let inner = format!("{}1{}", "[".repeat(depth), "]".repeat(depth));
         for b in [
@@ -349,8 +360,10 @@ fn nesting_limit_matches_reference() {
             let reference = run_ref(|| unsafe { ref_settings_v1(c.as_ptr(), false) });
             let current = run(|| unsafe { new_settings_v1(c.as_ptr(), false) });
             assert_eq!(current, reference, "{b}");
+            rec.add(format!("{b:?} -> {}\n{}", current.0, current.1));
         }
     }
+    rec.finish();
 }
 
 /// Token soup with what ArduinoJson accepts beyond JSON (single quotes,
@@ -361,6 +374,7 @@ fn nesting_limit_matches_reference() {
 fn unusual_syntax_matches_reference() {
     let _g = CFG.lock().unwrap_or_else(|e| e.into_inner());
     let rng = Rng(Cell::new(0x0003));
+    let mut rec = Rec::new("http_settings", "unusual_syntax_matches_reference");
     let keys = [
         "ssid",
         "'ssid'",
@@ -450,6 +464,7 @@ fn unusual_syntax_matches_reference() {
             "case {i}: {:?}",
             String::from_utf8_lossy(&b)
         );
+        let v1 = current;
         let mut vr = [false; 2];
         let mut vc = [false; 2];
         let reference = run_ref(|| unsafe { (ref_settings_v2(c.as_ptr(), vr.as_mut_ptr()), vr) });
@@ -460,5 +475,14 @@ fn unusual_syntax_matches_reference() {
             "v2 case {i}: {:?}",
             String::from_utf8_lossy(&b)
         );
+        rec.add(format!(
+            "\"{}\" dual {dual} -> {}\n{}v2 -> {:?}\n{}",
+            b.escape_ascii(),
+            v1.0,
+            v1.1,
+            current.0,
+            current.1
+        ));
     }
+    rec.finish();
 }

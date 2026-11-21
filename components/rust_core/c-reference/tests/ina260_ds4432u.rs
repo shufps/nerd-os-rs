@@ -11,6 +11,10 @@ use c_reference as _;
 use rust_core::i2c::RegBus;
 use rust_core::{ds4432u, ina260};
 
+#[path = "../../tests/golden/mod.rs"]
+mod golden;
+use golden::Rec;
+
 extern "C" {
     fn i2c_stub_reset();
     fn i2c_stub_set(reg: u8, value: u16);
@@ -66,6 +70,7 @@ unsafe fn ref_trace() -> String {
 #[test]
 fn ina260_registers() {
     let _g = LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    let mut rec = Rec::new("ina260_ds4432u", "ina260_registers");
     unsafe {
         i2c_stub_reset();
         let mut f = Fake {
@@ -82,7 +87,8 @@ fn ina260_registers() {
                 f.regs[reg as usize] = b;
             }
             f.trace.clear();
-            assert_eq!(ina260::installed(&mut f), refina_installed());
+            let inst = ina260::installed(&mut f);
+            assert_eq!(inst, refina_installed());
             let c = ina260::current(&mut f);
             let c_ref = refina_current();
             // deliberate difference: the register is signed
@@ -92,13 +98,19 @@ fn ina260_registers() {
                 assert_eq!(c, (v as u16 as i16) as f32 * 1.25);
                 assert!(c < 0.0 && c_ref > 0.0);
             }
-            assert_eq!(
-                ina260::voltage(&mut f).to_bits(),
-                refina_voltage().to_bits()
-            );
-            assert_eq!(ina260::power(&mut f).to_bits(), refina_power().to_bits());
+            let volt = ina260::voltage(&mut f);
+            assert_eq!(volt.to_bits(), refina_voltage().to_bits());
+            let pow = ina260::power(&mut f);
+            assert_eq!(pow.to_bits(), refina_power().to_bits());
             let t = ref_trace();
             assert_eq!(f.trace, t);
+            rec.add(format!(
+                "{v:04x}: {inst} {:#x} {:#x} {:#x}\n{}",
+                c.to_bits(),
+                volt.to_bits(),
+                pow.to_bits(),
+                f.trace
+            ));
             assert_eq!(t, "rr 40 02 2\nrr 40 01 2\nrr 40 02 2\nrr 40 03 2\n");
         }
         // the last register value, 0xffff: -1 LSB (the reference: 81918.75 mA)
@@ -108,18 +120,31 @@ fn ina260_registers() {
         f.fail = true;
         f.trace.clear();
         i2c_stub_clear_trace();
-        assert!(!ina260::installed(&mut f) && !refina_installed());
-        assert_eq!(ina260::current(&mut f), refina_current());
-        assert_eq!(ina260::voltage(&mut f), refina_voltage());
-        assert_eq!(ina260::power(&mut f), refina_power());
+        let inst = ina260::installed(&mut f);
+        assert!(!inst && !refina_installed());
+        let c = ina260::current(&mut f);
+        assert_eq!(c, refina_current());
+        let volt = ina260::voltage(&mut f);
+        assert_eq!(volt, refina_voltage());
+        let pow = ina260::power(&mut f);
+        assert_eq!(pow, refina_power());
         assert_eq!(f.trace, ref_trace());
+        rec.add(format!(
+            "bus error: {inst} {:#x} {:#x} {:#x}\n{}",
+            c.to_bits(),
+            volt.to_bits(),
+            pow.to_bits(),
+            f.trace
+        ));
         i2c_stub_fail(false);
     }
+    rec.finish();
 }
 
 #[test]
 fn ds4432u_codes() {
     let _g = LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    let mut rec = Rec::new("ina260_ds4432u", "ds4432u_codes");
     unsafe {
         for fail in [false, true] {
             i2c_stub_reset();
@@ -139,14 +164,21 @@ fn ds4432u_codes() {
                     assert_eq!(ok, refds_set(output, code) == 0);
                     let mut v = 0u8;
                     let rc = refds_get(output, &mut v);
-                    assert_eq!(ds4432u::code(&mut f, output), (rc == 0).then_some(v));
+                    let got = ds4432u::code(&mut f, output);
+                    assert_eq!(got, (rc == 0).then_some(v));
+                    rec.add(format!(
+                        "fail {fail} out {output} code {code:02x}: {ok} {got:?}"
+                    ));
                 }
             }
-            assert_eq!(ds4432u::test(&mut f), refds_test());
+            let test = ds4432u::test(&mut f);
+            assert_eq!(test, refds_test());
             let t = ref_trace();
             assert_eq!(f.trace, t);
+            rec.add(format!("fail {fail}: test {test}\n{}", f.trace));
             assert!(t.starts_with("wr 48 f8 00\nrr 48 f8 1\n") && t.contains("wr 48 f9 ff\n"));
         }
         i2c_stub_fail(false);
     }
+    rec.finish();
 }

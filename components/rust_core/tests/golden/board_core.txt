@@ -1,0 +1,58 @@
+# Golden outputs (the former C/C++ code), see tests/golden/mod.rs
+=== chip_temperatures
+count 5000
+sha256 ab4a73f78ca2df420f13313cea6d0a697f5bcfa23411253d8234945415fd1be5
+--- sample 0
+| [7fc00000, 42a21d2f, 7fc00000, 7fc00000] 42a21d2f
+--- sample 1
+| [428fb2b0] 428fb2b0
+--- sample 2
+| [40d8d4fe, c1400000, 7fc00000, c1500000, 41ee1cac, 419174bc, 429077cf] 429077cf
+--- sample 3
+| [] 00000000
+--- sample 4
+| [42d5a45a, 42721ba6, 4240f7cf, 4282f439, 7fc00000, c1100000, c1b00000, 4247ba5e] 42d5a45a
+--- sample 5
+| [7fc00000, 42893127, c1500000, 42678a3d, 42c2ed91, 7fc00000, c1500000, 425d4ccd, 422477cf, 7fc00000] 42c2ed91
+--- sample 6
+| [42abd47b, c2100000, 4202a1cb, c1880000, 42c5dba6, 42288000] 42c5dba6
+--- sample 7
+| [419e0c4a, 4189f7cf, 4285f2b0, 41f60c4a, c2440000, 4240978d, 41f03958, 7fc00000, c21c0000, 428b7f7d, 4277926f, 427ead0e] 428b7f7d
+=== pmbus_faults
+count 100000
+sha256 d3ca8f18825d5a5f6413139e081cfcff5f35728cec48ee578f8bdfe578f4a6a3
+--- sample 0
+| [00, 00, 00, 00, 00] 0 00000000
+--- sample 1
+| [00, 00, 00, 00, ff] 0 00000000
+--- sample 2
+| [00, 00, 00, 00, 80] 2 00000000
+--- sample 3
+| [00, 00, 00, 00, 10] 0 00000000
+--- sample 4
+| [00, 00, 00, 00, 90] 2 00000000
+--- sample 5
+| [00, 00, 00, 00, 04] 0 00000000
+--- sample 6
+| [00, 00, 00, 00, 40] 0 00000000
+--- sample 7
+| [00, 00, 00, 00, 7f] 0 00000000
+=== validation_and_clamping
+count 172032
+sha256 8bf1988bbe06564e283e665f71ed1862dc8866aa6a8676f747720098aae842fa
+--- sample 0
+| 0 0 0 00000000 true true
+--- sample 1
+| 0 0 0 3a83126f true true
+--- sample 2
+| 0 0 0 3b03126f true true
+--- sample 3
+| 0 0 0 3b449ba6 true true
+--- sample 4
+| 0 0 0 3b83126f true true
+--- sample 5
+| 0 0 0 3ba3d70a true true
+--- sample 6
+| 0 0 0 3bc49ba6 true true
+--- sample 7
+| 0 0 0 3be56042 true true

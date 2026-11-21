@@ -13,6 +13,10 @@ use std::sync::Mutex;
 use c_reference as _;
 use rust_core::pool::{any_usable, verify, Actions, DualPool, Failover, PoolState, VerifyInput};
 
+#[path = "../../tests/golden/mod.rs"]
+mod golden;
+use golden::Rec;
+
 #[repr(C)]
 #[derive(Debug, PartialEq)]
 struct VerifyOut {
@@ -92,10 +96,9 @@ impl Rng {
 /// The reference keeps its state in globals: one test at a time.
 static REFERENCE: Mutex<()> = Mutex::new(());
 
+/// Fixed (the golden file records the outputs for exactly these inputs).
 fn iterations() -> (usize, u64) {
-    let n = std::env::var("DIFF_ITERATIONS").map_or(100_000, |v| v.parse().unwrap());
-    let seed = std::env::var("DIFF_SEED").map_or(0x0b00_1500_0000_0007, |v| v.parse().unwrap());
-    (n, seed)
+    (100_000, 0x0b00_1500_0000_0007)
 }
 
 /// `connected` is the manager's `isConnected()`: the task exists and is connected.
@@ -114,6 +117,7 @@ fn random_state(rng: &Rng) -> PoolState {
 #[test]
 fn failover_matches_reference() {
     let _serial = REFERENCE.lock().unwrap_or_else(|e| e.into_inner());
+    let mut rec = Rec::new("pool_policy", "failover_matches_reference");
     // SAFETY: resets the reference's globals.
     unsafe { ref_reset() };
     let (n, seed) = iterations();
@@ -150,12 +154,15 @@ fn failover_matches_reference() {
             (expected, selected),
             "case {i}: event {event} pool {pool} {s:?}"
         );
+        rec.add(format!("{i} {event} {pool} {got:?} {}", f.selected));
     }
+    rec.finish();
 }
 
 #[test]
 fn dual_pool_events_match_reference() {
     let _serial = REFERENCE.lock().unwrap_or_else(|e| e.into_inner());
+    let mut rec = Rec::new("pool_policy", "dual_pool_events_match_reference");
     // SAFETY: resets the reference's globals.
     unsafe { ref_reset() };
     let (n, seed) = iterations();
@@ -192,12 +199,15 @@ fn dual_pool_events_match_reference() {
             (expected, diff_err),
             "case {i}: event {event} pool {pool} {s:?}"
         );
+        rec.add(format!("{i} {event} {pool} {got:?} {:?}", d.pool_diff_err));
     }
+    rec.finish();
 }
 
 #[test]
 fn dual_pool_dithering_matches_reference() {
     let _serial = REFERENCE.lock().unwrap_or_else(|e| e.into_inner());
+    let mut rec = Rec::new("pool_policy", "dual_pool_dithering_matches_reference");
     // SAFETY: resets the reference's globals.
     unsafe { ref_reset() };
     let (n, seed) = iterations();
@@ -224,7 +234,9 @@ fn dual_pool_dithering_matches_reference() {
             got as i32, expected,
             "case {i}: balance {balance} {valid:?} {blocked:?}"
         );
+        rec.add(format!("{i} {balance} {got}"));
     }
+    rec.finish();
 }
 
 /// Without disconnects in between, the ASIC difficulty matches; with one,
@@ -232,6 +244,7 @@ fn dual_pool_dithering_matches_reference() {
 #[test]
 fn dual_pool_asic_diff_matches_reference() {
     let _serial = REFERENCE.lock().unwrap_or_else(|e| e.into_inner());
+    let mut rec = Rec::new("pool_policy", "dual_pool_asic_diff_matches_reference");
     // SAFETY: resets the reference's globals.
     unsafe { ref_reset() };
     let (n, seed) = iterations();
@@ -250,12 +263,15 @@ fn dual_pool_asic_diff_matches_reference() {
         let expected = unsafe { ref_dual_asic_diff(pool as i32, diff, mn, mx, &mut err) };
         let got = d.select_asic_diff(pool, diff, mn, mx);
         assert_eq!((got, d.pool_diff_err[pool]), (expected, err), "case {i}");
+        rec.add(format!("{i} {pool} {diff} {got} {}", d.pool_diff_err[pool]));
     }
+    rec.finish();
 }
 
 #[test]
 fn dual_pool_balance_matches_reference() {
     let _serial = REFERENCE.lock().unwrap_or_else(|e| e.into_inner());
+    let mut rec = Rec::new("pool_policy", "dual_pool_balance_matches_reference");
     // SAFETY: resets the reference's globals.
     unsafe { ref_reset() };
     let (n, seed) = iterations();
@@ -276,13 +292,17 @@ fn dual_pool_balance_matches_reference() {
                 s.connected[1],
             )
         };
-        assert_eq!(d.active_balance(pool, &s), expected, "case {i}");
+        let got = d.active_balance(pool, &s);
+        assert_eq!(got, expected, "case {i}");
+        rec.add(format!("{i} {balance} {pool} {got}"));
     }
+    rec.finish();
 }
 
 #[test]
 fn verification_matches_reference() {
     let _serial = REFERENCE.lock().unwrap_or_else(|e| e.into_inner());
+    let mut rec = Rec::new("pool_policy", "verification_matches_reference");
     // SAFETY: resets the reference's globals.
     unsafe { ref_reset() };
     let (n, seed) = iterations();
@@ -354,5 +374,7 @@ fn verification_matches_reference() {
             got, expected,
             "case {i}: {input:?} configured {configured:?} other_blocked {other_blocked}"
         );
+        rec.add(format!("{i} {got:?}"));
     }
+    rec.finish();
 }

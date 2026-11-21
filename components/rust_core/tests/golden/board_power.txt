@@ -1,0 +1,206 @@
+# Golden outputs (the former C/C++ code), see tests/golden/mod.rs
+=== ds4432_codes
+count 3290
+sha256 1389c0bb274ecc141d33cb64044ba868c1b90356d37a6079284feb8237276c5e
+--- sample 0
+| 00000000 00
+--- sample 1
+| 39d1b717 00
+--- sample 2
+| 3a6bedfa 00
+--- sample 3
+| 3a83126f 00
+--- sample 4
+| 3ab78035 00
+--- sample 5
+| 3af9096c 00
+--- sample 6
+| 3b03126f 00
+--- sample 7
+| 3b1d4952 00
+=== nerdaxe_sequences
+count 20000
+sha256 33745245f5013c3c4bf990628df0bdebad4ce14869956fe1b7dfbdf88704e164
+--- sample 0
+| AxeGamma what 1 volts 3fe00000 RefParams { init_mv: 1149, asic_mv: 1131, phases: 0, imax: 0, ifault: 0.0, freq: 934, count: 2, max_diff: 2158822469, vr_freq: 2256531213, min_mv: 1050, max_mv: 0, buck_init_ok: true, set_vout_ok: true, disable_ok: true, chips: 1, baud: 4770854 }
+| res true state [0, 0, 0, 0]
+| vout 3fe00000
+| 
+--- sample 1
+| AxeGaia what 1 volts 3fe147ae RefParams { init_mv: 1371, asic_mv: 1483, phases: 0, imax: 0, ifault: 0.0, freq: 695, count: 2, max_diff: 1028157270, vr_freq: 3570657800, min_mv: 0, max_mv: 1400, buck_init_ok: true, set_vout_ok: true, disable_ok: true, chips: 1, baud: 742506 }
+| res false state [0, 0, 0, 0]
+| 
+--- sample 2
+| Axe what 1 volts 3fcced91 RefParams { init_mv: 1396, asic_mv: 1408, phases: 0, imax: 0, ifault: 0.0, freq: 303, count: 2, max_diff: 2210397613, vr_freq: 2967357718, min_mv: 0, max_mv: 0, buck_init_ok: true, set_vout_ok: true, disable_ok: true, chips: 1, baud: 1172085 }
+| res true state [0, 0, 0, 0]
+| dac 27
+| vreg 1
+| 
+--- sample 3
+| Axe what 1 volts 3f8020c5 RefParams { init_mv: 1184, asic_mv: 1363, phases: 0, imax: 0, ifault: 0.0, freq: 791, count: 2, max_diff: 1489729596, vr_freq: 2218484172, min_mv: 1050, max_mv: 1400, buck_init_ok: true, set_vout_ok: true, disable_ok: true, chips: 1, baud: 502276 }
+| res false state [0, 0, 0, 0]
+| 
+--- sample 4
+| AxeGaia what 0 volts 3fbc0831 RefParams { init_mv: 1699, asic_mv: 1735, phases: 0, imax: 0, ifault: 0.0, freq: 906, count: 1, max_diff: 205562058, vr_freq: 3531559691, min_mv: 1050, max_mv: 1400, buck_init_ok: true, set_vout_ok: true, disable_ok: true, chips: 1, baud: 74617 }
+| res true state [1, 1, 1, 0]
+| vout 00000000
+| ldo 1
+| delay 500
+| reset 0
+| delay 250
+| delay 100
+| delay 500
+| reset 1
+| delay 250
+| clear
+| asic_init 906 1 205562058 3531559691
+| max_baud
+| delay 500
+| baud 74617
+| clear
+| delay 500
+| 
+--- sample 5
+| Axe what 0 volts 00000000 RefParams { init_mv: 1004, asic_mv: 1726, phases: 0, imax: 0, ifault: 0.0, freq: 911, count: 2, max_diff: 231203051, vr_freq: 3253548522, min_mv: 1050, max_mv: 1400, buck_init_ok: true, set_vout_ok: true, disable_ok: true, chips: 0, baud: 4324735 }
+| res false state [1, 0, 0, 0]
+| vreg 0
+| reset 0
+| delay 250
+| delay 500
+| reset 1
+| delay 250
+| clear
+| asic_init 911 2 231203051 3253548522
+| 
+--- sample 6
+| AxeGaia what 1 volts 3f9020c5 RefParams { init_mv: 1805, asic_mv: 1669, phases: 0, imax: 0, ifault: 0.0, freq: 250, count: 2, max_diff: 4041192579, vr_freq: 303516458, min_mv: 0, max_mv: 0, buck_init_ok: true, set_vout_ok: true, disable_ok: true, chips: 1, baud: 3350450 }
+| res true state [0, 0, 0, 0]
+| vout 3f9020c5
+| 
+--- sample 7
+| Axe what 2 volts 3fa2d0e5 RefParams { init_mv: 1529, asic_mv: 1731, phases: 0, imax: 0, ifault: 0.0, freq: 758, count: 2, max_diff: 1966674060, vr_freq: 1356644781, min_mv: 0, max_mv: 0, buck_init_ok: true, set_vout_ok: true, disable_ok: true, chips: 1, baud: 3223313 }
+| res false state [0, 0, 0, 1]
+| vreg 0
+| 
+=== sequences
+count 20000
+sha256 03749339cea4b1018fe949e58a9e5117f76dfb34e43613e793abdea0fa406e8a
+--- sample 0
+| what 2 rev7 false volts 3f558106 RefParams { init_mv: 1200, asic_mv: 834, phases: 6, imax: 64, ifault: 93.135, freq: 220, count: 5, max_diff: 1871399242, vr_freq: 941575512, min_mv: 1050, max_mv: 0, buck_init_ok: true, set_vout_ok: true, disable_ok: true, chips: 0, baud: 188650 }
+| res false state [0, 0, 0, 1]
+| vreg 0
+| delay 500
+| ldo 0
+| delay 500
+| 
+--- sample 1
+| what 0 rev7 true volts 3fbd9168 RefParams { init_mv: 900, asic_mv: 1481, phases: 5, imax: 45, ifault: 46.686, freq: 908, count: 5, max_diff: 54746282, vr_freq: 1025618067, min_mv: 0, max_mv: 1200, buck_init_ok: true, set_vout_ok: false, disable_ok: true, chips: 12, baud: 2955093 }
+| res false state [0, 0, 0, 0]
+| vreg 0
+| ldo 0
+| reset 0
+| delay 250
+| ldo 1
+| delay 100
+| vreg 1
+| delay 50
+| buck_init 5 45 423abe77
+| 
+--- sample 2
+| what 0 rev7 true volts 3fcc28f6 RefParams { init_mv: 900, asic_mv: 1249, phases: 3, imax: 118, ifault: 75.939, freq: 672, count: 8, max_diff: 3102937246, vr_freq: 2972389695, min_mv: 1050, max_mv: 0, buck_init_ok: false, set_vout_ok: true, disable_ok: true, chips: 2, baud: 1912070 }
+| res false state [0, 0, 0, 0]
+| vreg 0
+| ldo 0
+| reset 0
+| delay 250
+| ldo 1
+| delay 100
+| vreg 1
+| delay 50
+| buck_init 3 118 4297e0c5
+| 
+--- sample 3
+| what 0 rev7 true volts 00000000 RefParams { init_mv: 1050, asic_mv: 1414, phases: 2, imax: 57, ifault: 22.22, freq: 828, count: 5, max_diff: 681420721, vr_freq: 1143951550, min_mv: 1050, max_mv: 0, buck_init_ok: true, set_vout_ok: true, disable_ok: false, chips: 2, baud: 4554015 }
+| res true state [1, 2, 1, 0]
+| vreg 0
+| ldo 0
+| reset 0
+| delay 250
+| ldo 1
+| delay 100
+| vreg 1
+| delay 50
+| buck_init 2 57 41b1c28f
+| vreg 1
+| delay 20
+| vout 3fb4fdf4
+| delay 500
+| reset 1
+| delay 250
+| clear
+| asic_init 828 5 681420721 1143951550
+| max_baud
+| delay 500
+| baud 4554015
+| clear
+| delay 500
+| vreg 1
+| delay 20
+| vout 3fb4fdf4
+| 
+--- sample 4
+| what 2 rev7 false volts 3fbdb22d RefParams { init_mv: 1250, asic_mv: 1482, phases: 4, imax: 190, ifault: 84.544, freq: 139, count: 7, max_diff: 538232643, vr_freq: 3617021453, min_mv: 1050, max_mv: 1200, buck_init_ok: true, set_vout_ok: true, disable_ok: true, chips: 12, baud: 4197942 }
+| res false state [0, 0, 0, 1]
+| vreg 0
+| delay 500
+| ldo 0
+| delay 500
+| 
+--- sample 5
+| what 0 rev7 true volts 3fa91687 RefParams { init_mv: 900, asic_mv: 1444, phases: 3, imax: 6, ifault: 199.378, freq: 606, count: 7, max_diff: 1240712549, vr_freq: 912513967, min_mv: 0, max_mv: 0, buck_init_ok: true, set_vout_ok: true, disable_ok: true, chips: 10, baud: 302563 }
+| res true state [1, 10, 1, 0]
+| vreg 0
+| ldo 0
+| reset 0
+| delay 250
+| ldo 1
+| delay 100
+| vreg 1
+| delay 50
+| buck_init 3 6 434760c5
+| vreg 1
+| delay 20
+| vout 3fb8d4fe
+| delay 500
+| reset 1
+| delay 250
+| clear
+| asic_init 606 7 1240712549 912513967
+| max_baud
+| delay 500
+| baud 302563
+| clear
+| delay 500
+| vreg 1
+| delay 20
+| vout 3fb8d4fe
+| 
+--- sample 6
+| what 0 rev7 true volts 3f5ba5e3 RefParams { init_mv: 1050, asic_mv: 911, phases: 1, imax: 67, ifault: 141.035, freq: 416, count: 12, max_diff: 823234914, vr_freq: 1992010432, min_mv: 0, max_mv: 0, buck_init_ok: false, set_vout_ok: true, disable_ok: true, chips: 1, baud: 4349243 }
+| res false state [0, 0, 0, 0]
+| vreg 0
+| ldo 0
+| reset 0
+| delay 250
+| ldo 1
+| delay 100
+| vreg 1
+| delay 50
+| buck_init 1 67 430d08f6
+| 
+--- sample 7
+| what 1 rev7 true volts 00000000 RefParams { init_mv: 1250, asic_mv: 1472, phases: 6, imax: 123, ifault: 199.583, freq: 460, count: 6, max_diff: 3436395435, vr_freq: 2596869916, min_mv: 1050, max_mv: 1400, buck_init_ok: false, set_vout_ok: false, disable_ok: false, chips: 5, baud: 4388055 }
+| res false state [0, 0, 0, 0]
+| disable
+| vreg 0
+| 

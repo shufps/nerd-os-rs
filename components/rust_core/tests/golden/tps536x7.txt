@@ -1,0 +1,353 @@
+# Golden outputs (the former C/C++ code), see tests/golden/mod.rs
+=== getters_and_status
+count 8000
+sha256 b31f61a67ca815128690f62a118380d58880efc49edad23f35d4b0a8b8931a08
+--- sample 0
+| Tps53647 0 [3dd8c000, bebd8000, 3c240000, 49288000, 3f68c000, 3e020000, 429d1900] 0x7223 [b, 7b, ec, cd, 1e]
+| rw 71 8d
+| rw 71 97
+| rw 71 96
+| rw 71 88
+| rw 71 89
+| rw 71 8c
+| rw 71 d4
+| rw 71 21
+| rb 71 78
+| rb 71 7b
+| rb 71 7a
+| rb 71 7c
+| rb 71 7d
+| rb 71 78
+| rw 71 79
+| rb 71 7a
+| rb 71 7b
+| rb 71 7c
+| rb 71 80
+| wc 71 03
+| 
+--- sample 1
+| Tps53647 0 [46f0c000, c8d90000, bfc24000, c1aa4000, 47168000, c7160000, 42817700] 0xd75c [48, bb, 1d, 60, 70]
+| rw 71 8d
+| rw 71 97
+| rw 71 96
+| rw 71 88
+| rw 71 89
+| rw 71 8c
+| rw 71 d4
+| rw 71 21
+| rb 71 78
+| rb 71 7b
+| rb 71 7a
+| rb 71 7c
+| rb 71 7d
+| rb 71 78
+| rw 71 79
+| rb 71 7a
+| rb 71 7b
+| rb 71 7c
+| rb 71 80
+| wc 71 03
+| 
+--- sample 2
+| Tps53647 0 [c3528000, cb3f0000, bf440000, c5d9c000, c2480000, 48120000, 42e92300] 0x3cb7 [53, 96, 26, ef, e0]
+| rw 71 8d
+| rw 71 97
+| rw 71 96
+| rw 71 88
+| rw 71 89
+| rw 71 8c
+| rw 71 d4
+| rw 71 21
+| rb 71 78
+| rb 71 7b
+| rb 71 7a
+| rb 71 7c
+| rb 71 7d
+| rb 71 78
+| rw 71 79
+| rb 71 7a
+| rb 71 7b
+| rb 71 7c
+| rb 71 80
+| wc 71 03
+| 
+--- sample 3
+| Tps53647 0 [c0ca0000, 45608000, c581c000, c7860000, 42e4c000, 42070000, 42fc4100] 0x18aa [90, 7e, 70, cc, 29]
+| rw 71 8d
+| rw 71 97
+| rw 71 96
+| rw 71 88
+| rw 71 89
+| rw 71 8c
+| rw 71 d4
+| rw 71 21
+| rb 71 78
+| rb 71 7b
+| rb 71 7a
+| rb 71 7c
+| rb 71 7d
+| rb 71 78
+| rw 71 79
+| rb 71 7a
+| rb 71 7b
+| rb 71 7c
+| rb 71 80
+| wc 71 03
+| 
+--- sample 4
+| Tps53647 0 [c0418000, 494ac000, 3e4b4000, bb5b0000, c6950000, 481b0000, 42f56300] 0xd62f [bd, 4c, a9, 9c, b7]
+| rw 71 8d
+| rw 71 97
+| rw 71 96
+| rw 71 88
+| rw 71 89
+| rw 71 8c
+| rw 71 d4
+| rw 71 21
+| rb 71 78
+| rb 71 7b
+| rb 71 7a
+| rb 71 7c
+| rb 71 7d
+| rb 71 78
+| rw 71 79
+| rb 71 7a
+| rb 71 7b
+| rb 71 7c
+| rb 71 80
+| wc 71 03
+| 
+--- sample 5
+| Tps53647 0 [c5f84000, 3d048000, befbc000, 40858000, 44520000, 4816c000, 420eba00] 0x9c81 [a1, 6a, cf, 5c, d4]
+| rw 71 8d
+| rw 71 97
+| rw 71 96
+| rw 71 88
+| rw 71 89
+| rw 71 8c
+| rw 71 d4
+| rw 71 21
+| rb 71 78
+| rb 71 7b
+| rb 71 7a
+| rb 71 7c
+| rb 71 7d
+| rb 71 78
+| rw 71 79
+| rb 71 7a
+| rb 71 7b
+| rb 71 7c
+| rb 71 80
+| wc 71 03
+| 
+--- sample 6
+| Tps53647 0 [c1e00000, c66b8000, 47c90000, 4379c000, ba800000, c59dc000, 42a04700] 0x7d7b [c9, 46, 87, 9e, f5]
+| rw 71 8d
+| rw 71 97
+| rw 71 96
+| rw 71 88
+| rw 71 89
+| rw 71 8c
+| rw 71 d4
+| rw 71 21
+| rb 71 78
+| rb 71 7b
+| rb 71 7a
+| rb 71 7c
+| rb 71 7d
+| rb 71 78
+| rw 71 79
+| rb 71 7a
+| rb 71 7b
+| rb 71 7c
+| rb 71 80
+| wc 71 03
+| 
+--- sample 7
+| Tps53647 0 [c6500000, c64b0000, 3f080000, c5d38000, 47b00000, 47400000, 42ed2300] 0x74b0 [ff, f7, f2, 30, 34]
+| rw 71 8d
+| rw 71 97
+| rw 71 96
+| rw 71 88
+| rw 71 89
+| rw 71 8c
+| rw 71 d4
+| rw 71 21
+| rb 71 78
+| rb 71 7b
+| rb 71 7a
+| rb 71 7c
+| rb 71 7d
+| rb 71 78
+| rw 71 79
+| rb 71 7a
+| rb 71 7b
+| rb 71 7c
+| rb 71 80
+| wc 71 03
+| 
+=== init_sequences
+count 3200
+sha256 5044d95bf79d16c1b97326c89e2e0694e25143f6541362d5fe9342c47f59ed78
+--- sample 0
+| Tps53647 0 code 01f0 phases 1 imax 130 ifault 0xc1c00000: true
+| rw 71 fc
+| wc 71 03
+| wc 71 12
+| wb 71 02 17
+| wb 71 dc 20
+| wb 71 da 82
+| wb 71 dd 89
+| wb 71 02 17
+| wb 71 dc 20
+| wb 71 e4 00
+| ww 71 51 eaf8
+| ww 71 4f ebe8
+| ww 71 4a 0000
+| ww 71 46 0000
+| 
+--- sample 1
+| Tps53647 0 code 01f0 phases 4 imax 128 ifault 0x42a85c29: true
+| rw 71 fc
+| wc 71 03
+| wc 71 12
+| wb 71 02 17
+| wb 71 dc 20
+| wb 71 da 80
+| wb 71 dd 89
+| wb 71 02 17
+| wb 71 dc 20
+| wb 71 e4 03
+| ww 71 51 eaf8
+| ww 71 4f ebe8
+| ww 71 4a eaa1
+| ww 71 46 eaa1
+| 
+--- sample 2
+| Tps53647 0 code 01f0 phases 4 imax 266 ifault 0x444531ec: true
+| rw 71 fc
+| wc 71 03
+| wc 71 12
+| wb 71 02 17
+| wb 71 dc 20
+| wb 71 da 0a
+| wb 71 dd 89
+| wb 71 02 17
+| wb 71 dc 20
+| wb 71 e4 03
+| ww 71 51 eaf8
+| ww 71 4f ebe8
+| ww 71 4a 0315
+| ww 71 46 0315
+| 
+--- sample 3
+| Tps53647 0 code 01f0 phases 2 imax 39 ifault 0x41e00000: true
+| rw 71 fc
+| wc 71 03
+| wc 71 12
+| wb 71 02 17
+| wb 71 dc 20
+| wb 71 da 27
+| wb 71 dd 89
+| wb 71 02 17
+| wb 71 dc 20
+| wb 71 e4 01
+| ww 71 51 eaf8
+| ww 71 4f ebe8
+| ww 71 4a db80
+| ww 71 46 db80
+| 
+--- sample 4
+| Tps53647 0 code 01f0 phases 7 imax 83 ifault 0x44586f5c: true
+| rw 71 fc
+| wc 71 03
+| wc 71 12
+| wb 71 02 17
+| wb 71 dc 20
+| wb 71 da 53
+| wb 71 dd 89
+| wb 71 02 17
+| wb 71 dc 20
+| ww 71 51 eaf8
+| ww 71 4f ebe8
+| ww 71 4a 0362
+| ww 71 46 0362
+| 
+--- sample 5
+| Tps53647 0 code 01f0 phases 1 imax 203 ifault 0x42580000: true
+| rw 71 fc
+| wc 71 03
+| wc 71 12
+| wb 71 02 17
+| wb 71 dc 20
+| wb 71 da cb
+| wb 71 dd 89
+| wb 71 02 17
+| wb 71 dc 20
+| wb 71 e4 00
+| ww 71 51 eaf8
+| ww 71 4f ebe8
+| ww 71 4a e360
+| ww 71 46 e360
+| 
+--- sample 6
+| Tps53647 0 code 01f0 phases 5 imax 203 ifault 0x42b00000: true
+| rw 71 fc
+| wc 71 03
+| wc 71 12
+| wb 71 02 17
+| wb 71 dc 20
+| wb 71 da cb
+| wb 71 dd 89
+| wb 71 02 17
+| wb 71 dc 20
+| wb 71 e4 04
+| ww 71 51 eaf8
+| ww 71 4f ebe8
+| ww 71 4a eac0
+| ww 71 46 eac0
+| 
+--- sample 7
+| Tps53647 0 code 01f0 phases 6 imax 143 ifault 0x42820000: true
+| rw 71 fc
+| wc 71 03
+| wc 71 12
+| wb 71 02 17
+| wb 71 dc 20
+| wb 71 da 8f
+| wb 71 dd 89
+| wb 71 02 17
+| wb 71 dc 20
+| wb 71 e4 05
+| ww 71 51 eaf8
+| ww 71 4f ebe8
+| ww 71 4a ea08
+| ww 71 46 ea08
+| 
+=== set_vout_over_the_range
+count 88044
+sha256 2854b9b3399bc69e19cdfe839b181137d81b776101f8f8177895c4636f3fe4c9
+--- sample 0
+| Tps53647 0 0x0: true
+| 
+--- sample 1
+| Tps53647 0 0x3a83126f: false
+| 
+--- sample 2
+| Tps53647 0 0x3b03126f: false
+| 
+--- sample 3
+| Tps53647 0 0x3b449ba6: false
+| 
+--- sample 4
+| Tps53647 0 0x3b83126f: false
+| 
+--- sample 5
+| Tps53647 0 0x3ba3d70a: false
+| 
+--- sample 6
+| Tps53647 0 0x3bc49ba6: false
+| 
+--- sample 7
+| Tps53647 0 0x3be56042: false
+| 

@@ -1,0 +1,88 @@
+# Golden outputs (the former C/C++ code), see tests/golden/mod.rs
+=== fan_speeds
+count 1107
+sha256 87e21b53b15f2b4d30ea7ab673536d03d81e87cbcc55e5f953134ab1e153a365
+--- sample 0
+| 0xbdcccccd
+| wr 4c 4c 00
+| 
+--- sample 1
+| 0xbdcac083
+| wr 4c 4c 00
+| 
+--- sample 2
+| 0xbdc8b439
+| wr 4c 4c 00
+| 
+--- sample 3
+| 0xbdc6a7f0
+| wr 4c 4c 00
+| 
+--- sample 4
+| 0xbdc49ba6
+| wr 4c 4c 00
+| 
+--- sample 5
+| 0xbdc28f5c
+| wr 4c 4c 00
+| 
+--- sample 6
+| 0xbdc08312
+| wr 4c 4c 00
+| 
+--- sample 7
+| 0xbdbe76c9
+| wr 4c 4c 00
+| 
+=== init_polarity_settings
+count 4
+sha256 1935f9e47fad376fd02c52879d1328eaa8ecb4eaa0dadca651cec4eac30c12d0
+--- sample 0
+| fail false invert false: true true
+| wr 4c 03 04
+| wr 4c 4a 23
+| wr 4c 4a 23
+| wr 4c 17 24
+| wr 4c 18 00
+| 
+--- sample 1
+| fail false invert true: true true
+| wr 4c 03 04
+| wr 4c 4a 33
+| wr 4c 4a 33
+| wr 4c 17 24
+| wr 4c 18 00
+| 
+--- sample 2
+| fail true invert false: false false
+| wr 4c 03 04
+| wr 4c 4a 23
+| wr 4c 17 24
+| wr 4c 18 00
+| 
+--- sample 3
+| fail true invert true: false false
+| wr 4c 03 04
+| wr 4c 4a 33
+| wr 4c 17 24
+| wr 4c 18 00
+| 
+=== tach_and_temperatures
+count 67502
+sha256 40880b13d6a797ff7ecb0d87156ed6a70f5cfcb659d43f64b61d48ec6d5a8d9e
+--- sample 0
+| tach 0x0053: 65060
+--- sample 1
+| tach 0x0054: 64285
+--- sample 2
+| tach 0x0055: 63529
+--- sample 3
+| tach 0x0056: 62790
+--- sample 4
+| tach 0x0057: 62068
+--- sample 5
+| tach 0x0058: 61363
+--- sample 6
+| tach 0x0059: 60674
+--- sample 7
+| tach 0x005a: 60000

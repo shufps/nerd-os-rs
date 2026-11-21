@@ -9,6 +9,10 @@ use c_reference as _;
 use rust_core::asic::Chip;
 use rust_core::board_profile::{profile, BoardId, Detect, Profile};
 
+#[path = "../../tests/golden/mod.rs"]
+mod golden;
+use golden::Rec;
+
 extern "C" {
     fn ref_board_profile(board: c_int, tps67: bool, six_phase: bool, out: *mut Profile) -> bool;
     fn board_profile(board: c_int, detect: *const Detect, out: *mut Profile) -> bool;
@@ -87,6 +91,7 @@ fn fields(p: &Profile) -> Vec<(&'static str, String)> {
 
 #[test]
 fn profiles_match_the_former_constructors() {
+    let mut rec = Rec::new("board_profile", "profiles_match_the_former_constructors");
     for b in 0..12 {
         let id = BoardId::from_int(b).unwrap();
         for (tps67, six) in [(false, false), (true, false), (false, true), (true, true)] {
@@ -118,8 +123,14 @@ fn profiles_match_the_former_constructors() {
                 fields(&r),
                 "{id:?} tps53667={tps67} six_phase={six}"
             );
+            let mut out = format!("{id:?} tps53667={tps67} six_phase={six}");
+            for (k, v) in fields(&p) {
+                out += &format!("\n{k} {v}");
+            }
+            rec.add(out);
         }
     }
+    rec.finish();
 }
 
 #[test]

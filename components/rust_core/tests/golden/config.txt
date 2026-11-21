@@ -1,0 +1,163 @@
+# Golden outputs (the former C/C++ code), see tests/golden/mod.rs
+=== getters_on_random_documents
+count 20000
+sha256 8e7b042d01604fa3cb67461163c1c4609b08c7a747b58b2dd5d2f1dd27063aad
+--- sample 0
+| {"c":"1.5","c":1.9} true
+| a: [0, 7, 65535] [0, 9, 18446744073709551615] [false, true] false None
+| b: [0, 7, 65535] [0, 9, 18446744073709551615] [false, true] false None
+| c: [1, 1, 1] [1, 1, 1] [true, true] true None
+| fanspeed: [0, 7, 65535] [0, 9, 18446744073709551615] [false, true] false None
+| missing: [0, 7, 65535] [0, 9, 18446744073709551615] [false, true] false None
+| {"c":1.9}
+--- sample 1
+| {"missing":65536.0,"fanspeed":18446744073709551615} true
+| a: [0, 7, 65535] [0, 9, 18446744073709551615] [false, true] false None
+| b: [0, 7, 65535] [0, 9, 18446744073709551615] [false, true] false None
+| c: [0, 7, 65535] [0, 9, 18446744073709551615] [false, true] false None
+| fanspeed: [0, 0, 0] [18446744073709551615, 18446744073709551615, 18446744073709551615] [false, false] true None
+| missing: [0, 0, 0] [65536, 65536, 65536] [false, false] true None
+| {"missing":65536,"fanspeed":18446744073709551615}
+--- sample 2
+| {"b":65535,"fanspeed":null,"c":4294967296.5,"b":[1]} true
+| a: [0, 7, 65535] [0, 9, 18446744073709551615] [false, true] false None
+| b: [0, 0, 0] [0, 0, 0] [false, false] true None
+| c: [0, 0, 0] [4294967296, 4294967296, 4294967296] [false, false] true None
+| fanspeed: [0, 7, 65535] [0, 9, 18446744073709551615] [false, true] false None
+| missing: [0, 7, 65535] [0, 9, 18446744073709551615] [false, true] false None
+| {"b":[1],"fanspeed":null,"c":4.294967297e9}
+--- sample 3
+| {} true
+| a: [0, 7, 65535] [0, 9, 18446744073709551615] [false, true] false None
+| b: [0, 7, 65535] [0, 9, 18446744073709551615] [false, true] false None
+| c: [0, 7, 65535] [0, 9, 18446744073709551615] [false, true] false None
+| fanspeed: [0, 7, 65535] [0, 9, 18446744073709551615] [false, true] false None
+| missing: [0, 7, 65535] [0, 9, 18446744073709551615] [false, true] false None
+| {}
+--- sample 4
+| {} true
+| a: [0, 7, 65535] [0, 9, 18446744073709551615] [false, true] false None
+| b: [0, 7, 65535] [0, 9, 18446744073709551615] [false, true] false None
+| c: [0, 7, 65535] [0, 9, 18446744073709551615] [false, true] false None
+| fanspeed: [0, 7, 65535] [0, 9, 18446744073709551615] [false, true] false None
+| missing: [0, 7, 65535] [0, 9, 18446744073709551615] [false, true] false None
+| {}
+--- sample 5
+| {"b":-1,"fanspeed":true,"missing":9223372036854775807} true
+| a: [0, 7, 65535] [0, 9, 18446744073709551615] [false, true] false None
+| b: [0, 0, 0] [0, 0, 0] [false, false] true None
+| c: [0, 7, 65535] [0, 9, 18446744073709551615] [false, true] false None
+| fanspeed: [1, 1, 1] [1, 1, 1] [true, true] true None
+| missing: [0, 0, 0] [9223372036854775807, 9223372036854775807, 9223372036854775807] [false, false] true None
+| {"b":-1,"fanspeed":true,"missing":9223372036854775807}
+--- sample 6
+| {"b":" 7","c":true,"b":false} true
+| a: [0, 7, 65535] [0, 9, 18446744073709551615] [false, true] false None
+| b: [0, 0, 0] [0, 0, 0] [false, false] true None
+| c: [1, 1, 1] [1, 1, 1] [true, true] true None
+| fanspeed: [0, 7, 65535] [0, 9, 18446744073709551615] [false, true] false None
+| missing: [0, 7, 65535] [0, 9, 18446744073709551615] [false, true] false None
+| {"b":false,"c":true}
+--- sample 7
+| {} true
+| a: [0, 7, 65535] [0, 9, 18446744073709551615] [false, true] false None
+| b: [0, 7, 65535] [0, 9, 18446744073709551615] [false, true] false None
+| c: [0, 7, 65535] [0, 9, 18446744073709551615] [false, true] false None
+| fanspeed: [0, 7, 65535] [0, 9, 18446744073709551615] [false, true] false None
+| missing: [0, 7, 65535] [0, 9, 18446744073709551615] [false, true] false None
+| {}
+=== random_set_sequences
+count 5000
+sha256 f78b33cf330bd7210728df7d80f2025674341f73ac696fce3c7a71ed3f84dd47
+--- sample 0
+| str "a" "\xc3\xa4\xc3\xb6\xc3\xbc"
+| str "a" ""
+| bool "a" true
+| u64 "c" 11831956465222058836
+| {"b":1,"fanspeed":"old","a":true,"c":11831956465222058836}
+| a: [1, 1, 1] [1, 1, 1] [true, true] true None
+| b: [1, 1, 1] [1, 1, 1] [true, true] true None
+| c: [0, 0, 0] [11831956465222058836, 11831956465222058836, 11831956465222058836] [false, false] true None
+| fanspeed: [0, 0, 0] [0, 0, 0] [false, false] true Some([111, 108, 100])
+| missing: [0, 7, 65535] [0, 9, 18446744073709551615] [false, true] false None
+| 
+--- sample 1
+| null "a"
+| u64 "missing" 916060946252654525
+| {"b":1,"fanspeed":"old","a":null,"missing":916060946252654525}
+| a: [0, 7, 65535] [0, 9, 18446744073709551615] [false, true] false None
+| b: [1, 1, 1] [1, 1, 1] [true, true] true None
+| c: [0, 7, 65535] [0, 9, 18446744073709551615] [false, true] false None
+| fanspeed: [0, 0, 0] [0, 0, 0] [false, false] true Some([111, 108, 100])
+| missing: [0, 0, 0] [916060946252654525, 916060946252654525, 916060946252654525] [false, false] true None
+| 
+--- sample 2
+| u16 "fanspeed" 38843
+| null "b"
+| {"b":null,"fanspeed":38843}
+| a: [0, 7, 65535] [0, 9, 18446744073709551615] [false, true] false None
+| b: [0, 7, 65535] [0, 9, 18446744073709551615] [false, true] false None
+| c: [0, 7, 65535] [0, 9, 18446744073709551615] [false, true] false None
+| fanspeed: [38843, 38843, 38843] [38843, 38843, 38843] [true, true] true None
+| missing: [0, 7, 65535] [0, 9, 18446744073709551615] [false, true] false None
+| 
+--- sample 3
+| null "b"
+| {"b":null,"fanspeed":"old"}
+| a: [0, 7, 65535] [0, 9, 18446744073709551615] [false, true] false None
+| b: [0, 7, 65535] [0, 9, 18446744073709551615] [false, true] false None
+| c: [0, 7, 65535] [0, 9, 18446744073709551615] [false, true] false None
+| fanspeed: [0, 0, 0] [0, 0, 0] [false, false] true Some([111, 108, 100])
+| missing: [0, 7, 65535] [0, 9, 18446744073709551615] [false, true] false None
+| 
+--- sample 4
+| null "a"
+| u16 "missing" 52241
+| u16 "missing" 1156
+| bool "c" false
+| str "c" ""
+| bool "missing" true
+| {"b":1,"fanspeed":"old","a":null,"missing":true,"c":""}
+| a: [0, 7, 65535] [0, 9, 18446744073709551615] [false, true] false None
+| b: [1, 1, 1] [1, 1, 1] [true, true] true None
+| c: [0, 0, 0] [0, 0, 0] [false, false] true Some([])
+| fanspeed: [0, 0, 0] [0, 0, 0] [false, false] true Some([111, 108, 100])
+| missing: [1, 1, 1] [1, 1, 1] [true, true] true None
+| 
+--- sample 5
+| u64 "a" 5176930123459449373
+| str "fanspeed" "with \"quote\""
+| {"b":1,"fanspeed":"with \"quote\"","a":5176930123459449373}
+| a: [0, 0, 0] [5176930123459449373, 5176930123459449373, 5176930123459449373] [false, false] true None
+| b: [1, 1, 1] [1, 1, 1] [true, true] true None
+| c: [0, 7, 65535] [0, 9, 18446744073709551615] [false, true] false None
+| fanspeed: [0, 0, 0] [0, 0, 0] [false, false] true Some([119, 105, 116, 104, 32, 34, 113, 117, 111, 116, 101, 34])
+| missing: [0, 7, 65535] [0, 9, 18446744073709551615] [false, true] false None
+| 
+--- sample 6
+| bool "a" false
+| u64 "b" 11998625432263379909
+| bool "c" false
+| bool "b" false
+| u16 "a" 59946
+| {"b":false,"fanspeed":"old","a":59946,"c":false}
+| a: [59946, 59946, 59946] [59946, 59946, 59946] [true, true] true None
+| b: [0, 0, 0] [0, 0, 0] [false, false] true None
+| c: [0, 0, 0] [0, 0, 0] [false, false] true None
+| fanspeed: [0, 0, 0] [0, 0, 0] [false, false] true Some([111, 108, 100])
+| missing: [0, 7, 65535] [0, 9, 18446744073709551615] [false, true] false None
+| 
+--- sample 7
+| str "missing" "back\\slash"
+| u16 "fanspeed" 37766
+| null "b"
+| u16 "fanspeed" 61745
+| null "a"
+| null "a"
+| {"b":null,"fanspeed":61745,"missing":"back\\slash","a":null}
+| a: [0, 7, 65535] [0, 9, 18446744073709551615] [false, true] false None
+| b: [0, 7, 65535] [0, 9, 18446744073709551615] [false, true] false None
+| c: [0, 7, 65535] [0, 9, 18446744073709551615] [false, true] false None
+| fanspeed: [61745, 61745, 61745] [61745, 61745, 61745] [true, true] true None
+| missing: [0, 0, 0] [0, 0, 0] [false, false] true Some([98, 97, 99, 107, 92, 115, 108, 97, 115, 104])
+| 

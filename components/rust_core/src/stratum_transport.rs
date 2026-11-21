@@ -8,14 +8,16 @@
 //! submit never sees a half-built transport); `close()` first shuts the
 //! socket down without the lock, so a writer blocked in
 //! `esp_transport_write()` fails out and releases it; the Noise keys are
-//! published only after the handshake; `recv()` runs without the lock (only
-//! the owner task reads). The Noise sending half lives under that lock, the
-//! receiving half under its own, so a share submit never waits for a frame.
+//! published only after the handshake. The reads (`recv()`, the Noise
+//! handshake and frames) run without that lock but hold the shared `io`
+//! lock, which `close()`/`connect()` take exclusively before they free the
+//! handle. The Noise sending half lives under the state lock, the receiving
+//! half under its own, so a share submit never waits for a frame.
 
 use crate::idf::idf_const;
 use core::ffi::{c_char, c_int, c_void, CStr};
 use std::sync::atomic::{AtomicBool, AtomicI32, Ordering};
-use std::sync::Mutex;
+use std::sync::{Mutex, RwLock};
 
 use crate::config;
 use crate::log::log;
@@ -158,6 +160,9 @@ struct State {
 pub struct Transport {
     kind: Kind,
     state: Mutex<State>,
+    /// held (shared) by the reads that use the handle without the state
+    /// lock, (exclusive) by close/connect before they free it
+    io: RwLock<()>,
     /// Stratum v2: the Noise receiving half (used by the owner task)
     noise_rx: Mutex<Option<Receiver>>,
     /// the socket for the unlocked shutdown in `close()`
@@ -166,10 +171,11 @@ pub struct Transport {
     require_auth: AtomicBool,
 }
 
-// SAFETY: the raw handles are used under the lock (recv: by the owner task
-// only), and the keep-alive pointer stays inside the locked state
+// SAFETY: the raw handle is used under the state lock, or (the blocking
+// reads) under the shared `io` lock, which close/connect take exclusively
+// before they free it; the keep-alive pointer stays inside the locked state
 unsafe impl Send for Transport {}
-// SAFETY: see Send: all handle access is serialized by the lock or the owner task
+// SAFETY: see Send
 unsafe impl Sync for Transport {}
 
 fn err_text(e: c_int) -> String {
@@ -188,6 +194,7 @@ impl Transport {
                 noise_tx: None,
                 keep_alive: KeepAlive::default(),
             }),
+            io: RwLock::new(()),
             noise_rx: Mutex::new(None),
             sock: AtomicI32::new(-1),
             authority: Mutex::new(None),
@@ -201,6 +208,17 @@ impl Transport {
 
     fn rx(&self) -> std::sync::MutexGuard<'_, Option<Receiver>> {
         self.noise_rx.lock().unwrap_or_else(|e| e.into_inner())
+    }
+
+    /// The handle for a read outside the state lock, with the guard that
+    /// keeps close/connect from freeing it meanwhile.
+    fn reading(&self) -> (std::sync::RwLockReadGuard<'_, ()>, Handle) {
+        let g = self.io.read().unwrap_or_else(|e| e.into_inner());
+        (g, self.lock().t)
+    }
+
+    fn freeing(&self) -> std::sync::RwLockWriteGuard<'_, ()> {
+        self.io.write().unwrap_or_else(|e| e.into_inner())
     }
 
     fn close_locked(&self, s: &mut State) {
@@ -227,15 +245,19 @@ impl Transport {
     }
 
     pub fn close(&self) {
+        // a read blocked on the socket fails out, so the guard comes quickly
         self.shutdown_socket();
         // never together with the state lock (recv_frame() takes them in turn)
         *self.rx() = None;
+        let _io = self.freeing();
         let mut s = self.lock();
         self.close_locked(&mut s);
     }
 
     /// The TCP/TLS connection (under the lock throughout).
     fn connect_plain(&self, host: &CStr, ip: Option<&CStr>, port: u16) -> bool {
+        self.shutdown_socket();
+        let _io = self.freeing();
         let mut s = self.lock();
         self.close_locked(&mut s);
         let tls = self.kind == Kind::Tls;
@@ -362,13 +384,20 @@ impl Transport {
             return false;
         }
         log!(Info, NOISE_TAG, "Starting Noise handshake");
-        // only the owner task changes the handle: no lock during the handshake
-        let t = self.lock().t;
         // with a synced clock, the certificate's validity period is checked too
         let now = crate::clock::is_time_synced().then(crate::clock::now);
-        // SAFETY: the transport just connected; only this (owner) task closes it
-        let mut wire = unsafe { EspWire::new(t.cast()) };
-        let Some(cipher) = noise::handshake(&mut wire, authority.as_ref(), now) else {
+        let cipher = {
+            // no state lock during the handshake: the read guard keeps the
+            // handle alive
+            let (_io, t) = self.reading();
+            if t.is_null() {
+                return false;
+            }
+            // SAFETY: the handle just connected; close/connect wait for the guard
+            let mut wire = unsafe { EspWire::new(t.cast()) };
+            noise::handshake(&mut wire, authority.as_ref(), now)
+        };
+        let Some(cipher) = cipher else {
             log!(Error, NOISE_TAG, "Noise handshake failed");
             self.close();
             return false;
@@ -441,12 +470,12 @@ impl Transport {
             );
             return -EIO;
         }
-        let t = self.lock().t;
+        let (_io, t) = self.reading();
         if t.is_null() {
             return -ENOTCONN;
         }
-        // SAFETY: a connected transport that only the owner task (this caller)
-        // closes; pointer and length come from the same mutable slice
+        // SAFETY: a connected handle that close/connect free only after the
+        // read guard is gone; pointer and length come from the same slice
         let r = unsafe {
             sys::esp_transport_read(
                 t,
@@ -485,10 +514,6 @@ impl Transport {
         self.require_auth.store(require, Ordering::Release);
     }
 
-    pub fn handle(&self) -> Handle {
-        self.lock().t
-    }
-
     /// Stratum v2: whether the Noise channel is up.
     pub fn is_secured(&self) -> bool {
         let s = self.lock();
@@ -497,13 +522,12 @@ impl Transport {
 
     /// Stratum v2: waits up to `ms` for data of the next frame.
     pub fn poll_read(&self, ms: u32) -> Readiness {
-        let t = self.lock().t;
+        let (_io, t) = self.reading();
         if t.is_null() || self.rx().is_none() {
             log!(Error, NOISE_TAG, "Noise context or transport lost");
             return Readiness::Error;
         }
-        // SAFETY: a connected transport; only the owner task (this caller)
-        // closes it
+        // SAFETY: a connected handle, kept alive by the read guard
         match unsafe { sys::esp_transport_poll_read(t, ms as c_int) } {
             r if r > 0 => Readiness::Readable,
             0 => Readiness::Timeout,
@@ -514,13 +538,13 @@ impl Transport {
     /// Stratum v2: receives and decrypts the next frame, its payload into
     /// `buf`. Owner task only, like `recv()`.
     pub fn recv_frame(&self, buf: &mut [u8]) -> Option<FrameHeader> {
-        let t = self.lock().t;
+        let (_io, t) = self.reading();
         let mut rx = self.rx();
         let (Some(rx), false) = (rx.as_mut(), t.is_null()) else {
             log!(Error, NOISE_TAG, "Noise context or transport lost");
             return None;
         };
-        // SAFETY: as in poll_read()
+        // SAFETY: a connected handle, kept alive by the read guard
         let mut wire = unsafe { EspWire::new(t.cast()) };
         rx.recv(&mut wire, buf).map(|h| parse_frame_header(&h))
     }

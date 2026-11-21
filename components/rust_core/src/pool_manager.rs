@@ -132,6 +132,8 @@ fn lock<T>(m: &Mutex<T>) -> MutexGuard<'_, T> {
 // ---------------------------------------------------------------------------
 // the stratum task of one pool
 
+// lives in an Arc (one per pool): the variants' size difference costs nothing
+#[allow(clippy::large_enum_variant)]
 enum Proto {
     V1 {
         tcp: Transport,

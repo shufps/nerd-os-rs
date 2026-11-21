@@ -2,7 +2,7 @@
 //! `main/fan_controller.cpp`): the hardware lock (a FreeRTOS recursive
 //! mutex shared by everything that touches the ASICs and the I2C devices),
 //! shutdown and restart, the task that runs the power loop (`power_task.rs`)
-//! with the fan control (`fan_control.rs`) on the board (`board_api.h`), and
+//! with the fan control (`fan_control.rs`) on the board (`board_api.rs`), and
 //! the values the other tasks read. C API: `power_mgmt.h`.
 
 use core::ffi::{c_int, c_void, CStr};
@@ -42,68 +42,68 @@ mod sys {
     pub unsafe fn esp_restart() -> ! {
         std::process::abort()
     }
-    pub unsafe fn bapi_is_initialized() -> bool {
+    pub fn bapi_is_initialized() -> bool {
         false
     }
-    pub unsafe fn bapi_is_buck_initialized() -> bool {
+    pub fn bapi_is_buck_initialized() -> bool {
         false
     }
-    pub unsafe fn bapi_asic_voltage_millis() -> u16 {
+    pub fn bapi_asic_voltage_millis() -> u16 {
         0
     }
-    pub unsafe fn bapi_set_voltage(_: f32) {}
-    pub unsafe fn bapi_asic_frequency() -> u16 {
+    pub fn bapi_set_voltage(_: f32) {}
+    pub fn bapi_asic_frequency() -> u16 {
         0
     }
-    pub unsafe fn bapi_set_asic_frequency(_: f32) -> bool {
+    pub fn bapi_set_asic_frequency(_: f32) -> bool {
         false
     }
-    pub unsafe fn bapi_vr_frequency() -> u32 {
+    pub fn bapi_vr_frequency() -> u32 {
         0
     }
-    pub unsafe fn bapi_set_vr_frequency(_: u32) {}
-    pub unsafe fn bapi_request_chip_temps() {}
-    pub unsafe fn bapi_max_chip_temp() -> f32 {
+    pub fn bapi_set_vr_frequency(_: u32) {}
+    pub fn bapi_request_chip_temps() {}
+    pub fn bapi_max_chip_temp() -> f32 {
         0.0
     }
-    pub unsafe fn bapi_asic_count() -> c_int {
+    pub fn bapi_asic_count() -> c_int {
         0
     }
-    pub unsafe fn bapi_chip_temp(_: c_int) -> f32 {
+    pub fn bapi_chip_temp(_: c_int) -> f32 {
         0.0
     }
-    pub unsafe fn bapi_request_buck_telemetry() {}
-    pub unsafe fn bapi_power(_: c_int) -> f32 {
+    pub fn bapi_request_buck_telemetry() {}
+    pub fn bapi_power(_: c_int) -> f32 {
         0.0
     }
-    pub unsafe fn bapi_fault(_: *mut u32) -> c_int {
+    pub fn bapi_fault() -> (c_int, u32) {
+        (0, 0)
+    }
+    pub fn bapi_num_temp_sensors() -> c_int {
         0
     }
-    pub unsafe fn bapi_num_temp_sensors() -> c_int {
-        0
-    }
-    pub unsafe fn bapi_temperature(_: c_int) -> f32 {
+    pub fn bapi_temperature(_: c_int) -> f32 {
         0.0
     }
-    pub unsafe fn bapi_shutdown() {}
-    pub unsafe fn bapi_invert_fan_polarity() -> bool {
+    pub fn bapi_shutdown() {}
+    pub fn bapi_invert_fan_polarity() -> bool {
         false
     }
-    pub unsafe fn bapi_set_fan_polarity(_: bool) {}
-    pub unsafe fn bapi_num_fans() -> c_int {
+    pub fn bapi_set_fan_polarity(_: bool) {}
+    pub fn bapi_num_fans() -> c_int {
         0
     }
-    pub unsafe fn bapi_set_fan_speed(_: c_int, _: f32) {}
-    pub unsafe fn bapi_fan_rpm(_: c_int) -> u16 {
+    pub fn bapi_set_fan_speed(_: c_int, _: f32) {}
+    pub fn bapi_fan_rpm(_: c_int) -> u16 {
         0
     }
-    pub unsafe fn bapi_pid_settings(_: c_int, out: *mut u16) {
-        core::ptr::write_bytes(out, 0, 4);
+    pub fn bapi_pid_settings(_: c_int) -> [u16; 4] {
+        [0; 4]
     }
-    pub unsafe fn bapi_fan_mode(_: c_int) -> c_int {
+    pub fn bapi_fan_mode(_: c_int) -> c_int {
         0
     }
-    pub unsafe fn bapi_set_board_error(_: c_int, _: u32) {}
+    pub fn bapi_set_board_error(_: c_int, _: u32) {}
 }
 
 /// `queueQUEUE_TYPE_RECURSIVE_MUTEX`, `portMAX_DELAY`
@@ -145,7 +145,7 @@ pub fn shutdown() {
     lock();
     if BOARD_SET.load(Ordering::Acquire) {
         SHUTDOWN.store(true, Ordering::Release);
-        unsafe { sys::bapi_shutdown() };
+        sys::bapi_shutdown();
     }
     unlock();
 }
@@ -173,12 +173,11 @@ fn fan_config() -> ([ChannelConfig; MAX_FANS], bool) {
         i: 10,
         d: 1000,
     }; MAX_FANS];
-    let n = (unsafe { sys::bapi_num_fans() }.max(0) as usize).min(MAX_FANS);
+    let n = (sys::bapi_num_fans().max(0) as usize).min(MAX_FANS);
     for (ch, c) in cfg.iter_mut().enumerate().take(n) {
-        let mut pid = [0u16; 4];
-        unsafe { sys::bapi_pid_settings(ch as c_int, pid.as_mut_ptr()) };
+        let pid = sys::bapi_pid_settings(ch as c_int);
         let key = |k0: &'static [u8], k1: &'static [u8]| if ch == 0 { k0 } else { k1 };
-        c.mode = unsafe { sys::bapi_fan_mode(ch as c_int) } as u8;
+        c.mode = sys::bapi_fan_mode(ch as c_int) as u8;
         c.manual_speed = if ch == 0 {
             config::get_u16(b"fanspeed", sdkconfig::FAN_SPEED as u16)
         } else {
@@ -208,10 +207,10 @@ struct BoardFans;
 
 impl Fans for BoardFans {
     fn rpm(&mut self, ch: usize) -> u16 {
-        unsafe { sys::bapi_fan_rpm(ch as c_int) }
+        sys::bapi_fan_rpm(ch as c_int)
     }
     fn set_speed(&mut self, ch: usize, fraction: f32) {
-        unsafe { sys::bapi_set_fan_speed(ch as c_int, fraction) }
+        sys::bapi_set_fan_speed(ch as c_int, fraction)
     }
 }
 
@@ -229,60 +228,58 @@ impl Env for Board {
         is_shutdown()
     }
     fn is_initialized(&mut self) -> bool {
-        unsafe { sys::bapi_is_initialized() }
+        sys::bapi_is_initialized()
     }
     fn is_buck_initialized(&mut self) -> bool {
-        unsafe { sys::bapi_is_buck_initialized() }
+        sys::bapi_is_buck_initialized()
     }
     fn asic_voltage_millis(&mut self) -> u16 {
-        unsafe { sys::bapi_asic_voltage_millis() }
+        sys::bapi_asic_voltage_millis()
     }
     fn set_voltage(&mut self, volts: f32) {
-        unsafe { sys::bapi_set_voltage(volts) }
+        sys::bapi_set_voltage(volts)
     }
     fn asic_frequency(&mut self) -> u16 {
-        unsafe { sys::bapi_asic_frequency() }
+        sys::bapi_asic_frequency()
     }
     fn set_asic_frequency(&mut self, mhz: f32) -> bool {
-        unsafe { sys::bapi_set_asic_frequency(mhz) }
+        sys::bapi_set_asic_frequency(mhz)
     }
     fn vr_frequency(&mut self) -> u32 {
-        unsafe { sys::bapi_vr_frequency() }
+        sys::bapi_vr_frequency()
     }
     fn set_vr_frequency(&mut self, hz: u32) {
-        unsafe { sys::bapi_set_vr_frequency(hz) }
+        sys::bapi_set_vr_frequency(hz)
     }
     fn request_chip_temps(&mut self) {
-        unsafe { sys::bapi_request_chip_temps() }
+        sys::bapi_request_chip_temps()
     }
     fn max_chip_temp(&mut self) -> f32 {
-        unsafe { sys::bapi_max_chip_temp() }
+        sys::bapi_max_chip_temp()
     }
     fn asic_count(&mut self) -> c_int {
-        unsafe { sys::bapi_asic_count() }
+        sys::bapi_asic_count()
     }
     fn chip_temp(&mut self, i: c_int) -> f32 {
-        unsafe { sys::bapi_chip_temp(i) }
+        sys::bapi_chip_temp(i)
     }
     fn request_buck_telemetry(&mut self) {
-        unsafe { sys::bapi_request_buck_telemetry() }
+        sys::bapi_request_buck_telemetry()
     }
     fn power(&mut self, what: c_int) -> f32 {
-        unsafe { sys::bapi_power(what) }
+        sys::bapi_power(what)
     }
     fn fault(&mut self) -> (c_int, u32) {
-        let mut status = 0;
-        let e = unsafe { sys::bapi_fault(&mut status) };
-        (e, status)
+        sys::bapi_fault()
     }
     fn set_board_error(&mut self, error: c_int, status: u32) {
-        unsafe { sys::bapi_set_board_error(error, status) }
+        sys::bapi_set_board_error(error, status)
     }
     fn num_temp_sensors(&mut self) -> c_int {
-        unsafe { sys::bapi_num_temp_sensors() }
+        sys::bapi_num_temp_sensors()
     }
     fn temperature(&mut self, i: c_int) -> f32 {
-        unsafe { sys::bapi_temperature(i) }
+        sys::bapi_temperature(i)
     }
     fn fan_update(&mut self, chip_temp_max: f32, vr_temp: f32) {
         if let Some(f) = FANS.get() {
@@ -322,8 +319,8 @@ pub fn fan_get(ch: c_int, what: c_int) -> u16 {
 /// The task: fan polarity and controller, then the power loop.
 pub fn run() -> ! {
     BOARD_SET.store(true, Ordering::Release);
-    unsafe { sys::bapi_set_fan_polarity(sys::bapi_invert_fan_polarity()) };
-    let n = unsafe { sys::bapi_num_fans() }.max(0) as usize;
+    sys::bapi_set_fan_polarity(sys::bapi_invert_fan_polarity());
+    let n = sys::bapi_num_fans().max(0) as usize;
     let (cfg, max) = fan_config();
     let _ = FANS.set(FanController::new(n, POLL_MS as c_int, cfg, max));
     // NQ+: the chips' internal temperature sensors are too slow for the PID,

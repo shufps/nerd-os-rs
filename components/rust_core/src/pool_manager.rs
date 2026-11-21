@@ -92,27 +92,27 @@ mod sys {
     pub unsafe fn esp_task_wdt_reset() -> c_int {
         0
     }
-    pub unsafe fn bapi_mining_agent() -> *const c_char {
-        c"agent".as_ptr()
+    pub fn bapi_mining_agent() -> &'static CStr {
+        c"agent"
     }
-    pub unsafe fn bapi_asic_model() -> *const c_char {
-        c"BM1370".as_ptr()
+    pub fn bapi_asic_model() -> &'static CStr {
+        c"BM1370"
     }
-    pub unsafe fn bapi_device_model() -> *const c_char {
-        c"NerdQAxe++".as_ptr()
+    pub fn bapi_device_model() -> &'static CStr {
+        c"NerdQAxe++"
     }
-    pub unsafe fn bapi_asic_min_difficulty(dual: bool) -> u32 {
+    pub fn bapi_asic_min_difficulty(dual: bool) -> u32 {
         if dual {
             1024
         } else {
             512
         }
     }
-    pub unsafe fn bapi_asic_max_difficulty() -> u32 {
+    pub fn bapi_asic_max_difficulty() -> u32 {
         4096
     }
-    pub unsafe fn bapi_set_board_error_if_none(_: c_int, _: u32) {}
-    pub unsafe fn bapi_clear_board_error(_: c_int) {}
+    pub fn bapi_set_board_error_if_none(_: c_int, _: u32) {}
+    pub fn bapi_clear_board_error(_: c_int) {}
 }
 
 fn delay_ms(ms: u32) {
@@ -125,14 +125,6 @@ fn suspend_self() {
 
 fn now_us() -> u64 {
     crate::cutil::now_us().max(1) as u64
-}
-
-unsafe fn board_str(p: *const c_char) -> CString {
-    if p.is_null() {
-        CString::default()
-    } else {
-        CStr::from_ptr(p).into()
-    }
 }
 
 fn set_u64(key: &[u8], v: u64) {
@@ -587,12 +579,7 @@ impl Ctx {
             let c = lock(&t.config);
             (c.user.clone(), c.password.clone(), c.enonce_sub)
         };
-        let (device, asic) = unsafe {
-            (
-                board_str(sys::bapi_mining_agent()),
-                board_str(sys::bapi_asic_model()),
-            )
-        };
+        let (device, asic) = (sys::bapi_mining_agent(), sys::bapi_asic_model());
         let version = crate::mdns::fw_version();
         let setup = v1::Setup {
             device: device.to_bytes(),
@@ -624,12 +611,7 @@ impl Ctx {
             let c = lock(&t.config);
             (c.host.clone(), c.port as u16, c.user.clone())
         };
-        let (vendor, hw) = unsafe {
-            (
-                board_str(sys::bapi_device_model()),
-                board_str(sys::bapi_asic_model()),
-            )
-        };
+        let (vendor, hw) = (sys::bapi_device_model(), sys::bapi_asic_model());
         let setup = v2::Setup {
             host: host.to_bytes(),
             port,
@@ -1083,9 +1065,9 @@ impl Manager {
                     T,
                     "All pools blocked by verification - raising fault flag"
                 );
-                unsafe { sys::bapi_set_board_error_if_none(COINBASE_VERIFY_FAULT, 0) };
+                sys::bapi_set_board_error_if_none(COINBASE_VERIFY_FAULT, 0);
             } else {
-                unsafe { sys::bapi_clear_board_error(COINBASE_VERIFY_FAULT) };
+                sys::bapi_clear_board_error(COINBASE_VERIFY_FAULT);
             }
         }
     }
@@ -1152,12 +1134,10 @@ impl Manager {
     }
 
     pub fn select_asic_diff(&self, pool: c_int, pool_diff: u32) -> u32 {
-        let (min, max) = unsafe {
-            (
-                sys::bapi_asic_min_difficulty(self.is_dual()),
-                sys::bapi_asic_max_difficulty(),
-            )
-        };
+        let (min, max) = (
+            sys::bapi_asic_min_difficulty(self.is_dual()),
+            sys::bapi_asic_max_difficulty(),
+        );
         self.policy.select_asic_diff(pool, pool_diff, min, max)
     }
 

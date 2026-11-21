@@ -4,7 +4,7 @@
 //! hashrate, and the system task: every 5 s it updates the display (IP,
 //! found block overlay, error overlay, values) and pushes a history sample.
 //! The display is C++ (LVGL) and reached through `display_api.h`, the board
-//! through `board_api.h`. C API: `system_state.h`, wrapped by the inline
+//! through `board_api.rs`. C API: `system_state.h`, wrapped by the inline
 //! class in `main/system.h`.
 //!
 //! The strings that change at runtime (WiFi status, SSID, IP address) are
@@ -113,10 +113,10 @@ mod sys {
     pub unsafe fn esp_reset_reason() -> c_int {
         1
     }
-    pub unsafe fn bapi_is_can_slave() -> bool {
+    pub fn bapi_is_can_slave() -> bool {
         false
     }
-    pub unsafe fn bapi_has_hashrate_counter() -> bool {
+    pub fn bapi_has_hashrate_counter() -> bool {
         false
     }
     pub unsafe fn network_preferred_ip_eth(_: *mut c_char, _: usize, _: *mut bool) -> bool {
@@ -293,7 +293,7 @@ pub fn reset_reason() -> &'static CStr {
 /// The hashrate shown (GH/s): the ASICs' counters where the board has
 /// them, else the 10 min average of the shares.
 pub fn current_hashrate() -> f32 {
-    if unsafe { sys::bapi_has_hashrate_counter() } {
+    if sys::bapi_has_hashrate_counter() {
         crate::hashrate::ffi::hashrate_monitor_smoothed()
     } else {
         crate::history::ffi::history_current(1) as f32
@@ -378,7 +378,7 @@ pub fn run() -> ! {
     log!(Info, TAG, "SYSTEM_task started");
 
     unsafe { sys::disp_wait_for_splashs() };
-    let can_slave = unsafe { sys::bapi_is_can_slave() };
+    let can_slave = sys::bapi_is_can_slave();
 
     if !can_slave {
         loop {

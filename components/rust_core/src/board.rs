@@ -1516,15 +1516,25 @@ fn detect_num_temp_sensors(t: &CStr) -> c_int {
 pub(crate) mod ffi {
     use super::*;
 
-    fn b() -> &'static Board {
+    pub(crate) fn b() -> &'static Board {
         BOARD.get().expect("board not created")
     }
 
-    unsafe fn text(p: *const c_char) -> *const c_char {
+    fn text(p: *const c_char) -> *const c_char {
         if p.is_null() {
             c"".as_ptr()
         } else {
             p
+        }
+    }
+
+    /// A profile string (a `'static` C string literal, or NULL).
+    pub(crate) fn static_text(p: *const c_char) -> &'static CStr {
+        if p.is_null() {
+            c""
+        } else {
+            // SAFETY: the profiles hold only `c"..."` literals (board_profile.rs)
+            unsafe { CStr::from_ptr(p) }
         }
     }
 
@@ -1783,9 +1793,14 @@ pub(crate) mod ffi {
     /// `out` writable.
     #[no_mangle]
     pub unsafe extern "C" fn board_info(out: *mut Info) {
+        *out = info();
+    }
+
+    /// A snapshot of the board's values.
+    pub(crate) fn info() -> Info {
         let s = b().state();
         let p = &s.p;
-        *out = Info {
+        Info {
             device_model: text(p.device_model),
             mining_agent: text(p.mining_agent),
             asic_model: text(p.asic_model),
@@ -1832,7 +1847,7 @@ pub(crate) mod ffi {
             frequency_count: p.frequency_count,
             voltages: p.voltages,
             voltage_count: p.voltage_count,
-        };
+        }
     }
 
     #[no_mangle]

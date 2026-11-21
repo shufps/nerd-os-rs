@@ -13,7 +13,7 @@
 //! OTP only for `allTime`. Restart and shutdown deliberately have no OTP
 //! check (home automation pauses mining with them).
 
-use core::ffi::{c_char, CStr};
+use core::ffi::CStr;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[repr(u8)]
@@ -94,24 +94,18 @@ pub mod flag {
     pub const NORMAL_ONLY: u16 = 1 << 10;
 }
 
-/// `http_route_t`
-#[repr(C)]
+/// One route of the table.
 #[derive(Clone, Copy, Debug)]
 pub struct Route {
-    pub uri: *const c_char,
+    pub uri: &'static CStr,
     pub method: Method,
     pub handler: Handler,
     pub flags: u16,
 }
 
-// SAFETY: the table is static data: the uri points to a static C string and
-// is never written
-unsafe impl Sync for Route {}
-
 impl Route {
     pub fn uri(&self) -> &'static str {
-        // SAFETY: routes are built by r() from a `&'static CStr`
-        unsafe { CStr::from_ptr(self.uri) }.to_str().unwrap_or("")
+        self.uri.to_str().unwrap_or("")
     }
 }
 
@@ -121,7 +115,7 @@ use Method::*;
 
 const fn r(uri: &'static CStr, method: Method, handler: Handler, flags: u16) -> Route {
     Route {
-        uri: uri.as_ptr(),
+        uri,
         method,
         handler,
         flags,
@@ -239,20 +233,6 @@ pub fn active(route: &Route, recovery: bool, coredump: bool) -> bool {
 pub fn needs_otp(route: &Route, recovery: bool) -> bool {
     let f = route.flags;
     f & (OTP | OTP_FORCE) != 0 || f & OTP_UNLESS_RECOVERY != 0 && !recovery
-}
-
-mod ffi {
-    use super::*;
-
-    /// The route table; `*count` entries.
-    ///
-    /// # Safety
-    /// `count` writable.
-    #[no_mangle]
-    pub unsafe extern "C" fn http_routes(count: *mut usize) -> *const Route {
-        *count = ROUTES.len();
-        ROUTES.as_ptr()
-    }
 }
 
 #[cfg(test)]

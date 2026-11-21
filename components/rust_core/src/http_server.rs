@@ -367,7 +367,7 @@ unsafe fn register_routes(ctx: *mut ServerCtx) {
             },
         }));
         let u = httpd::Uri {
-            uri: rt.uri,
+            uri: rt.uri.as_ptr(),
             method: method(rt.method),
             handler: Some(trampoline),
             user_ctx: rc as *const RouteCtx as *mut c_void,

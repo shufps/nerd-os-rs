@@ -797,8 +797,9 @@ pub fn write_float(out: &mut Vec<u8>, mut value: f64, places: i8) {
     }
 }
 
-/// `writeString()`: `"` `\` and \b \f \n \r \t escaped, NUL as `\u0000`, all
-/// other bytes as they are.
+/// `writeString()`: `"` `\` and \b \f \n \r \t escaped, the other control
+/// characters as `\u00XX` (ArduinoJson wrote them raw, which is not valid
+/// JSON), all other bytes as they are.
 pub fn write_string(out: &mut Vec<u8>, s: &[u8]) {
     out.push(b'"');
     for &c in s {
@@ -810,8 +811,8 @@ pub fn write_string(out: &mut Vec<u8>, s: &[u8]) {
             b'\n' => b'n',
             b'\r' => b'r',
             b'\t' => b't',
-            0 => {
-                out.extend_from_slice(b"\\u0000");
+            c if c < 0x20 => {
+                out.extend_from_slice(format!("\\u{c:04x}").as_bytes());
                 continue;
             }
             c => {
@@ -887,6 +888,22 @@ impl Json {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn control_characters_are_escaped() {
+        let mut out = Vec::new();
+        write_string(&mut out, b"a\x00\x01\x08\t\n\x0b\x0c\r\x1f\x7f\"\\z");
+        assert_eq!(
+            out,
+            b"\"a\\u0000\\u0001\\b\\t\\n\\u000b\\f\\r\\u001f\x7f\\\"\\\\z\""
+        );
+        // valid JSON that reads back as the same bytes
+        let v: serde_json::Value = serde_json::from_slice(&out).unwrap();
+        assert_eq!(
+            v.as_str().unwrap().as_bytes(),
+            b"a\x00\x01\x08\t\n\x0b\x0c\r\x1f\x7f\"\\z"
+        );
+    }
 
     #[test]
     fn numbers_like_arduinojson() {

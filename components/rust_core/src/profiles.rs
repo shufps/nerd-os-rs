@@ -150,7 +150,10 @@ pub fn settings(v: &Json) -> Option<Json> {
 
 fn profile(v: &Json) -> Result<Profile, Error> {
     let name = v.get("name").as_cstr().ok_or(Error::BadName)?;
-    if name.is_empty() || name.len() > MAX_NAME || name.contains(&0) {
+    // characters, as the UI's maxlength and the error text (bytes if the
+    // name is not UTF-8)
+    let len = std::str::from_utf8(name).map_or(name.len(), |s| s.chars().count());
+    if name.is_empty() || len > MAX_NAME || name.contains(&0) {
         return Err(Error::BadName);
     }
     let settings = settings(v.get("settings")).ok_or(Error::BadSettings)?;
@@ -558,6 +561,19 @@ mod tests {
             p(&format!(
                 r#"{{"profiles":[{{"name":"{}","settings":{{}}}}]}}"#,
                 "n".repeat(33)
+            )),
+            Err(Error::BadName)
+        );
+        // 32 characters in 35 bytes are fine, 33 characters are not
+        let ok = "Nacht – leise, Lüfter gedrosselt";
+        assert_eq!((ok.chars().count(), ok.len()), (32, 35));
+        assert!(p(&format!(
+            r#"{{"profiles":[{{"name":"{ok}","settings":{{}}}}]}}"#
+        ))
+        .is_ok());
+        assert_eq!(
+            p(&format!(
+                r#"{{"profiles":[{{"name":"{ok}ü","settings":{{}}}}]}}"#
             )),
             Err(Error::BadName)
         );

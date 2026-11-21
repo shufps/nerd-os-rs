@@ -14,6 +14,7 @@
 //! The class hierarchy is flattened: each method matches the board id the
 //! way the C++ overrides did.
 
+use crate::asic::driver::ffi::Handle as Asics;
 use crate::idf::idf_const;
 use core::ffi::{c_char, c_int, CStr};
 use std::sync::{Mutex, MutexGuard, OnceLock};
@@ -311,8 +312,8 @@ unsafe impl Send for State {}
 pub struct Board {
     s: Mutex<State>,
     hw: Mutex<Hw>,
-    /// `asic_driver_t` of the board's ASIC (from the C++ object)
-    asic: OnceLock<usize>,
+    /// the driver of the board's ASIC chain (lives as long as the board)
+    asic: OnceLock<&'static Asics>,
 }
 
 static BOARD: OnceLock<Board> = OnceLock::new();
@@ -578,20 +579,20 @@ impl power::Hw for PowerHw<'_> {
         max_difficulty: u32,
         vr_frequency: u32,
     ) -> c_int {
-        self.b.with_asic(0, |a| unsafe {
-            crate::asic::driver::ffi::asic_driver_init(
-                a,
-                frequency as u64,
-                count as u16,
-                max_difficulty,
-                vr_frequency,
-            ) as c_int
+        self.b.with_asic(0, |a| {
+            a.run(|d, u| {
+                d.init(
+                    u,
+                    frequency as u64,
+                    count as u16,
+                    max_difficulty,
+                    vr_frequency,
+                )
+            }) as c_int
         })
     }
     fn asic_max_baud(&mut self) -> c_int {
-        self.b.with_asic(0, |a| unsafe {
-            crate::asic::driver::ffi::asic_driver_set_max_baud(a)
-        })
+        self.b.with_asic(0, |a| a.run(|d, u| d.set_max_baud(u)))
     }
     fn state(&mut self, what: c_int, value: c_int) {
         let mut s = self.b.state();
@@ -722,23 +723,19 @@ impl Board {
         self.state().id
     }
 
-    fn with_asic<T>(
-        &self,
-        def: T,
-        f: impl FnOnce(*const crate::asic::driver::ffi::Handle) -> T,
-    ) -> T {
+    fn with_asic<T>(&self, def: T, f: impl FnOnce(&Asics) -> T) -> T {
         match self.asic.get() {
-            Some(&a) => f(a as *const _),
+            Some(a) => f(a),
             None => def,
         }
     }
 
     /// The ASIC driver once the ASICs are initialized (`getAsics()`).
-    pub fn asic_handle(&self) -> Option<*const crate::asic::driver::ffi::Handle> {
+    pub fn asic_handle(&self) -> Option<&'static Asics> {
         if !self.state().initialized {
             return None;
         }
-        self.asic.get().map(|&a| a as *const _)
+        self.asic.get().copied()
     }
 
     /// The ASIC's small core count (0 before the ASICs are initialized).
@@ -746,9 +743,7 @@ impl Board {
         if !self.state().initialized {
             return 0;
         }
-        self.with_asic(0, |a| unsafe {
-            crate::asic::driver::ffi::asic_driver_small_core_count(a)
-        })
+        self.with_asic(0, |a| a.driver().chip().small_core_count())
     }
 
     pub fn load_settings(&self) {
@@ -1041,15 +1036,11 @@ impl Board {
             );
             return false;
         }
-        self.with_asic(false, |a| unsafe {
-            crate::asic::driver::ffi::asic_driver_set_frequency(a, mhz)
-        })
+        self.with_asic(false, |a| a.run(|d, u| d.set_frequency(u, mhz)))
     }
 
     pub fn set_vr_frequency(&self, hz: u32) {
-        self.with_asic((), |a| unsafe {
-            crate::asic::driver::ffi::asic_driver_set_vr_frequency(a, hz)
-        })
+        self.with_asic((), |a| a.run(|d, u| d.set_vr_frequency(u, hz)))
     }
 
     pub fn num_fans(&self) -> c_int {
@@ -1277,9 +1268,7 @@ impl Board {
                         hw.asic_temp_due_us += ASIC_TEMP_PERIOD_US;
                     }
                     drop(hw);
-                    self.with_asic((), |a| unsafe {
-                        crate::asic::driver::ffi::asic_driver_request_chip_temp(a)
-                    });
+                    self.with_asic((), |a| a.run(|d, u| d.request_chip_temp(u)));
                 }
             }
             NerdOctaxeGamma => {
@@ -1546,9 +1535,9 @@ pub(crate) mod ffi {
         };
         let _ = BOARD.set(Board::new(id));
         // the board's ASIC chain on the UART
-        let uart = crate::serial::uart();
-        let asic = unsafe { crate::asic::driver::ffi::asic_driver_new(board_asic_chip(), &uart) };
-        let _ = b().asic.set(asic as usize);
+        if let Some(asic) = Asics::new(board_asic_chip(), crate::serial::uart()) {
+            let _ = b().asic.set(Box::leak(Box::new(asic)));
+        }
         true
     }
 

@@ -530,7 +530,21 @@ pub(crate) mod ffi {
     }
 
     impl Handle {
-        fn run<T>(&self, f: impl FnOnce(&Driver, &mut CUart) -> T) -> T {
+        /// A driver for `chip` (`asic_chip_t`) on `uart`; None for an unknown
+        /// chip.
+        pub fn new(chip: i32, uart: CUart) -> Option<Self> {
+            Some(Handle {
+                driver: Driver::new(Chip::from_raw(chip)?),
+                uart,
+            })
+        }
+
+        pub fn driver(&self) -> &Driver {
+            &self.driver
+        }
+
+        /// Runs `f` with the driver and its UART.
+        pub fn run<T>(&self, f: impl FnOnce(&Driver, &mut CUart) -> T) -> T {
             let mut uart = self.uart;
             f(&self.driver, &mut uart)
         }
@@ -540,13 +554,7 @@ pub(crate) mod ffi {
     /// `uart` valid; its callbacks for the lifetime of the driver.
     #[no_mangle]
     pub unsafe extern "C" fn asic_driver_new(chip: i32, uart: *const CUart) -> *mut Handle {
-        let Some(chip) = Chip::from_raw(chip) else {
-            return core::ptr::null_mut();
-        };
-        Box::into_raw(Box::new(Handle {
-            driver: Driver::new(chip),
-            uart: *uart,
-        }))
+        Handle::new(chip, *uart).map_or(core::ptr::null_mut(), |h| Box::into_raw(Box::new(h)))
     }
 
     /// # Safety

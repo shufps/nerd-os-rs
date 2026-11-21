@@ -12,13 +12,12 @@ use core::ffi::{c_int, c_void, CStr};
 use std::sync::Mutex;
 use std::time::Duration;
 
-use crate::asic::driver::ffi as asic;
 use crate::can_master::{self, ffi as master, SLAVE_MAX};
 use crate::can_slave::{self, ffi as slave};
 use crate::idf::nvs::{err_name, Nvs};
 use crate::idf::twai::{self, Message};
 use crate::idf::{ms_to_ticks, EspErr, ESP_OK};
-use crate::jobs::{free_job, JOB_TABLES};
+use crate::jobs::JOB_TABLES;
 use crate::log::log;
 use crate::mining::nonce_difficulty;
 
@@ -365,11 +364,10 @@ fn handle_nonce(slave_id: u8, nonce: u32, rolled_version: u32, job_id: u8) {
         TAG_MASTER,
         "slave {slave_id} nonce={nonce:08X} job_id={job_id:02X}"
     );
-    let job = JOB_TABLES
+    let Some(j) = JOB_TABLES
         .get(1 + slave_id as usize)
-        .map_or(core::ptr::null_mut(), |t| t.clone_job(job_id));
-    // SAFETY: a clone is ours until freed below.
-    let Some(j) = (unsafe { job.as_ref() }) else {
+        .and_then(|t| t.clone_job(job_id))
+    else {
         log!(
             Warn,
             TAG_MASTER,
@@ -398,23 +396,20 @@ fn handle_nonce(slave_id: u8, nonce: u32, rolled_version: u32, job_id: u8) {
 
     // the share history needs the slave's chip number, which is not sent
     if diff >= j.pool_diff as f64 {
-        unsafe {
-            crate::pool_manager::ffi::pool_mgr_submit_share(
-                j.pool_id,
-                j.jobid,
-                j.extranonce2,
+        if let Some(m) = crate::pool_manager::get() {
+            m.submit_share(
+                (j.pool_id & 1) as usize,
+                j.job_id(),
+                j.extranonce2(),
                 j.ntime,
                 nonce,
                 version,
                 j.version,
-            )
-        };
+            );
+        }
     }
     crate::pool_manager::ffi::pool_mgr_check_best_diff(j.pool_id, diff, j.target);
     crate::pool_manager::ffi::pool_mgr_check_found_block(j.pool_id, diff, j.target);
-
-    // SAFETY: the clone is ours.
-    unsafe { free_job(job) };
 }
 
 fn master_loop() -> ! {
@@ -684,7 +679,7 @@ fn slave_loop() -> ! {
             }
             can_slave::EVENT_JOB => {
                 if let Some(a) = crate::board::get().and_then(|b| b.asic_handle()) {
-                    unsafe { asic::asic_driver_send_raw_job(a, &ev.job) };
+                    a.run(|d, u| d.send_raw_job(u, &ev.job));
                 }
             }
             _ => {}
@@ -717,10 +712,9 @@ fn slave_result_loop() -> ! {
             sleep_ms(100);
             continue;
         };
-        let mut r = crate::asic::TaskResult::default();
-        if !unsafe { asic::asic_driver_process_work(a, &mut r) } {
+        let Some(r) = a.run(|d, u| d.process_work(u)) else {
             continue;
-        }
+        };
         if r.is_reg_resp != 0 {
             match r.reg {
                 0xb4 => {

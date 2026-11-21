@@ -10,9 +10,10 @@
 //! the C++ code switched `miningInfo[pool]` between its instances.
 
 use core::ffi::{c_char, c_int, CStr};
+use std::ffi::CString;
 use std::sync::Mutex;
 
-use crate::cutil::{c_free, c_malloc, c_strdup, until_nul};
+use crate::cutil::until_nul;
 use crate::log::log;
 use crate::mining::JobHashes;
 use crate::stratum_v1::job::build_parts;
@@ -29,6 +30,7 @@ pub const TABLES: usize = 1 + CAN_SLAVE_MAX;
 
 /// `bm_job`
 #[repr(C)]
+#[derive(Clone, Copy)]
 pub struct BmJob {
     pub version: u32,
     pub version_mask: u32,
@@ -52,7 +54,7 @@ const _: () = assert!(core::mem::size_of::<BmJob>() == 168);
 #[cfg(target_pointer_width = "64")]
 const _: () = assert!(core::mem::size_of::<BmJob>() == 176);
 
-/// The fields of a job before it is handed to C.
+/// The fields of a job before it becomes a [`Job`].
 struct Built {
     version: u32,
     version_mask: u32,
@@ -64,103 +66,95 @@ struct Built {
     extranonce2: Vec<u8>,
 }
 
-/// Allocates a `bm_job` the C side frees with `free_bm_job()`.
-fn into_c(b: Built, pool: c_int, asic_diff: u32) -> *mut BmJob {
-    let p = c_malloc(core::mem::size_of::<BmJob>()) as *mut BmJob;
-    if p.is_null() {
-        return p;
-    }
-    let job = BmJob {
-        version: b.version,
-        version_mask: b.version_mask,
-        prev_block_hash: b.hashes.prev_block_hash,
-        prev_block_hash_be: b.hashes.prev_block_hash_be,
-        merkle_root: b.hashes.merkle_root,
-        merkle_root_be: b.hashes.merkle_root_be,
-        ntime: b.ntime,
-        target: b.nbits,
-        starting_nonce: 0,
-        pool_diff: b.pool_diff,
-        asic_diff,
-        pool_id: pool,
-        jobid: c_strdup(&b.job_id),
-        extranonce2: c_strdup(&b.extranonce2),
-    };
-    // SAFETY: p is a fresh allocation of the right size.
-    unsafe { p.write(job) };
-    p
+/// `bytes` as a C string, cut at the first NUL (as the C copy was).
+fn c_string(bytes: &[u8]) -> CString {
+    CString::new(until_nul(bytes)).unwrap_or_default()
 }
 
-/// `free_bm_job()`
-///
-/// # Safety
-/// `job` is null or a live `bm_job` with `malloc()`ed strings.
-pub(crate) unsafe fn free_job(job: *mut BmJob) {
-    if let Some(j) = job.as_mut() {
-        c_free(j.jobid as _);
-        c_free(j.extranonce2 as _);
-        c_free(job as _);
-    }
+/// A job of the pipeline: the `bm_job` the drivers send, with its own job ID
+/// and extranonce2 (the `bm_job`'s string fields point at them).
+pub struct Job {
+    bm: BmJob,
+    job_id: CString,
+    extranonce2: CString,
 }
 
-/// A copy of `job` with its own strings, or null.
-///
-/// # Safety
-/// `job` is a live `bm_job`.
-unsafe fn clone_job(job: &BmJob) -> *mut BmJob {
-    let p = c_malloc(core::mem::size_of::<BmJob>()) as *mut BmJob;
-    if p.is_null() {
-        return p;
-    }
-    let s = |c: *mut c_char| {
-        if c.is_null() {
-            c
-        } else {
-            c_strdup(CStr::from_ptr(c).to_bytes())
+// SAFETY: the only pointers in `bm` point into the job's own strings, which
+// move with it (their heap buffers stay where they are).
+unsafe impl Send for Job {}
+
+impl Job {
+    fn new(mut bm: BmJob, job_id: CString, extranonce2: CString) -> Self {
+        bm.jobid = job_id.as_ptr() as *mut c_char;
+        bm.extranonce2 = extranonce2.as_ptr() as *mut c_char;
+        Self {
+            bm,
+            job_id,
+            extranonce2,
         }
-    };
-    core::ptr::copy_nonoverlapping(job, p, 1);
-    (*p).jobid = s(job.jobid);
-    (*p).extranonce2 = s(job.extranonce2);
-    p
+    }
+
+    fn built(b: Built, pool: c_int, asic_diff: u32) -> Self {
+        let bm = BmJob {
+            version: b.version,
+            version_mask: b.version_mask,
+            prev_block_hash: b.hashes.prev_block_hash,
+            prev_block_hash_be: b.hashes.prev_block_hash_be,
+            merkle_root: b.hashes.merkle_root,
+            merkle_root_be: b.hashes.merkle_root_be,
+            ntime: b.ntime,
+            target: b.nbits,
+            starting_nonce: 0,
+            pool_diff: b.pool_diff,
+            asic_diff,
+            pool_id: pool,
+            jobid: core::ptr::null_mut(),
+            extranonce2: core::ptr::null_mut(),
+        };
+        Self::new(bm, c_string(&b.job_id), c_string(&b.extranonce2))
+    }
+
+    pub fn job_id(&self) -> &CStr {
+        &self.job_id
+    }
+
+    pub fn extranonce2(&self) -> &CStr {
+        &self.extranonce2
+    }
+}
+
+impl core::ops::Deref for Job {
+    type Target = BmJob;
+    fn deref(&self) -> &BmJob {
+        &self.bm
+    }
+}
+
+impl Clone for Job {
+    fn clone(&self) -> Self {
+        Self::new(self.bm, self.job_id.clone(), self.extranonce2.clone())
+    }
 }
 
 // ---------------------------------------------------------------------------
 // Job tables
 
-/// A `bm_job` owned by a table.
-struct Owned(*mut BmJob);
-
-// SAFETY: the job is only reached through the table's mutex.
-unsafe impl Send for Owned {}
-
-impl Drop for Owned {
-    fn drop(&mut self) {
-        // SAFETY: the table took ownership of a live job.
-        unsafe { free_job(self.0) }
-    }
-}
-
 /// Job ID → job; allocated on first use, so unused CAN slave tables cost
 /// nothing.
-pub struct Table(Mutex<Vec<Option<Owned>>>);
+pub struct Table(Mutex<Vec<Option<Job>>>);
 
 impl Table {
     const fn new() -> Self {
         Self(Mutex::new(Vec::new()))
     }
 
-    fn with<T>(&self, f: impl FnOnce(&mut Vec<Option<Owned>>) -> T) -> T {
+    fn with<T>(&self, f: impl FnOnce(&mut Vec<Option<Job>>) -> T) -> T {
         f(&mut self.0.lock().unwrap_or_else(|e| e.into_inner()))
     }
 
-    /// Takes ownership of `job`; a job still in the slot is freed.
-    ///
-    /// # Safety
-    /// `job` is null or a live `bm_job` nobody else frees.
-    pub unsafe fn store(&self, job: *mut BmJob, id: u8) {
-        let job = Owned(job);
-        if job.0.is_null() || id as usize >= MAX_ASIC_JOBS {
+    /// Stores `job` under `id`, replacing the job still in the slot.
+    pub fn store(&self, job: Job, id: u8) {
+        if id as usize >= MAX_ASIC_JOBS {
             // not reachable: the drivers send IDs below 0x80
             return;
         }
@@ -173,13 +167,9 @@ impl Table {
     }
 
     /// A copy of the job sent with `id` (the ID comes from a chip or a CAN
-    /// frame, 0..255), or null.
-    pub fn clone_job(&self, id: u8) -> *mut BmJob {
-        self.with(|t| match t.get(id as usize) {
-            // SAFETY: the table owns a live job.
-            Some(Some(job)) => unsafe { clone_job(&*job.0) },
-            _ => core::ptr::null_mut(),
-        })
+    /// frame, 0..255).
+    pub fn clone_job(&self, id: u8) -> Option<Job> {
+        self.with(|t| t.get(id as usize).cloned().flatten())
     }
 
     /// Drops the jobs of `pool`; how many there were.
@@ -187,11 +177,7 @@ impl Table {
         self.with(|t| {
             let mut n = 0;
             for slot in t.iter_mut() {
-                // SAFETY: the table owns live jobs.
-                if slot
-                    .as_ref()
-                    .is_some_and(|j| unsafe { (*j.0).pool_id } == pool)
-                {
+                if slot.as_ref().is_some_and(|j| j.pool_id == pool) {
                     *slot = None;
                     n += 1;
                 }
@@ -717,10 +703,10 @@ pub fn build(
     extranonce2: u32,
     log_new_work: bool,
     select_diff: impl FnOnce(u32) -> u32,
-) -> *mut BmJob {
+) -> Option<Job> {
     with_pool(pool, |w| {
         if !w.is_valid() {
-            return core::ptr::null_mut();
+            return None;
         }
         if log_new_work && w.last_ntime != w.ntime() {
             w.last_ntime = w.ntime();
@@ -733,15 +719,10 @@ pub fn build(
             );
         }
         let asic_diff = select_diff(w.active_difficulty());
-        match w.build(extranonce2) {
-            Some(b) => into_c(b, pool, asic_diff),
-            None => core::ptr::null_mut(),
-        }
+        w.build(extranonce2).map(|b| Job::built(b, pool, asic_diff))
     })
-    .unwrap_or(core::ptr::null_mut())
+    .flatten()
 }
-
-mod ffi {}
 
 /// The work and the tables are global: tests that use them hold this lock.
 #[cfg(test)]
@@ -764,23 +745,17 @@ pub(crate) mod test_support {
         g
     }
 
-    /// The fields of a built job the tests look at; frees it.
-    ///
-    /// # Safety
-    /// `job` is a live job from `build()`.
-    pub(crate) unsafe fn take(job: *mut BmJob) -> (u32, u32, String, String, c_int, u32) {
-        assert!(!job.is_null());
-        let j = &*job;
-        let r = (
+    /// The fields of a built job the tests look at.
+    pub(crate) fn take(job: Option<Job>) -> (u32, u32, String, String, c_int, u32) {
+        let j = job.expect("a job");
+        (
             j.pool_diff,
             j.asic_diff,
-            CStr::from_ptr(j.jobid).to_string_lossy().into_owned(),
-            CStr::from_ptr(j.extranonce2).to_string_lossy().into_owned(),
+            j.job_id().to_string_lossy().into_owned(),
+            j.extranonce2().to_string_lossy().into_owned(),
             j.pool_id,
             j.version_mask,
-        );
-        free_job(job);
-        r
+        )
     }
 }
 
@@ -812,7 +787,7 @@ mod tests {
         let (id, cb1, cb2) = (c"1d2e".into(), c"0100".into(), c"ffff".into());
         let n = notify(&id, &cb1, &cb2);
         unsafe { v1_notify(0, &n, false) };
-        assert!(build(0, 0, false, |d| d).is_null());
+        assert!(build(0, 0, false, |d| d).is_none());
 
         v1_set_extranonce(0, Some(b"aabbccdd"), 4);
         // set_difficulty applies with the next notify
@@ -823,12 +798,12 @@ mod tests {
             512
         });
         assert_eq!(
-            unsafe { take(job) },
+            take(job),
             (8192, 512, "1d2e".into(), "00000007".into(), 0, 0)
         );
 
         unsafe { v1_notify(0, &n, false) };
-        assert_eq!(unsafe { take(build(0, 1, false, |d| d)) }.0, 4096);
+        assert_eq!(take(build(0, 1, false, |d| d)).0, 4096);
     }
 
     #[test]
@@ -839,9 +814,9 @@ mod tests {
         v1_set_extranonce(1, Some(b"aa"), 2);
         unsafe { v1_notify(1, &n, false) };
         v1_set_next_extranonce(1, Some(b"bb"), 3);
-        assert_eq!(unsafe { take(build(1, 1, false, |d| d)) }.3, "0001");
+        assert_eq!(take(build(1, 1, false, |d| d)).3, "0001");
         unsafe { v1_notify(1, &n, false) };
-        assert_eq!(unsafe { take(build(1, 1, false, |d| d)) }.3, "000001");
+        assert_eq!(take(build(1, 1, false, |d| d)).3, "000001");
     }
 
     fn std_job(job_id: u32) -> StandardJob {
@@ -860,20 +835,20 @@ mod tests {
         let _s = serial();
         sv2_standard(0, &std_job(42), false, 0x1fffe000, 1024);
         assert_eq!(
-            unsafe { take(build(0, 0, false, |d| d)) },
+            take(build(0, 0, false, |d| d)),
             (1024, 1024, "42".into(), "".into(), 0, 0x1fffe000)
         );
-        assert!(build(0, 0, false, |d| d).is_null());
+        assert!(build(0, 0, false, |d| d).is_none());
         // SetTarget: no resend for the standard channel
         let before = TRIGGERS.load(core::sync::atomic::Ordering::Relaxed);
         sv2_set_difficulty(0, 2048);
         assert_eq!(TRIGGERS.load(core::sync::atomic::Ordering::Relaxed), before);
         sv2_standard(0, &std_job(43), false, 0x1fffe000, 2048);
-        assert_eq!(unsafe { take(build(0, 0, false, |d| d)) }.2, "43");
+        assert_eq!(take(build(0, 0, false, |d| d)).2, "43");
 
         // a v1 message makes v1 active again, starting invalid
         v1_set_version_mask(0, 0x1fffe000);
-        assert!(build(0, 0, false, |d| d).is_null());
+        assert!(build(0, 0, false, |d| d).is_none());
     }
 
     #[test]
@@ -893,12 +868,33 @@ mod tests {
         sv2_extended(1, ext, false, 6, 0x1fffe000, 512);
         let a = build(1, 1, false, |d| d);
         let b = build(1, 2, false, |d| d);
-        let (ra, rb) = unsafe { ((*a).merkle_root, (*b).merkle_root) };
+        let (ra, rb) = (
+            a.as_ref().unwrap().merkle_root,
+            b.as_ref().unwrap().merkle_root,
+        );
         assert_ne!(ra, rb);
-        assert_eq!(unsafe { take(a) }.3, "000000000001");
-        unsafe { take(b) };
+        assert_eq!(take(a).3, "000000000001");
+        take(b);
         invalidate(1);
-        assert!(build(1, 1, false, |d| d).is_null());
+        assert!(build(1, 1, false, |d| d).is_none());
+    }
+
+    #[test]
+    fn job_strings_follow_the_job() {
+        let _s = serial();
+        sv2_standard(0, &std_job(77), false, 0, 1);
+        let job = build(0, 0, false, |d| d).unwrap();
+        // moved and cloned: the C view still points at the job's own strings
+        let moved = vec![job];
+        let copy = moved[0].clone();
+        drop(moved);
+        assert_eq!(copy.bm.jobid as *const c_char, copy.job_id().as_ptr());
+        assert_eq!(
+            copy.bm.extranonce2 as *const c_char,
+            copy.extranonce2().as_ptr()
+        );
+        // SAFETY: points at the job's own string (asserted above)
+        assert_eq!(unsafe { CStr::from_ptr(copy.bm.jobid) }, c"77");
     }
 
     #[test]
@@ -907,33 +903,33 @@ mod tests {
         let t = &JOB_TABLES[3];
         sv2_standard(1, &std_job(9), false, 0, 1);
         let job = build(1, 0, false, |d| d);
-        unsafe { t.store(job, 5) };
+        t.store(job.unwrap(), 5);
         let c = t.clone_job(5);
-        assert_eq!(unsafe { take(c) }.2, "9");
-        assert!(t.clone_job(6).is_null());
-        assert!(t.clone_job(200).is_null());
+        assert_eq!(take(c).2, "9");
+        assert!(t.clone_job(6).is_none());
+        assert!(t.clone_job(200).is_none());
         // out-of-range ID: freed, not stored
         sv2_standard(1, &std_job(10), false, 0, 1);
-        unsafe { t.store(build(1, 0, false, |d| d), 200) };
+        t.store(build(1, 0, false, |d| d).unwrap(), 200);
         assert_eq!(t.clean(0), 0);
         assert_eq!(t.clean(1), 1);
-        assert!(t.clone_job(5).is_null());
+        assert!(t.clone_job(5).is_none());
     }
 
     #[test]
     fn clean_flag_and_abandon_clear_the_master_table() {
         let _s = serial();
         sv2_standard(0, &std_job(1), false, 0, 1);
-        unsafe { master().store(build(0, 0, false, |d| d), 1) };
+        master().store(build(0, 0, false, |d| d).unwrap(), 1);
         sv2_standard(0, &std_job(2), true, 0, 1);
-        assert!(master().clone_job(1).is_null());
+        assert!(master().clone_job(1).is_none());
 
         let (id, cb1, cb2) = (c"1".into(), c"01".into(), c"02".into());
         let n = notify(&id, &cb1, &cb2);
         v1_set_extranonce(0, Some(b"aa"), 2);
         unsafe { v1_notify(0, &n, false) };
-        unsafe { master().store(build(0, 0, false, |d| d), 2) };
+        master().store(build(0, 0, false, |d| d).unwrap(), 2);
         unsafe { v1_notify(0, &n, true) };
-        assert!(master().clone_job(2).is_null());
+        assert!(master().clone_job(2).is_none());
     }
 }

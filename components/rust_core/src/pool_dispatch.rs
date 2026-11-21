@@ -351,7 +351,7 @@ mod tests {
     /// The job the pool's work builds now (extranonce2 counter 1).
     fn job(pool: c_int) -> Option<(u32, u32, String, String, c_int, u32)> {
         let j = jobs::build(pool, 1, false, |d| d);
-        (!j.is_null()).then(|| unsafe { take(j) })
+        j.is_some().then(|| take(j))
     }
 
     #[test]
@@ -360,7 +360,7 @@ mod tests {
         t.line(1, SUBSCRIBE, 0);
         // the first notify abandons the pool's old jobs
         jobs::sv2_standard(1, &old_job(), false, 0, 1);
-        unsafe { jobs::JOB_TABLES[0].store(jobs::build(1, 0, false, |d| d), 3) };
+        jobs::JOB_TABLES[0].store(jobs::build(1, 0, false, |d| d).unwrap(), 3);
         t.rec.first_job = true;
         t.line(1, &NOTIFY.replace('\n', ""), 0);
         assert_eq!(
@@ -370,7 +370,7 @@ mod tests {
                 "valid_notify 1",
             ]
         );
-        assert!(jobs::JOB_TABLES[0].clone_job(3).is_null());
+        assert!(jobs::JOB_TABLES[0].clone_job(3).is_none());
         assert!(pool_summary(&t.stats, 1).network_difficulty > 1.0);
         // the work was replaced by v1, which needs the extranonce again
         assert!(job(1).is_none());

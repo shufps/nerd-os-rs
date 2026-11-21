@@ -13,7 +13,7 @@
 //! - the duplicate nonce counter (a `u64` written by the result task and
 //!   read by the HTTP and influx tasks) is behind a lock.
 
-use core::ffi::{c_char, c_int, c_void, CStr};
+use core::ffi::{c_int, CStr};
 use std::sync::{Condvar, Mutex};
 use std::time::{Duration, Instant};
 
@@ -100,18 +100,15 @@ impl JobTask {
         let Some(pool) = env.next_pool() else {
             return false;
         };
-        let job = jobs::build(pool, self.extranonce2, true, |d| {
+        let Some(job) = jobs::build(pool, self.extranonce2, true, |d| {
             env.select_asic_diff(pool, d)
-        });
-        // SAFETY: a job from build() is live until stored.
-        let Some(j) = (unsafe { job.as_ref() }) else {
+        }) else {
             return false;
         };
-        env.set_difficulty_mask(j.asic_diff);
+        env.set_difficulty_mask(job.asic_diff);
         self.last_send = Some(Instant::now());
-        let id = env.send_work(self.extranonce2, j);
-        // SAFETY: the table takes over the job.
-        unsafe { JOB_TABLES[0].store(job, id) };
+        let id = env.send_work(self.extranonce2, &job);
+        JOB_TABLES[0].store(job, id);
         self.extranonce2 = self.extranonce2.wrapping_add(1);
 
         for slave in 0..CAN_SLAVE_MAX as u8 {
@@ -121,12 +118,9 @@ impl JobTask {
             let counter = &mut self.slave_counters[slave as usize];
             let e2 = slave_extranonce2(slave, *counter);
             *counter = counter.wrapping_add(1);
-            let job = jobs::build(pool, e2, false, |d| env.select_asic_diff(pool, d));
-            // SAFETY: as above
-            if let Some(j) = unsafe { job.as_ref() } {
-                env.send_slave_job(slave, id, j);
-                // SAFETY: the slave's table takes over the job.
-                unsafe { JOB_TABLES[1 + slave as usize].store(job, id) };
+            if let Some(job) = jobs::build(pool, e2, false, |d| env.select_asic_diff(pool, d)) {
+                env.send_slave_job(slave, id, &job);
+                JOB_TABLES[1 + slave as usize].store(job, id);
             }
         }
         true
@@ -262,9 +256,7 @@ impl ResultTask {
             return;
         }
 
-        let job = JOB_TABLES[0].clone_job(r.job_id);
-        // SAFETY: a clone is ours until freed below.
-        let Some(j) = (unsafe { job.as_ref() }) else {
+        let Some(j) = JOB_TABLES[0].clone_job(r.job_id) else {
             return;
         };
         // the chips return the rolled bits only
@@ -278,8 +270,7 @@ impl ResultTask {
             r.nonce,
         );
         let pool_str = if j.pool_id != 0 { "Sec" } else { "Pri" };
-        // SAFETY: the clone's strings are NUL-terminated or null.
-        let (job_id, extranonce2) = unsafe { (cstr(j.jobid), cstr(j.extranonce2)) };
+        let (job_id, extranonce2) = (j.job_id(), j.extranonce2());
         let max = env.asic_max_difficulty() as f64;
 
         // only nonces >= the ASIC maximum (or the pool difficulty, which can
@@ -321,9 +312,6 @@ impl ResultTask {
             );
         }
         env.check_difficulty(j.pool_id, diff, j.target);
-
-        // SAFETY: the clone is ours.
-        unsafe { jobs::free_job(job) };
     }
 
     pub fn run(&mut self, env: &mut impl ResultEnv) -> ! {
@@ -336,143 +324,8 @@ impl ResultTask {
     }
 }
 
-/// # Safety
-/// `p` is NUL-terminated or null.
-unsafe fn cstr<'a>(p: *const c_char) -> &'a CStr {
-    if p.is_null() {
-        c""
-    } else {
-        CStr::from_ptr(p)
-    }
-}
-
 // ---------------------------------------------------------------------------
 // C API
-
-/// `jobs_task_hooks_t`
-#[repr(C)]
-pub struct JobHooks {
-    pub ctx: *mut c_void,
-    pub suspend_if_shutdown: unsafe extern "C" fn(ctx: *mut c_void),
-    pub job_interval_ms: unsafe extern "C" fn(ctx: *mut c_void) -> u32,
-    pub next_pool: unsafe extern "C" fn(ctx: *mut c_void) -> c_int,
-    pub select_asic_diff:
-        unsafe extern "C" fn(ctx: *mut c_void, pool: c_int, pool_diff: u32) -> u32,
-    pub set_difficulty_mask: unsafe extern "C" fn(ctx: *mut c_void, difficulty: u32),
-    pub send_work:
-        unsafe extern "C" fn(ctx: *mut c_void, extranonce2: u32, job: *const BmJob) -> u8,
-    pub slave_active: unsafe extern "C" fn(ctx: *mut c_void, slave: u8) -> bool,
-    pub send_slave_job:
-        unsafe extern "C" fn(ctx: *mut c_void, slave: u8, job_id: u8, job: *const BmJob),
-}
-
-impl JobEnv for &JobHooks {
-    fn suspend_if_shutdown(&mut self) {
-        // SAFETY: valid hooks (caller contract of jobs_task_run)
-        unsafe { (self.suspend_if_shutdown)(self.ctx) }
-    }
-    fn job_interval_ms(&mut self) -> u32 {
-        unsafe { (self.job_interval_ms)(self.ctx) }
-    }
-    fn next_pool(&mut self) -> Option<c_int> {
-        let pool = unsafe { (self.next_pool)(self.ctx) };
-        (pool >= 0).then_some(pool)
-    }
-    fn select_asic_diff(&mut self, pool: c_int, pool_diff: u32) -> u32 {
-        unsafe { (self.select_asic_diff)(self.ctx, pool, pool_diff) }
-    }
-    fn set_difficulty_mask(&mut self, difficulty: u32) {
-        unsafe { (self.set_difficulty_mask)(self.ctx, difficulty) }
-    }
-    fn send_work(&mut self, extranonce2: u32, job: &BmJob) -> u8 {
-        unsafe { (self.send_work)(self.ctx, extranonce2, job) }
-    }
-    fn slave_active(&mut self, slave: u8) -> bool {
-        unsafe { (self.slave_active)(self.ctx, slave) }
-    }
-    fn send_slave_job(&mut self, slave: u8, job_id: u8, job: &BmJob) {
-        unsafe { (self.send_slave_job)(self.ctx, slave, job_id, job) }
-    }
-}
-
-/// `asic_result_hooks_t`
-#[repr(C)]
-pub struct ResultHooks {
-    pub ctx: *mut c_void,
-    pub suspend_if_shutdown: unsafe extern "C" fn(ctx: *mut c_void),
-    pub process_work: unsafe extern "C" fn(ctx: *mut c_void, result: *mut TaskResult) -> bool,
-    pub set_chip_temp: unsafe extern "C" fn(ctx: *mut c_void, asic_nr: c_int, temp: f32),
-    pub asic_max_difficulty: unsafe extern "C" fn(ctx: *mut c_void) -> u32,
-    pub best_session_diff: unsafe extern "C" fn(ctx: *mut c_void, buf: *mut c_char, len: usize),
-    pub push_share: unsafe extern "C" fn(ctx: *mut c_void, asic_nr: c_int),
-    pub submit_share: unsafe extern "C" fn(
-        ctx: *mut c_void,
-        pool: c_int,
-        job_id: *const c_char,
-        extranonce2: *const c_char,
-        ntime: u32,
-        nonce: u32,
-        version_rolled: u32,
-        version: u32,
-    ),
-    pub check_difficulty:
-        unsafe extern "C" fn(ctx: *mut c_void, pool: c_int, difficulty: f64, nbits: u32),
-}
-
-impl ResultEnv for &ResultHooks {
-    fn suspend_if_shutdown(&mut self) {
-        // SAFETY: valid hooks (caller contract of asic_result_run)
-        unsafe { (self.suspend_if_shutdown)(self.ctx) }
-    }
-    fn process_work(&mut self) -> Option<TaskResult> {
-        let mut r = TaskResult::default();
-        unsafe { (self.process_work)(self.ctx, &mut r) }.then_some(r)
-    }
-    fn set_chip_temp(&mut self, asic_nr: c_int, temp: f32) {
-        unsafe { (self.set_chip_temp)(self.ctx, asic_nr, temp) }
-    }
-    fn asic_max_difficulty(&mut self) -> u32 {
-        unsafe { (self.asic_max_difficulty)(self.ctx) }
-    }
-    fn best_session_diff(&mut self) -> String {
-        let mut buf = [0 as c_char; 16];
-        unsafe { (self.best_session_diff)(self.ctx, buf.as_mut_ptr(), buf.len()) };
-        buf[15] = 0;
-        // SAFETY: NUL-terminated above
-        unsafe { CStr::from_ptr(buf.as_ptr()) }
-            .to_string_lossy()
-            .into_owned()
-    }
-    fn push_share(&mut self, asic_nr: c_int) {
-        unsafe { (self.push_share)(self.ctx, asic_nr) }
-    }
-    fn submit_share(
-        &mut self,
-        pool: c_int,
-        job_id: &CStr,
-        extranonce2: &CStr,
-        ntime: u32,
-        nonce: u32,
-        version_rolled: u32,
-        version: u32,
-    ) {
-        unsafe {
-            (self.submit_share)(
-                self.ctx,
-                pool,
-                job_id.as_ptr(),
-                extranonce2.as_ptr(),
-                ntime,
-                nonce,
-                version_rolled,
-                version,
-            )
-        }
-    }
-    fn check_difficulty(&mut self, pool: c_int, difficulty: f64, nbits: u32) {
-        unsafe { (self.check_difficulty)(self.ctx, pool, difficulty, nbits) }
-    }
-}
 
 pub(crate) mod ffi {
     use super::*;
@@ -609,15 +462,11 @@ mod tests {
         assert_eq!(env.sent, [(0, 512), (1, 512)]);
         assert_eq!(env.slave_jobs, [(2, 8), (2, 16)]);
         // the master and the slave table know the jobs, with their extranonce2
-        let job = JOB_TABLES[0].clone_job(16);
-        let slave = JOB_TABLES[3].clone_job(16);
-        unsafe {
-            assert_eq!(CStr::from_ptr((*job).extranonce2), c"00000001");
-            // slave 2, counter 1
-            assert_eq!(CStr::from_ptr((*slave).extranonce2), c"04000001");
-            jobs::free_job(job);
-            jobs::free_job(slave);
-        }
+        let job = JOB_TABLES[0].clone_job(16).unwrap();
+        let slave = JOB_TABLES[3].clone_job(16).unwrap();
+        assert_eq!(job.extranonce2(), c"00000001");
+        // slave 2, counter 1
+        assert_eq!(slave.extranonce2(), c"04000001");
         // no pool manager yet: nothing
         env.pool = None;
         assert!(!task.send_next(&mut env));

@@ -41,17 +41,11 @@ fn suspend_if_shutdown(tag: &CStr) {
 }
 
 /// The ASIC driver while the ASICs are initialized (`getAsics()`).
-fn asics() -> Option<*const asic::Handle> {
+fn asics() -> Option<&'static asic::Handle> {
     crate::board::get()?.asic_handle()
 }
 
-fn board_info() -> crate::board::ffi::Info {
-    let mut i = core::mem::MaybeUninit::uninit();
-    unsafe {
-        crate::board::ffi::board_info(i.as_mut_ptr());
-        i.assume_init()
-    }
-}
+use crate::board::ffi::info as board_info;
 
 // ---------------------------------------------------------------------------
 // jobs
@@ -78,14 +72,14 @@ impl JobEnv for Jobs {
     }
     fn set_difficulty_mask(&mut self, difficulty: u32) {
         if let Some(a) = asics() {
-            unsafe { asic::asic_driver_set_difficulty_mask(a, difficulty as i32) };
+            a.run(|d, u| d.set_difficulty_mask(u, difficulty as i32));
         }
     }
     fn send_work(&mut self, extranonce2: u32, job: &BmJob) -> u8 {
         let Some(a) = asics() else { return 0 };
-        unsafe {
-            asic::asic_driver_send_work(
-                a,
+        a.run(|d, u| {
+            d.send_work(
+                u,
                 extranonce2,
                 job.starting_nonce,
                 job.target,
@@ -94,7 +88,7 @@ impl JobEnv for Jobs {
                 &job.prev_block_hash_be,
                 job.version,
             )
-        }
+        })
     }
     fn slave_active(&mut self, slave: u8) -> bool {
         crate::can_master::ffi::can_master_is_slave_active(slave)
@@ -115,9 +109,8 @@ impl ResultEnv for Results {
         suspend_if_shutdown(RESULT_TAG);
     }
     fn process_work(&mut self) -> Option<TaskResult> {
-        let a = asics()?;
-        let mut r = crate::asic::TaskResult::default();
-        unsafe { asic::asic_driver_process_work(a, &mut r) }.then_some(TaskResult {
+        let r = asics()?.run(|d, u| d.process_work(u))?;
+        Some(TaskResult {
             job_id: r.job_id,
             nonce: r.nonce,
             rolled_version: r.rolled_version,
@@ -150,17 +143,17 @@ impl ResultEnv for Results {
         version_rolled: u32,
         version: u32,
     ) {
-        unsafe {
-            mgr::pool_mgr_submit_share(
-                pool,
-                job_id.as_ptr(),
-                extranonce2.as_ptr(),
+        if let Some(m) = crate::pool_manager::get() {
+            m.submit_share(
+                (pool & 1) as usize,
+                job_id,
+                extranonce2,
                 ntime,
                 nonce,
                 version_rolled,
                 version,
-            )
-        };
+            );
+        }
     }
     fn check_difficulty(&mut self, pool: c_int, difficulty: f64, nbits: u32) {
         mgr::pool_mgr_check_best_diff(pool, difficulty, nbits);
@@ -274,7 +267,7 @@ impl crate::influx::TaskEnv for Influx {
 // ---------------------------------------------------------------------------
 // hashrate monitor
 
-struct Counters(*const asic::Handle);
+struct Counters(&'static asic::Handle);
 const HR_TAG: &CStr = c"hashrate_monitor";
 
 impl crate::hashrate::Env for Counters {
@@ -282,15 +275,17 @@ impl crate::hashrate::Env for Counters {
         suspend_if_shutdown(HR_TAG);
     }
     fn reset_counter(&mut self, reg: u8) {
-        unsafe { asic::asic_driver_reset_counter(self.0, reg) };
+        self.0.run(|d, u| d.reset_counter(u, reg));
     }
     fn read_counter(&mut self, reg: u8) {
-        unsafe { asic::asic_driver_read_counter(self.0, reg) };
+        self.0.run(|d, u| d.read_counter(u, reg));
     }
 }
 
 unsafe extern "C" fn hashrate_task(arg: *mut c_void) {
-    crate::hashrate::run(&mut Counters(arg as *const asic::Handle))
+    // SAFETY: the board's driver (it lives as long as the board), see
+    // hashrate_monitor_start()
+    crate::hashrate::run(&mut Counters(&*(arg as *const asic::Handle)))
 }
 
 pub(crate) mod ffi {
@@ -358,7 +353,7 @@ pub(crate) mod ffi {
                 hashrate_task,
                 c"hr_monitor".as_ptr(),
                 4096,
-                a as *mut c_void,
+                a as *const asic::Handle as *mut c_void,
                 10,
                 core::ptr::null_mut(),
             )

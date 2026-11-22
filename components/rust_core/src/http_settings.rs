@@ -127,9 +127,9 @@ fn flag(v: &Json) -> Option<bool> {
     v.as_bool().or_else(|| v.as_int().map(|i| i != 0))
 }
 
-/// A PID factor as stored: hundredths, saturated.
+/// A PID factor as stored: hundredths, rounded, saturated.
 fn hundredths(f: f32) -> u32 {
-    (f * 100.0) as u16 as u32
+    (f * 100.0).round() as u16 as u32
 }
 
 /// The coinbase fee as stored: tenths of a percent, rounded, saturated.
@@ -428,5 +428,13 @@ mod tests {
         assert_eq!(hundredths(1e9), 65535);
         assert_eq!(hundredths(f32::NAN), 0);
         assert_eq!(tenths(2.25), 23);
+    }
+
+    #[test]
+    fn pid_factors_keep_their_hundredths() {
+        // 0.53 * 100.0 is 52.999996 in f32
+        for h in 0..1000u32 {
+            assert_eq!(hundredths(h as f32 / 100.0), h);
+        }
     }
 }

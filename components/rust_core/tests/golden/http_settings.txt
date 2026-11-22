@@ -67,7 +67,7 @@ sha256 50feff80be8d55662b4420d08ffe55d8939537642c439bfed1fa4f64a273a229
 | 
 === v1_bodies_match_reference
 count 30000
-sha256 d538a4f6c6ae7914541d15a04eb354c405dca86e3c01025f549fc4615e64ccbc
+sha256 77c9b1226315739f3ee4b3a34c8c1e094e1657d1a8f95d6890115719887db5d8
 --- sample 0
 | "{\"p" dual false -> false
 | 
@@ -97,7 +97,7 @@ sha256 d538a4f6c6ae7914541d15a04eb354c405dca86e3c01025f549fc4615e64ccbc
 | 
 === v2_bodies_match_reference
 count 30000
-sha256 a1ba304f7a46b585190939a21c574eba346231442f5072626f9431ffe743b61f
+sha256 e4797cc06dcef7223e9544134ab32f1adc49478347416d428a45ce14b8595839
 --- sample 0
 | "{\"autoScreenOff\":18446744073709551616,\"hostname\":false}" -> (true, [false, false])
 | 

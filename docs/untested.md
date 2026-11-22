@@ -5,28 +5,11 @@ only by host tests: unit tests, and golden tests with the outputs of the
 former C/C++ code where those exist. Each entry names the PR, what is missing and
 what a test would need. When an entry has been tested, delete it.
 
-## Stratum
-
-- **TLS pool connection** (`src/stratum_transport.rs`, `Kind::Tls`).
-  No pool with `stratum+ssl` was configured, so only TCP (SV1) and Noise
-  (SV2) ran on hardware. Needs a TLS pool, for example a TLS port of
-  public-pool, with `stratumtls` set.
-- **Failover switching** (`src/pool_manager.rs`). Only dual pool mode
-  ran on the Q1373. Unit tests cover the switching to the secondary pool
-  through the reconnect timer and the switching back when the primary
-  returns. Needs failover mode with a primary that goes away, for example
-  a `socat` relay to ckpool that is stopped and started again.
-- **Coinbase verification fault**. This raises the board error when
-  all configured pools are blocked by the verification. Needs a pool
-  whose coinbase does not pay the configured address, or a deliberately
-  wrong user address with verification mode 1.
-
 ## Display / system task
 
-- **Error overlay** (`src/system.rs`). It is shown when the board
-  error is set and hidden again when it clears. Needs a board error, for
-  example the coinbase verification fault above, or a lowered overheat
-  limit (only with the user's OK).
+- **Error overlay hidden again** (`src/system.rs`). Showing it ran on a
+  NerdQAxe++ (coinbase verification fault); that it goes away when the
+  error clears was not watched on the screen.
 - **Found block overlay**. It is shown when the found-block counter
   increases. Needs a found block.
 - **CAN slave label**. The display shows "CAN ID: n" or "CAN: ..."
@@ -45,8 +28,6 @@ what a test would need. When an entry has been tested, delete it.
   - NerdQAxe++: runs v2.0.0-alpha.1 (flashed with the web flasher); the
     rev7 TPS546 detection is not covered.
   - NerdEKO and NerdHAXE-γ.
-  - NerdQX: TMP451 mux on GPIO2/3; without the mux the limits drop to
-    1150 mV / 495 MHz.
   - NerdOCTAXE-γ: VR detection on GPIO3, two TMP451 muxes.
   - Q1370: TMP451 mux on the FXL6408.
   - NerdAxe: DS4432U DAC with INA260.
@@ -85,9 +66,6 @@ what a test would need. When an entry has been tested, delete it.
   This was tested with `dig` over the LAN, where the server also answers
   with 192.168.4.1. Needs a phone or laptop on the device's access point
   (no WiFi configured).
-- **WiFi health log, RSSI line** (`src/wifi_health.rs`). Tested on the
-  Q1373 over Ethernet (lwIP counters, "WiFi not connected"); the
-  RSSI / SSID / channel line needs a board on WiFi.
 
 ## CAN (`src/can.rs`, `src/http_can.rs`)
 
@@ -119,7 +97,6 @@ Tested with the user on the Q1373 (2026-11-19):
 Still to test:
 - the WiFi scan in the portal (`/api/v2/wifi/scan` with the AP active);
 - the WiFi reconnect backoff after a lost AP;
-- a board without Ethernet;
 - an ETH init failure (cleanup path). Since the soundness fixes it tears down
   in the IDF order (glue, netif, driver, PHY/MAC) and leaks MAC/PHY instead of
   freeing them when the driver refuses to uninstall. Needs a W5500 that fails
@@ -131,8 +108,7 @@ The web UI's updater lists the releases of `shufps/nerd-os-rs`, and the factory 
 
 Tested with the first release (v2.0.0-alpha.1): the CI upload into `webflasher-rs/`, and the web flasher installing it on a NerdQAxe++ and the Q1373.
 
-Still to test:
-- the updater listing the releases and the factory update from one of them.
+Tested with v2.0.0-alpha.4 on a NerdQAxe++: the updater listing the releases (pre-releases shown with the checkbox) and the factory update from one of them with "Keep Settings".
 
 ## Settings profiles: the profile "default"
 
@@ -153,8 +129,8 @@ The screens of the display (formerly `main/displays/ui.cpp`) are built in Rust (
 Tested on a Q1373 (screenshots compared with the C++ screens): splash with donation QR, mining, settings, BTC, global stats, the screen cycle with button 1, the network icon switching from WiFi to Ethernet.
 
 Still to test:
-- the boards with their own theme (every board except Q1370/Q1373): the backgrounds and the label positions;
-- the portal screen (AP mode with SSID), the error overlay, the "found block" overlay, the power-off screen, the OTP enrollment QR code, the self test screen.
+- the boards with their own theme (every board except Q1370/Q1373, NerdQAxe++ and NerdQX): the backgrounds and the label positions;
+- the portal screen (AP mode with SSID), the "found block" overlay, the power-off screen, the OTP enrollment QR code, the self test screen.
 
 ## Display driver in Rust
 
@@ -163,7 +139,7 @@ The display driver (formerly `main/displays/displayDriver.cpp`, buttons, UI mess
 Tested on a Q1373: panel init, splash sequence, screen cycle with button 1, OTP QR screen with cancel by button, auto screen off (countdown, off, on by button), the real buttons (short presses, button 2 toggling the screen) and the shutdown countdown with both held; the found-block image and its close by a button (a real block replayed by a test stratum server).
 
 Still to test:
-- identify (CAN command), the error overlay;
+- identify (CAN command);
 - the self test (`selftest` set, best difficulty 0) with its two log screens;
 - a board with `flip_screen` (mirrored panel).
 
@@ -171,7 +147,4 @@ Still to test:
 
 Ported from #18/#19. Tested on a Q1373 over Ethernet with SLAAC (global prefix from the router): IPv6 to a dual-stack TLS pool (solo.atlaspool.io:4333) with accepted shares; fallback to IPv4 when the pool refuses IPv6 (ckpool); web access from a link-local client allowed, from a global IPv6 client refused.
 
-Still to test:
-- the web UI accepting IPv6 pool addresses (the www image was not rebuilt);
-- IPv6 over Wi-Fi on a Q1373, and a unique-local (fc00::/7) client;
-- an IPv6 literal (with and without brackets) as the pool address.
+Tested with v2.0.0-alpha.4 on a NerdQAxe++ over Wi-Fi with SLAAC (unique-local prefix): IPv6 to a pool given as an IPv6 literal without and with brackets, and as a dual-stack name, each with accepted shares; web access from a unique-local client allowed. The web UI accepts an IPv6 literal (with or without brackets) as the pool address and still refuses a port or `stratum+tcp://` in it.

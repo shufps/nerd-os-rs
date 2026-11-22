@@ -637,8 +637,6 @@ These endpoints remain on v1 for backwards compatibility (Swarm discovery across
 | `POST` | `/api/system/OTAWWW` | Upload web UI binary |
 | `POST` | `/api/system/OTA/github` | One-click GitHub OTA update |
 | `GET` | `/api/system/OTA/github` | Get GitHub OTA update status |
-| `GET` | `/api/swarm/info` | Get swarm device list |
-| `PATCH` | `/api/swarm` | Update swarm configuration |
 
 #### `POST /api/system/reset-stats`
 

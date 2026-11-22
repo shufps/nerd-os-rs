@@ -70,10 +70,11 @@ idf_const!(PROF_REPLY: u32 = esp_ping_profile_t_ESP_PING_PROF_REPLY, 4);
 idf_const!(PROF_IPADDR: u32 = esp_ping_profile_t_ESP_PING_PROF_IPADDR, 5);
 idf_const!(PROF_SIZE: u32 = esp_ping_profile_t_ESP_PING_PROF_SIZE, 6);
 idf_const!(PROF_TIMEGAP: u32 = esp_ping_profile_t_ESP_PING_PROF_TIMEGAP, 7);
-idf_const!(
-    /// `ESP_PING_DEFAULT_CONFIG()`: `ESP_TASK_PING_STACK`, `IP_DEFAULT_TTL`
-    PING_STACK: u32 = ESP_TASK_PING_STACK, 2048 + 512
-);
+/// The stack of the ping session's task, which runs the reply callbacks
+/// (they format and log; with the web socket log on, the vprintf hook runs
+/// there too). `ESP_TASK_PING_STACK` (2560 bytes) overflowed after hours:
+/// measured peak 2432 bytes, 2528 with the web socket log on.
+const PING_STACK: u32 = 4096;
 idf_const!(DEFAULT_TTL: c_int = IP_DEFAULT_TTL, 64);
 
 /// The address as text (not lwIP's `ipaddr_ntoa()`: its one static

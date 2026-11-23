@@ -49,8 +49,8 @@ button {
 .cb-line .cb-title { font-weight: 600; }
 .cb-line .cb-desc { opacity: 0.78; font-size: 0.95rem; }
 
-/* metrics interval: the select in place of the checkbox */
-.metrics-row { gap: .6rem; flex-wrap: wrap; }
+/* metrics interval: under the checkbox text, aligned with it */
+.metrics-interval { margin-top: -.5rem; padding-left: 1.75rem; }
 .metrics-select { min-width: 9rem; }
 
 /* tighten checkbox spacing a bit */

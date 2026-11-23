@@ -499,7 +499,6 @@
     "COINBASE_VERIFY_FAILED_DESC": "se declanșează când coinbase-ul pool-ului nu conține adresa dvs. sau depășește limita de taxe configurată",
     "METRICS": "Metrici",
     "METRICS_DESC": "trimite regulat hashrate-ul, temperaturile, puterea, share-urile și cea mai bună dificultate",
-    "METRICS_OFF": "Oprit",
     "METRICS_EVERY": "la fiecare {{hours}} h"
   },
   "LANGUAGE": {

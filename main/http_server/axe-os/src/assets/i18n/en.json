@@ -501,7 +501,6 @@
     "COINBASE_VERIFY_FAILED_DESC": "triggers when the pool's coinbase does not contain your address or exceeds the configured fee limit",
     "METRICS": "Metrics",
     "METRICS_DESC": "sends hashrate, temperatures, power, shares and best difficulty regularly",
-    "METRICS_OFF": "Off",
     "METRICS_EVERY": "every {{hours}} h"
   },
   "LANGUAGE": {

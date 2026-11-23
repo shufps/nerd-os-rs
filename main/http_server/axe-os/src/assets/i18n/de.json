@@ -501,7 +501,6 @@
     "COINBASE_VERIFY_FAILED_DESC": "wird ausgelöst, wenn die Coinbase des Pools deine Adresse nicht enthält oder das konfigurierte Gebührenlimit überschreitet",
     "METRICS": "Metriken",
     "METRICS_DESC": "sendet regelmäßig Hashrate, Temperaturen, Leistung, Shares und beste Schwierigkeit",
-    "METRICS_OFF": "Aus",
     "METRICS_EVERY": "alle {{hours}} h"
   },
   "LANGUAGE": {

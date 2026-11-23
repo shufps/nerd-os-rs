@@ -499,7 +499,6 @@
     "COINBASE_VERIFY_FAILED_DESC": "se activa cuando la coinbase del pool no contiene tu dirección o excede el límite de comisión configurado",
     "METRICS": "Métricas",
     "METRICS_DESC": "envía regularmente el hashrate, las temperaturas, la potencia, los shares y la mejor dificultad",
-    "METRICS_OFF": "Desactivado",
     "METRICS_EVERY": "cada {{hours}} h"
   },
   "LANGUAGE": {

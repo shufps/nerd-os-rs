@@ -21,8 +21,8 @@ export class AlertComponent implements OnInit {
 
   public form!: FormGroup;
   public hasWebhook = false;
-  /** metrics message interval in hours, 0 = off */
-  public readonly heartbeatOptions = [0, 1, 2, 4, 6, 12, 24];
+  /** metrics message intervals in hours */
+  public readonly heartbeatOptions = [1, 2, 4, 6, 12, 24];
   @Input() uri = '';
 
   constructor(
@@ -45,7 +45,9 @@ export class AlertComponent implements OnInit {
           blockFoundEnable: [data?.blockFoundEnable === 1],
           bestDiffEnable: [data?.bestDiffEnable === 1],
           coinbaseVerifyEnable: [data?.coinbaseVerifyEnable === 1],
-          heartbeatHours: [data?.heartbeatHours ?? 0],
+          // metrics message: heartbeatHours 0 is off
+          heartbeatEnable: [(data?.heartbeatHours ?? 0) > 0],
+          heartbeatInterval: [(data?.heartbeatHours ?? 0) > 0 ? data.heartbeatHours : 1],
           showBlockFoundScreen: [data?.showBlockFoundScreen === 1],
 
           webhookUrl: [data?.hasWebhook ? 'WEBHOOK' : '', [
@@ -63,7 +65,7 @@ export class AlertComponent implements OnInit {
       blockFoundEnable: !!form.blockFoundEnable,
       bestDiffEnable: !!form.bestDiffEnable,
       coinbaseVerifyEnable: !!form.coinbaseVerifyEnable,
-      heartbeatHours: Number(form.heartbeatHours) || 0,
+      heartbeatHours: form.heartbeatEnable ? Number(form.heartbeatInterval) || 1 : 0,
     };
     if (form.webhookUrl !== 'WEBHOOK') {
       payload.webhookUrl = form.webhookUrl || '';

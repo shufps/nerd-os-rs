@@ -149,8 +149,8 @@ Tested with v2.0.0-alpha.4 on a NerdQAxe++ over Wi-Fi with SLAAC (unique-local p
 
 ## Metrics webhook
 
-New: an interval on the alert page (off, 1, 2, 4, 6, 12 or 24 hours); a webhook message at that interval with hashrate, temperatures, power, shares, best difficulty, blocks and uptime (`src/heartbeat.rs`). Tested on a NerdAxe over the API with a local webhook listener.
+New: a checkbox on the alert page with an interval (1, 2, 4, 6, 12 or 24 hours); a webhook message at that interval with hashrate, temperatures, power, shares, best difficulty, blocks and uptime (`src/heartbeat.rs`). Tested on a NerdAxe over the API with a local webhook listener.
 
 Still to test:
-- the interval select on the alert page in a browser;
+- the checkbox and interval select on the alert page in a browser;
 - a real Discord webhook (the message is sent in the same JSON as the alerts).

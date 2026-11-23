@@ -499,7 +499,6 @@
     "COINBASE_VERIFY_FAILED_DESC": "wyzwala się, gdy coinbase poola nie zawiera twojego adresu lub przekracza skonfigurowany limit opłat",
     "METRICS": "Metryki",
     "METRICS_DESC": "regularnie wysyła hashrate, temperatury, moc, udziały i najlepszą trudność",
-    "METRICS_OFF": "Wył.",
     "METRICS_EVERY": "co {{hours}} h"
   },
   "LANGUAGE": {

@@ -499,7 +499,6 @@
     "COINBASE_VERIFY_FAILED_DESC": "se déclenche lorsque la coinbase du pool ne contient pas votre adresse ou dépasse la limite de frais configurée",
     "METRICS": "Métriques",
     "METRICS_DESC": "envoie régulièrement le hashrate, les températures, la puissance, les shares et la meilleure difficulté",
-    "METRICS_OFF": "Désactivé",
     "METRICS_EVERY": "toutes les {{hours}} h"
   },
   "LANGUAGE": {

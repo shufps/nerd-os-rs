@@ -394,6 +394,16 @@ impl Tps546 {
         });
     }
 
+    /// The feedback divider (VOUT_SCALE_LOOP) and the VOUT_MIN/VOUT_MAX
+    /// limits (V); before `init()`.
+    pub fn set_vout_range(&self, scale_loop: f32, min: f32, max: f32) {
+        self.with(|s| {
+            s.config.scale_loop = scale_loop;
+            s.config.vout_min = min;
+            s.config.vout_max = max;
+        });
+    }
+
     /// Checks the device ID, writes the configuration (output off until
     /// `set_vout()`); 0 or -1.
     pub fn init(&self, bus: &mut impl Bus) -> c_int {

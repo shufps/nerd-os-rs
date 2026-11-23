@@ -931,6 +931,11 @@ impl Board {
         if id == NerdAxeGaia {
             tps.set_vin_config(10.5, 9.5, 10.5, 14.0);
             tps.set_iout_config(28.0, 33.0);
+            // the BM1373 runs at 0.9..1.04 V: with the 1:2 divider that is
+            // inside the recommended VOUT_COMMAND range (0.5..1.5 V,
+            // TPS546D24A datasheet table 7-1; with 0.25 it is 1..3 V), and
+            // 1.4 V is the highest valid VOUT_COMMAND there (table 7-34)
+            tps.set_vout_range(0.5, 0.8, 1.4);
         }
         if tps.init(&mut SmBus) != 0 {
             log!(Error, t, "TPS546 init failed!");

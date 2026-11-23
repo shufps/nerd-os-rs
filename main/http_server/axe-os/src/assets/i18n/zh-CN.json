@@ -89,7 +89,8 @@
     "BLOCK_SCRIPTSIG": "Scriptsig",
     "BLOCK_VALUE": "价值",
     "BLOCK_FEE": "手续费",
-    "BLOCK_SHARE": "Share"
+    "BLOCK_SHARE": "Share",
+    "BOARD_ERROR_HINT": "稳压器保护已关闭 ASIC 电压。请检查散热和电源，或降低频率/电压，然后重启矿机。"
   },
   "PERFORMANCE": {
     "TITLE": "性能",

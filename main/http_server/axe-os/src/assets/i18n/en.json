@@ -89,7 +89,8 @@
     "BLOCK_SCRIPTSIG": "Scriptsig",
     "BLOCK_VALUE": "Value",
     "BLOCK_FEE": "Fee",
-    "BLOCK_SHARE": "Share"
+    "BLOCK_SHARE": "Share",
+    "BOARD_ERROR_HINT": "the voltage regulator's protection switched off the ASIC voltage. Check cooling and power supply or lower frequency/voltage, then restart the miner."
   },
   "PERFORMANCE": {
     "TITLE": "Performance",

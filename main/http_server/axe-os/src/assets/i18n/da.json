@@ -89,7 +89,8 @@
     "BLOCK_SCRIPTSIG": "Scriptsig",
     "BLOCK_VALUE": "Værdi",
     "BLOCK_FEE": "Gebyr",
-    "BLOCK_SHARE": "Andel"
+    "BLOCK_SHARE": "Andel",
+    "BOARD_ERROR_HINT": "spændingsregulatorens beskyttelse har slukket ASIC-spændingen. Tjek køling og strømforsyning eller sænk frekvens/spænding, og genstart derefter mineren."
   },
   "PERFORMANCE": {
     "TITLE": "Ydelse",

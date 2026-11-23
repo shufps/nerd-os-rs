@@ -89,7 +89,8 @@
     "BLOCK_SCRIPTSIG": "Scriptsig",
     "BLOCK_VALUE": "Wert",
     "BLOCK_FEE": "Gebühr",
-    "BLOCK_SHARE": "Anteil"
+    "BLOCK_SHARE": "Anteil",
+    "BOARD_ERROR_HINT": "der Schutz des Spannungsreglers hat die ASIC-Spannung abgeschaltet. Prüfe Kühlung und Netzteil oder senke Frequenz/Spannung und starte den Miner dann neu."
   },
   "PERFORMANCE": {
     "TITLE": "Leistung",

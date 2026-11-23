@@ -89,7 +89,8 @@
     "BLOCK_SCRIPTSIG": "Scriptsig",
     "BLOCK_VALUE": "Valore",
     "BLOCK_FEE": "Commissione",
-    "BLOCK_SHARE": "Quota"
+    "BLOCK_SHARE": "Quota",
+    "BOARD_ERROR_HINT": "la protezione del regolatore di tensione ha spento la tensione degli ASIC. Controlla raffreddamento e alimentatore o riduci frequenza/tensione, poi riavvia il miner."
   },
   "PERFORMANCE": {
     "TITLE": "Prestazioni",

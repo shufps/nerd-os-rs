@@ -368,7 +368,7 @@ impl Tps546 {
         f(&mut self.s.lock().unwrap_or_else(|e| e.into_inner()))
     }
 
-    fn initialized(&self) -> bool {
+    pub(crate) fn initialized(&self) -> bool {
         self.with(|s| s.initialized)
     }
 

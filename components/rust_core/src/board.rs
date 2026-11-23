@@ -1319,6 +1319,12 @@ impl Board {
         match &hw.buck {
             Buck::Tps536x7(d) => regs(&|reg| d.status_reg(&mut SmBus, reg)),
             Buck::Rev7(d) => regs(&|reg| d.status_reg(&mut SmBus, reg)),
+            // NerdAxeGamma/Gaia: the TPS546 once initialized (the NerdAxe
+            // has none)
+            Buck::Axe if axe_tps().initialized() => {
+                let d = axe_tps();
+                regs(&|reg| d.status_reg(&mut SmBus, reg))
+            }
             Buck::Axe => (0, 0),
         }
     }

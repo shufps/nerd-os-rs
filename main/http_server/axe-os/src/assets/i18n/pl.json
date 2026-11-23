@@ -89,7 +89,8 @@
     "BLOCK_SCRIPTSIG": "Scriptsig",
     "BLOCK_VALUE": "Wartość",
     "BLOCK_FEE": "Opłata",
-    "BLOCK_SHARE": "Udział"
+    "BLOCK_SHARE": "Udział",
+    "BOARD_ERROR_HINT": "zabezpieczenie regulatora napięcia wyłączyło napięcie ASIC. Sprawdź chłodzenie i zasilacz lub obniż częstotliwość/napięcie, a następnie uruchom ponownie koparkę."
   },
   "PERFORMANCE": {
     "TITLE": "Wydajność",

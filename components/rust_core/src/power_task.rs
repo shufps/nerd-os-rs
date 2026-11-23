@@ -89,6 +89,8 @@ struct Last {
     vr_frequency: u32,
     /// the 15 s buck telemetry request (due at the first telemetry read)
     telemetry_due: Option<u64>,
+    /// the regulator fault last logged
+    fault: c_int,
 }
 
 pub struct PowerTask {
@@ -205,9 +207,17 @@ impl PowerTask {
         env.influx_pwr([vin, iin, pin, vout, iout, pout]);
         let (error, status) = env.fault();
         if error != ERROR_NONE {
+            if error != last.fault {
+                log!(
+                    Error,
+                    TAG,
+                    "voltage regulator fault {error} (status {status:08X}) - Shutting down asic voltage"
+                );
+            }
             env.set_board_error(error, status);
             env.set_voltage(0.0);
         }
+        last.fault = error;
         store(&self.out.voltage, (vin as f64 * 1000.0) as f32);
         store(&self.out.current, (iin as f64 * 1000.0) as f32);
         store(&self.out.power, pin);

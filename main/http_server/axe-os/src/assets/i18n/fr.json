@@ -89,7 +89,8 @@
     "BLOCK_SCRIPTSIG": "Scriptsig",
     "BLOCK_VALUE": "Valeur",
     "BLOCK_FEE": "Frais",
-    "BLOCK_SHARE": "Part"
+    "BLOCK_SHARE": "Part",
+    "BOARD_ERROR_HINT": "la protection du régulateur de tension a coupé la tension des ASIC. Vérifiez le refroidissement et l'alimentation ou baissez la fréquence/la tension, puis redémarrez le mineur."
   },
   "PERFORMANCE": {
     "TITLE": "Performance",

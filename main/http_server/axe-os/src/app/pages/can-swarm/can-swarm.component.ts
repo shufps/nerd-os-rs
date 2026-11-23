@@ -45,20 +45,8 @@ export interface CanSlave {
   autoScreenOff?: boolean;
 }
 
-// Mirrors Board::Error enum order from board.h
-export const BOARD_ERROR_STRINGS: Record<number, string> = {
-  0: '',
-  1: 'MINER OVERHEATED',
-  2: 'VREG OVERHEATED',
-  3: 'PSU FAULT',
-  4: 'CURRENT PROTECTION',
-  5: 'VOLTAGE PROTECTION',
-};
-
-export function boardErrorStr(code: number | undefined): string {
-  if (!code) return '';
-  return BOARD_ERROR_STRINGS[code] ?? 'ERROR';
-}
+export { BOARD_ERROR_STRINGS, boardErrorStr } from '../../models/board-error';
+import { boardErrorStr } from '../../models/board-error';
 
 export const FAN_MODES = [
   { value: 0, label: 'Manual' },

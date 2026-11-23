@@ -1,3 +1,4 @@
+import { hardwareBoardError } from '../../models/board-error';
 import {
   Component,
   AfterViewChecked,
@@ -103,6 +104,8 @@ import { maxAsicTemp,
 })
 
 export class HomeComponent implements AfterViewChecked, OnInit, OnDestroy {
+  /** the board's hardware protection error as text ('' if none) */
+  public hardwareError = hardwareBoardError;
   @ViewChild('myChart') ctx!: ElementRef<HTMLCanvasElement>;
 
   // Persisted UI state: chart collapsed (visual-only; data continues tracking).

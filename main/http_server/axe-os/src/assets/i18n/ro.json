@@ -89,7 +89,8 @@
     "BLOCK_SCRIPTSIG": "Scriptsig",
     "BLOCK_VALUE": "Valoare",
     "BLOCK_FEE": "Taxă",
-    "BLOCK_SHARE": "Cotă"
+    "BLOCK_SHARE": "Cotă",
+    "BOARD_ERROR_HINT": "protecția regulatorului de tensiune a oprit tensiunea ASIC. Verifică răcirea și sursa de alimentare sau scade frecvența/tensiunea, apoi repornește minerul."
   },
   "PERFORMANCE": {
     "TITLE": "Performanță",

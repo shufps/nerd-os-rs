@@ -17,6 +17,9 @@
         [style.left.px]="poolVerifyTooltipX" [style.top.px]="poolVerifyTooltipY"
         aria-hidden="true">{{ getPoolVerificationTooltip(1) }}</span>
   <div *ngIf="info$ | async as info; else loading">
+    <nb-alert *ngIf="hardwareError(info.system.boardError) as err" status="danger" class="board-error-alert">
+      <strong>{{ err }}</strong> — {{ 'HOME.BOARD_ERROR_HINT' | translate }}
+    </nb-alert>
     <div *ngIf="!info.system.shutdown; else shutdown">
       <!-- Chart (full width, top) -->
       <div class="row d-flex align-items-stretch">

@@ -89,7 +89,8 @@
     "BLOCK_SCRIPTSIG": "Scriptsig",
     "BLOCK_VALUE": "Valor",
     "BLOCK_FEE": "Comisión",
-    "BLOCK_SHARE": "Participación"
+    "BLOCK_SHARE": "Participación",
+    "BOARD_ERROR_HINT": "la protección del regulador de voltaje apagó el voltaje del ASIC. Revisa la refrigeración y la fuente de alimentación o baja la frecuencia/el voltaje y reinicia el minero."
   },
   "PERFORMANCE": {
     "TITLE": "Rendimiento",

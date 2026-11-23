@@ -462,6 +462,7 @@
     "SETTINGS": "Impostazioni varie",
     "FLIP_SCREEN": "Capovolgi schermo",
     "AUTO_SCREEN_OFF": "Spegnimento automatico schermo",
+    "AUTO_SCREEN_OFF_TIMEOUT": "Spegni lo schermo dopo (secondi)",
     "STRATUM_KEEPALIVE": "Abilita TCP Keepalive Stratum",
     "CUSTOM_MEMPOOL": "Endpoint Mempool personalizzato",
     "MEMPOOL_URL": "URL Mempool"

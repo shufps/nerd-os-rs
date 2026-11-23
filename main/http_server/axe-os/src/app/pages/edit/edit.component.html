@@ -608,6 +608,13 @@
                 <div class="form-row">
                     <nb-checkbox formControlName="autoScreenOff">{{ 'MISC.AUTO_SCREEN_OFF' | translate }}</nb-checkbox>
                 </div>
+                <div class="form-row" *ngIf="form.controls['autoScreenOff'].value">
+                    <label for="autoScreenOffTimeout" class="form-label">{{ 'MISC.AUTO_SCREEN_OFF_TIMEOUT' | translate }}:</label>
+                    <div class="form-control-wrapper">
+                        <input nbInput id="autoScreenOffTimeout" type="number" min="5" max="3600" step="1"
+                               formControlName="autoScreenOffTimeout" />
+                    </div>
+                </div>
                 <div class="form-row">
                     <nb-checkbox formControlName="customMempoolEnabled">{{ 'MISC.CUSTOM_MEMPOOL' | translate }}</nb-checkbox>
                 </div>

@@ -289,6 +289,7 @@ fn system_info(req: &mut Request) -> EspErr {
     s.flip_screen = b.flip_screen;
     s.invert_screen = cfg::invert_screen();
     s.auto_screen_off = cfg::auto_screen_off();
+    s.auto_screen_off_timeout = cfg::screen_off_secs();
     s.invert_fan_polarity = b.fan_invert;
     s.stratum_keep = cfg::stratum_keepalive();
     s.vr_frequency = b.vr_frequency;
@@ -550,6 +551,7 @@ pub(crate) fn v2_settings_doc() -> crate::ajson::Json {
     v.flip_screen = b.flip_screen;
     v.invert_screen = cfg::invert_screen();
     v.auto_screen_off = cfg::auto_screen_off();
+    v.auto_screen_off_timeout = cfg::screen_off_secs();
 
     http_json::v2_settings(&v)
 }

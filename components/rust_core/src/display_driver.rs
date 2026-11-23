@@ -57,8 +57,6 @@ const SPLASH2_MS: i64 = 5000;
 #[cfg(not(any(board = "NERDQX", board = "Q1370", board = "Q1373")))]
 const SPLASH2_MS: i64 = 3000;
 
-/// the screen goes dark after this time without a key press (auto off)
-const AUTO_OFF_US: i64 = 30_000_000;
 /// the "Turning screen off..." countdown (s)
 const AUTO_OFF_COUNTDOWN_S: i64 = 5;
 /// both buttons held this long switch the board off (s)
@@ -112,6 +110,8 @@ struct Driver {
     found_block: bool,
     identify_ms: u32,
     auto_off: bool,
+    /// the screen goes dark after this time without a key press
+    auto_off_us: i64,
     show_found_block: bool,
     /// the "Turning screen off..." box and its start
     countdown: Option<(Obj, i64)>,
@@ -172,6 +172,7 @@ impl Driver {
 
     fn load_settings(&mut self) {
         self.auto_off = crate::cfg::auto_screen_off();
+        self.auto_off_us = crate::cfg::screen_off_secs() as i64 * 1_000_000;
         self.show_found_block = crate::cfg::show_block_found();
         // the setting was switched off: the screen comes on
         if !self.auto_off {
@@ -208,7 +209,7 @@ impl Driver {
             return;
         }
         let now = now_us();
-        if now - self.last_keypress_us > AUTO_OFF_US {
+        if now - self.last_keypress_us > self.auto_off_us {
             if self.countdown.is_none() {
                 let bx = self.message_box(c"Turning screen off...").map(|(bx, _)| bx);
                 match bx {
@@ -863,6 +864,7 @@ pub mod api {
             found_block: false,
             identify_ms: 60_000,
             auto_off: false,
+            auto_off_us: crate::cfg::SCREEN_OFF_DEFAULT_S as i64 * 1_000_000,
             show_found_block: true,
             countdown: None,
             shutdown: None,

@@ -132,6 +132,14 @@ pub fn fan_pid_use_max() -> bool {
 pub fn invert_screen() -> bool {
     flag(b"invertscreen", 0)
 }
+/// The auto screen off time (s) and its limits.
+pub const SCREEN_OFF_DEFAULT_S: u32 = 30;
+pub const SCREEN_OFF_MIN_S: u32 = 5;
+pub const SCREEN_OFF_MAX_S: u32 = 3600;
+pub fn screen_off_secs() -> u32 {
+    let s = u16v(b"scroff_secs", SCREEN_OFF_DEFAULT_S as i64) as u32;
+    s.clamp(SCREEN_OFF_MIN_S, SCREEN_OFF_MAX_S)
+}
 pub fn auto_screen_off() -> bool {
     flag(b"autoscreenoff", k::AUTO_SCREEN_OFF_VALUE)
 }

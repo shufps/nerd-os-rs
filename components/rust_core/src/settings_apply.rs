@@ -77,6 +77,7 @@ pub fn apply(w: &Write, applied: &mut Applied, pid_use_max: bool, s: &mut impl S
         TempControlMode => s.set_u16(b"autofanspeed", u16v),
         FanSpeed => s.set_u16(b"fanspeed", u16v),
         AutoScreenOff => s.set_u16(b"autoscreenoff", b),
+        AutoScreenOffTimeout => s.set_u16(b"scroff_secs", u16v),
         StratumKeepalive => s.set_u16(b"stratum_keep", b),
         PidTargetTemp => s.set_u16(b"pid_temp", u16v),
         PidP => s.set_u16(b"pid_p", u16v),

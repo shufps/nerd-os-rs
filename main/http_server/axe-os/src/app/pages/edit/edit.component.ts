@@ -207,6 +207,11 @@ export class EditComponent implements OnInit {
           flipScreen: [info.flipScreen == 1],
           invertScreen: [info.invertScreen == 1],
           autoScreenOff: [info.autoScreenOff == 1],
+          autoScreenOffTimeout: [info.autoScreenOffTimeout ?? 30, [
+            Validators.required,
+            Validators.min(5),
+            Validators.max(3600)
+          ]],
           customMempoolEnabled: [!!info.mempoolCustom],
           mempoolUrl: [info.mempoolUrl || 'https://mempool.space'],
           timeFormat: [this.localStorageService.getItem('timeFormat') || '24h'],
@@ -491,6 +496,7 @@ export class EditComponent implements OnInit {
       flipScreen: !!f.flipScreen,
       invertScreen: !!f.invertScreen,
       autoScreenOff: !!f.autoScreenOff,
+      autoScreenOffTimeout: Number(f.autoScreenOffTimeout),
       // CAN
       canMaster: !!f.canMaster,
     };

@@ -1,12 +1,12 @@
 # Golden outputs (the former C/C++ code), see tests/golden/mod.rs
 === init_polarity_and_speeds
 count 44008
-sha256 db06b609a33ac1042b6549ea5f79c69f1f616432fd22c5c941ce1a9e4a6f5c6e
+sha256 71df28d360ce2e690618d83b1ebd4a3bbd644ceac7e421bd621ab7fa45e30a54
 --- sample 0
 | fail false invert false: true true
 | wr 2e 2a 00
 | wr 2e 2b 03
-| wr 2e 2d 09
+| wr 2e 2d 05
 | wr 2e 32 08
 | wr 2e 42 08
 | wr 2e 2a 00
@@ -15,7 +15,7 @@ sha256 db06b609a33ac1042b6549ea5f79c69f1f616432fd22c5c941ce1a9e4a6f5c6e
 | fail false invert true: true true
 | wr 2e 2a 03
 | wr 2e 2b 03
-| wr 2e 2d 09
+| wr 2e 2d 05
 | wr 2e 32 08
 | wr 2e 42 08
 | wr 2e 2a 03

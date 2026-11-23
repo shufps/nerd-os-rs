@@ -124,7 +124,7 @@ pub fn apply(w: &Write, applied: &mut Applied, pid_use_max: bool, s: &mut impl S
         DiscordBestDiff => s.set_u16(b"alrt_disc_bd_en", b),
         DiscordCoinbaseVerify => s.set_u16(b"alrt_disc_cb_en", b),
         ShowBlockFound => s.set_u16(b"block_found_en", b),
-        HeartbeatEnable => s.set_u16(b"alrt_hb_en", b),
+        HeartbeatHours => s.set_u16(b"alrt_hb_intv", u16v),
         // CAN node commands go to the node, not the config
         CanFrequency | CanVoltage | CanFan | CanDisplay => {}
         // coinbase verification: remember whether it changed, to re-run it

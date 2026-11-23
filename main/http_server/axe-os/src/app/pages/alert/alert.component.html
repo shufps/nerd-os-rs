@@ -42,11 +42,16 @@
           </nb-checkbox>
         </div>
 
-        <div class="form-row">
-          <nb-checkbox formControlName="heartbeatEnable" class="cb-line">
-            <span class="cb-title">{{ 'DISCORD.HOURLY_METRICS' | translate }}</span>
-            <span class="cb-desc">— {{ 'DISCORD.HOURLY_METRICS_DESC' | translate }}</span>
-          </nb-checkbox>
+        <div class="form-row metrics-row">
+          <nb-select formControlName="heartbeatHours" size="small" class="metrics-select">
+            <nb-option *ngFor="let h of heartbeatOptions" [value]="h">
+              {{ h === 0 ? ('DISCORD.METRICS_OFF' | translate) : ('DISCORD.METRICS_EVERY' | translate: { hours: h }) }}
+            </nb-option>
+          </nb-select>
+          <span class="cb-line">
+            <span class="cb-title">{{ 'DISCORD.METRICS' | translate }}</span>
+            <span class="cb-desc">— {{ 'DISCORD.METRICS_DESC' | translate }}</span>
+          </span>
         </div>
         <!-- Webhook -->
         <div class="form-row webhook-row mt-3">

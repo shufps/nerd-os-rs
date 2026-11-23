@@ -40,7 +40,7 @@ pub fn load_config() {
             sdkconfig::ALERT_DISCORD_BEST_DIFF_ENABLE_VALUE,
         ),
         coinbase_verify: on(b"alrt_disc_cb_en", 0),
-        heartbeat: on(b"alrt_hb_en", 0),
+        heartbeat_hours: config::get_u16(b"alrt_hb_intv", 0).min(crate::heartbeat::MAX_HOURS),
     });
 }
 

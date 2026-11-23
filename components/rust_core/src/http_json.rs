@@ -823,7 +823,7 @@ pub struct AlertInfo {
     pub best_diff: bool,
     pub coinbase_verify: bool,
     pub show_block_found_screen: bool,
-    pub heartbeat: bool,
+    pub heartbeat_hours: u16,
 }
 
 pub fn alert_info(a: &AlertInfo) -> Json {
@@ -834,7 +834,7 @@ pub fn alert_info(a: &AlertInfo) -> Json {
         .int("bestDiffEnable", a.best_diff as i64)
         .int("coinbaseVerifyEnable", a.coinbase_verify as i64)
         .int("showBlockFoundScreen", a.show_block_found_screen as i64)
-        .int("heartbeatEnable", a.heartbeat as i64);
+        .uint("heartbeatHours", a.heartbeat_hours as u64);
     d.into()
 }
 

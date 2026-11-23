@@ -147,10 +147,10 @@ Ported from #18/#19. Tested on a Q1373 over Ethernet with SLAAC (global prefix f
 
 Tested with v2.0.0-alpha.4 on a NerdQAxe++ over Wi-Fi with SLAAC (unique-local prefix): IPv6 to a pool given as an IPv6 literal without and with brackets, and as a dual-stack name, each with accepted shares; web access from a unique-local client allowed. The web UI accepts an IPv6 literal (with or without brackets) as the pool address and still refuses a port or `stratum+tcp://` in it.
 
-## Hourly metrics webhook
+## Metrics webhook
 
-New: a checkbox on the alert page; when enabled, every hour a webhook message with hashrate, temperatures, power, shares, best difficulty, blocks and uptime (`src/heartbeat.rs`). Tested on a NerdAxe over the API with a local webhook listener.
+New: an interval on the alert page (off, 1, 2, 4, 6, 12 or 24 hours); a webhook message at that interval with hashrate, temperatures, power, shares, best difficulty, blocks and uptime (`src/heartbeat.rs`). Tested on a NerdAxe over the API with a local webhook listener.
 
 Still to test:
-- the checkbox on the alert page in a browser;
+- the interval select on the alert page in a browser;
 - a real Discord webhook (the message is sent in the same JSON as the alerts).

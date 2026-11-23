@@ -497,8 +497,10 @@
     "BEST_DIFF_FOUND_DESC": "se déclenche lorsque l’appareil trouve une nouvelle meilleure difficulté",
     "COINBASE_VERIFY_FAILED": "Vérification coinbase échouée",
     "COINBASE_VERIFY_FAILED_DESC": "se déclenche lorsque la coinbase du pool ne contient pas votre adresse ou dépasse la limite de frais configurée",
-    "HOURLY_METRICS": "Métriques toutes les heures",
-    "HOURLY_METRICS_DESC": "envoie toutes les heures le hashrate, les températures, la puissance, les shares et la meilleure difficulté"
+    "METRICS": "Métriques",
+    "METRICS_DESC": "envoie régulièrement le hashrate, les températures, la puissance, les shares et la meilleure difficulté",
+    "METRICS_OFF": "Désactivé",
+    "METRICS_EVERY": "toutes les {{hours}} h"
   },
   "LANGUAGE": {
     "TITLE": "Langue / Language",

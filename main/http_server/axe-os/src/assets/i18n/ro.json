@@ -497,8 +497,10 @@
     "BEST_DIFF_FOUND_DESC": "se declanșează când dispozitivul găsește o nouă dificultate optimă",
     "COINBASE_VERIFY_FAILED": "Verificare coinbase eșuată",
     "COINBASE_VERIFY_FAILED_DESC": "se declanșează când coinbase-ul pool-ului nu conține adresa dvs. sau depășește limita de taxe configurată",
-    "HOURLY_METRICS": "Metrici în fiecare oră",
-    "HOURLY_METRICS_DESC": "trimite în fiecare oră hashrate-ul, temperaturile, puterea, share-urile și cea mai bună dificultate"
+    "METRICS": "Metrici",
+    "METRICS_DESC": "trimite regulat hashrate-ul, temperaturile, puterea, share-urile și cea mai bună dificultate",
+    "METRICS_OFF": "Oprit",
+    "METRICS_EVERY": "la fiecare {{hours}} h"
   },
   "LANGUAGE": {
     "TITLE": "Limbă / Langue",

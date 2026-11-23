@@ -495,8 +495,10 @@
     "BEST_DIFF_FOUND_DESC": "udløses, når enheden finder en ny bedste sværhedsgrad",
     "COINBASE_VERIFY_FAILED": "Coinbase-verifikation mislykkedes",
     "COINBASE_VERIFY_FAILED_DESC": "udløses, når poolens coinbase ikke indeholder din adresse eller overskrider den konfigurerede gebyrgrænse",
-    "HOURLY_METRICS": "Målinger hver time",
-    "HOURLY_METRICS_DESC": "sender hashrate, temperaturer, effekt, shares og bedste sværhedsgrad hver time"
+    "METRICS": "Målinger",
+    "METRICS_DESC": "sender regelmæssigt hashrate, temperaturer, effekt, shares og bedste sværhedsgrad",
+    "METRICS_OFF": "Fra",
+    "METRICS_EVERY": "hver {{hours}}. time"
   },
   "LANGUAGE": {
     "TITLE": "Sprog / Language",

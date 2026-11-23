@@ -4,6 +4,6 @@ export interface IAlertSettings {
   blockFoundEnable: boolean;
   bestDiffEnable: boolean;
   coinbaseVerifyEnable: boolean;
-  heartbeatEnable?: boolean;
+  heartbeatHours?: number;
   showBlockFoundScreen: boolean;
 }

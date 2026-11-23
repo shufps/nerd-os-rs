@@ -495,8 +495,10 @@
     "BEST_DIFF_FOUND_DESC": "当设备找到新的最佳难度时触发",
     "COINBASE_VERIFY_FAILED": "Coinbase 验证失败",
     "COINBASE_VERIFY_FAILED_DESC": "当矿池的 coinbase 中不包含你的地址，或矿池费用超出配置上限时触发",
-    "HOURLY_METRICS": "每小时发送指标",
-    "HOURLY_METRICS_DESC": "每小时发送算力、温度、功率、份额和最佳难度"
+    "METRICS": "指标",
+    "METRICS_DESC": "定期发送算力、温度、功率、份额和最佳难度",
+    "METRICS_OFF": "关闭",
+    "METRICS_EVERY": "每 {{hours}} 小时"
   },
   "LANGUAGE": {
     "TITLE": "语言",

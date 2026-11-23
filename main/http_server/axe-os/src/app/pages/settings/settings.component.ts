@@ -1,7 +1,7 @@
 import { HttpErrorResponse, HttpEventType } from '@angular/common/http';
 import { Component, OnInit, OnDestroy } from '@angular/core';
 import { FormControl } from '@angular/forms';
-import { combineLatest, map, Observable, catchError, of, shareReplay, startWith, Subscription, interval } from 'rxjs';
+import { combineLatest, map, Observable, catchError, of, shareReplay, startWith, Subscription, interval, EMPTY } from 'rxjs';
 import { switchMap, tap, take } from 'rxjs/operators';
 import { GithubUpdateService, UpdateStatus, VersionComparison, GithubRelease } from '../../services/github-update.service';
 import { LoadingService } from '../../services/loading.service';
@@ -13,6 +13,7 @@ import { IUpdateStatus } from 'src/app/models/IUpdateStatus';
 import { OtpAuthService, EnsureOtpResult, EnsureOtpOptions } from '../../services/otp-auth.service';
 import { ISettingsV2 } from '../../models/ISettingsV2';
 import { getAppVersion } from 'src/app/app.module';
+import { githubOtaOutcome, isProgressStep } from './github-ota-status';
 
 @Component({
   selector: 'app-settings',
@@ -50,6 +51,10 @@ export class SettingsComponent implements OnInit, OnDestroy {
   private sawRebooting = false;
 
   public currentStep: string = "";
+  /** Last step the device reported before a failure (where it failed). */
+  private lastOtaStep: string = "";
+  /** Error of the last GitHub update, shown below the install button. */
+  public otaError: string = "";
 
   // New properties for enhanced update system
   public updateStatus: UpdateStatus = UpdateStatus.UNKNOWN;
@@ -143,6 +148,7 @@ export class SettingsComponent implements OnInit, OnDestroy {
   }
 
   ngOnDestroy() {
+    this.stopUpdatePolling();
     // Clear reboot check interval
     if (this.rebootCheckInterval) {
       clearInterval(this.rebootCheckInterval);
@@ -406,6 +412,8 @@ export class SettingsComponent implements OnInit, OnDestroy {
           // reset UI states
           this.otaProgress = 0;
           this.isOneClickUpdate = true;
+          this.otaError = "";
+          this.lastOtaStep = "";
           this.firmwareUpdateProgress = 0;
 
           // kick the backend update
@@ -431,26 +439,56 @@ export class SettingsComponent implements OnInit, OnDestroy {
     this.updateStatusSub = interval(1000)
       .pipe(
         // Poll OTA status every second
-        switchMap(() => this.systemService.getGithubOTAStatus()),
-        tap((status: IUpdateStatus) => {
-          // Update UI state
-          this.otaProgress = status.progress;
-          this.currentStep = `UPDATE.STEP_${status.step.toUpperCase()}`;
-          //console.log('Update status:', status);
-
-          // check if device finished updating and only fire the success toast a single time
-          if (status.step === 'rebooting' && !this.sawRebooting) {
-            this.sawRebooting = true;
-            this.toastrService.success(this.translate.instant('TOAST.FIRMWARE_UPDATED'), this.translate.instant('TOAST.SUCCESS'));
-            this.startRebootCheck();
-          }
-        })
+        // A failed request (device busy, restarting, network hiccup) must not
+        // end the polling: skip this tick and ask again on the next one.
+        switchMap(() => this.systemService.getGithubOTAStatus().pipe(
+          catchError(() => EMPTY)
+        )),
+        tap((status: IUpdateStatus) => this.onGithubOtaStatus(status))
       )
-      .subscribe({
-        error: (err) => {
-          // ignore errors
-        }
-      });
+      .subscribe();
+  }
+
+  /** Handles one polled GitHub update status. */
+  private onGithubOtaStatus(status: IUpdateStatus) {
+    // after `rebooting` the reboot check takes over (and reloads the page)
+    if (this.sawRebooting) return;
+
+    // Update UI state
+    this.otaProgress = status.progress;
+    this.currentStep = `UPDATE.STEP_${(status.step ?? 'unknown').toUpperCase()}`;
+    if (isProgressStep(status.step)) {
+      this.lastOtaStep = status.step;
+    }
+
+    switch (githubOtaOutcome(status)) {
+      case 'rebooting':
+        // device finished updating: fire the success toast a single time
+        this.sawRebooting = true;
+        this.stopUpdatePolling();
+        this.toastrService.success(this.translate.instant('TOAST.FIRMWARE_UPDATED'), this.translate.instant('TOAST.SUCCESS'));
+        this.startRebootCheck();
+        break;
+      case 'failed':
+        this.onGithubUpdateFailed();
+        break;
+    }
+  }
+
+  /** Terminal error of the GitHub update: stop polling and the spinner, show why. */
+  private onGithubUpdateFailed() {
+    this.stopUpdatePolling();
+    this.isOneClickUpdate = false;
+    this.otaError = this.lastOtaStep
+      ? this.translate.instant('UPDATE.GITHUB_ERROR_STEP', {
+          step: this.translate.instant(`UPDATE.STEP_${this.lastOtaStep.toUpperCase()}`)
+        })
+      : this.translate.instant('UPDATE.GITHUB_ERROR');
+    this.toastrService.danger(
+      `${this.translate.instant('TOAST.UPDATE_FAILED')}: ${this.otaError}`,
+      this.translate.instant('TOAST.ERROR'),
+      { duration: 10000 }
+    );
   }
 
   // we can resume the update progress status on a page reload because
@@ -466,6 +504,9 @@ export class SettingsComponent implements OnInit, OnDestroy {
             this.isOneClickUpdate = true;
             this.otaProgress = status.progress;
             this.currentStep = `UPDATE.STEP_${status.step.toUpperCase()}`;
+            if (isProgressStep(status.step)) {
+              this.lastOtaStep = status.step;
+            }
             this.startUpdatePolling();
           }
         },

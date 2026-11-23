@@ -52,6 +52,7 @@ pub mod emc2302;
 pub mod fan_control;
 pub mod fxl6408;
 pub mod hashrate;
+pub mod heartbeat;
 pub mod history;
 pub mod http_auth;
 pub mod http_can;

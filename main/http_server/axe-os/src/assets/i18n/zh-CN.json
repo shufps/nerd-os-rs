@@ -491,7 +491,11 @@
     "BEST_DIFF_FOUND": "发现新的最佳难度",
     "BEST_DIFF_FOUND_DESC": "当设备找到新的最佳难度时触发",
     "COINBASE_VERIFY_FAILED": "Coinbase 验证失败",
-    "COINBASE_VERIFY_FAILED_DESC": "当矿池的 coinbase 中不包含你的地址，或矿池费用超出配置上限时触发"
+    "COINBASE_VERIFY_FAILED_DESC": "当矿池的 coinbase 中不包含你的地址，或矿池费用超出配置上限时触发",
+    "HEARTBEAT": "每 N 小时发送心跳",
+    "HEARTBEAT_DESC": "每 N 小时发送下面的消息作为带挖矿统计的保活信号（0 = 关闭，最多 168）",
+    "HEARTBEAT_TEMPLATE": "心跳消息",
+    "HEARTBEAT_TEMPLATE_HELP": "留空则使用默认文本。占位符："
   },
   "LANGUAGE": {
     "TITLE": "语言",

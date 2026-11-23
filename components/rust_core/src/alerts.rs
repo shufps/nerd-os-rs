@@ -18,6 +18,9 @@ use crate::log::log;
 const TAG: &CStr = c"discord";
 /// `ALERTER_MESSAGE_LEN` - 1: a queued message is cut to this many bytes.
 const MESSAGE_MAX: usize = 255;
+/// A message without the device block (the heartbeat) is cut to this many
+/// bytes (Discord takes up to 2000 characters).
+const PLAIN_MESSAGE_MAX: usize = 1000;
 const QUEUE_LEN: usize = 4;
 
 #[derive(Clone, Default, Debug)]
@@ -28,11 +31,14 @@ pub struct Config {
     pub block_found: bool,
     pub best_diff: bool,
     pub coinbase_verify: bool,
+    /// the heartbeat interval in hours, 0: off
+    pub heartbeat_hours: u16,
+    pub heartbeat_template: String,
 }
 
 static CONFIG: Mutex<Option<Config>> = Mutex::new(None);
 
-fn config() -> Config {
+pub(crate) fn config() -> Config {
     CONFIG
         .lock()
         .unwrap_or_else(|e| e.into_inner())
@@ -133,6 +139,13 @@ pub fn enqueue(message: &str, ip: &str, mac: &str) -> bool {
     let host = if host.is_empty() { "unknown" } else { &host };
     let msg = cut(text::with_device(message, host, ip, mac), MESSAGE_MAX);
     log!(Warn, TAG, "enqueued: {msg}");
+    queue().tx.try_send(msg).is_ok()
+}
+
+/// Queues `message` as it is (no device block); false if the queue is full.
+pub fn enqueue_plain(message: &str) -> bool {
+    let msg = cut(message.to_string(), PLAIN_MESSAGE_MAX);
+    log!(Info, TAG, "enqueued: {msg}");
     queue().tx.try_send(msg).is_ok()
 }
 

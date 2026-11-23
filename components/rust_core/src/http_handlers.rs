@@ -227,6 +227,10 @@ fn alert_get(req: &mut Request) -> EspErr {
         best_diff: cfg_flag(b"alrt_disc_bd_en", k::ALERT_DISCORD_BEST_DIFF_ENABLE_VALUE),
         coinbase_verify: cfg_flag(b"alrt_disc_cb_en", 0),
         show_block_found_screen: cfg_flag(b"block_found_en", k::SHOW_BLOCK_FOUND_ENABLE_VALUE),
+        heartbeat_hours: config::get_u16(b"alrt_hb_hours", 0).min(crate::heartbeat::MAX_HOURS),
+        heartbeat_template: crate::heartbeat::template_or_default(
+            &cfg_str(b"alrt_hb_tmpl", "").to_string_lossy(),
+        ),
     };
     send_doc(req, http_json::alert_info(&a))
 }

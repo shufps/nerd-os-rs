@@ -495,7 +495,11 @@
     "BEST_DIFF_FOUND": "Beste Schwierigkeit gefunden",
     "BEST_DIFF_FOUND_DESC": "wird ausgelöst, wenn das Gerät eine neue beste Schwierigkeit findet",
     "COINBASE_VERIFY_FAILED": "Coinbase-Verifizierung fehlgeschlagen",
-    "COINBASE_VERIFY_FAILED_DESC": "wird ausgelöst, wenn die Coinbase des Pools deine Adresse nicht enthält oder das konfigurierte Gebührenlimit überschreitet"
+    "COINBASE_VERIFY_FAILED_DESC": "wird ausgelöst, wenn die Coinbase des Pools deine Adresse nicht enthält oder das konfigurierte Gebührenlimit überschreitet",
+    "HEARTBEAT": "Heartbeat alle N Stunden",
+    "HEARTBEAT_DESC": "sendet alle N Stunden die Nachricht unten als Lebenszeichen mit Mining-Statistiken (0 = aus, max. 168)",
+    "HEARTBEAT_TEMPLATE": "Heartbeat-Nachricht",
+    "HEARTBEAT_TEMPLATE_HELP": "Leer verwendet den Standardtext. Platzhalter:"
   },
   "LANGUAGE": {
     "TITLE": "Sprache / Language",

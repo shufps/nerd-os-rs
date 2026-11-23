@@ -146,3 +146,11 @@ Still to test:
 Ported from #18/#19. Tested on a Q1373 over Ethernet with SLAAC (global prefix from the router): IPv6 to a dual-stack TLS pool (solo.atlaspool.io:4333) with accepted shares; fallback to IPv4 when the pool refuses IPv6 (ckpool); web access from a link-local client allowed, from a global IPv6 client refused.
 
 Tested with v2.0.0-alpha.4 on a NerdQAxe++ over Wi-Fi with SLAAC (unique-local prefix): IPv6 to a pool given as an IPv6 literal without and with brackets, and as a dual-stack name, each with accepted shares; web access from a unique-local client allowed. The web UI accepts an IPv6 literal (with or without brackets) as the pool address and still refuses a port or `stratum+tcp://` in it.
+
+## Heartbeat webhook
+
+New: every N hours (1 to 168, 0 off) a webhook message from a template with placeholders (`src/heartbeat.rs`). Tested on a NerdAxe over the API with a local webhook listener: range check, template with every placeholder, delivery after the interval.
+
+Still to test:
+- the alert page form in a browser (hours field, template field shown only for N > 0, save);
+- a real Discord webhook (the message is sent in the same JSON as the alerts).

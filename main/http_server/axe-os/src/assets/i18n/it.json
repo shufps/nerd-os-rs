@@ -493,7 +493,11 @@
     "BEST_DIFF_FOUND": "Difficoltà migliore trovata",
     "BEST_DIFF_FOUND_DESC": "si attiva quando il dispositivo trova una nuova difficoltà migliore",
     "COINBASE_VERIFY_FAILED": "Verifica coinbase fallita",
-    "COINBASE_VERIFY_FAILED_DESC": "si attiva quando la coinbase del pool non contiene il tuo indirizzo o supera il limite di commissione configurato"
+    "COINBASE_VERIFY_FAILED_DESC": "si attiva quando la coinbase del pool non contiene il tuo indirizzo o supera il limite di commissione configurato",
+    "HEARTBEAT": "Heartbeat ogni N ore",
+    "HEARTBEAT_DESC": "invia il messaggio qui sotto ogni N ore come segnale di vita con le statistiche di mining (0 = disattivato, max. 168)",
+    "HEARTBEAT_TEMPLATE": "Messaggio heartbeat",
+    "HEARTBEAT_TEMPLATE_HELP": "Vuoto usa il testo predefinito. Segnaposto:"
   },
   "LANGUAGE": {
     "TITLE": "Lingua / Langue",

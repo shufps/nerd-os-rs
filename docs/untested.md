@@ -10,8 +10,6 @@ what a test would need. When an entry has been tested, delete it.
 - **Error overlay hidden again** (`src/system.rs`). Showing it ran on a
   NerdQAxe++ (coinbase verification fault); that it goes away when the
   error clears was not watched on the screen.
-- **Found block overlay**. It is shown when the found-block counter
-  increases. Needs a found block.
 - **CAN slave label**. The display shows "CAN ID: n" or "CAN: ..."
   instead of the IP address. Needs a board in CAN slave mode.
 - **Boards without a hashrate counter**. The current hashrate comes

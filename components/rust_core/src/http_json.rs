@@ -304,6 +304,8 @@ pub struct SystemInfo {
     pub flip_screen: bool,
     pub invert_screen: bool,
     pub auto_screen_off: bool,
+    /// seconds
+    pub auto_screen_off_timeout: u32,
     pub invert_fan_polarity: bool,
     pub stratum_keep: bool,
     pub vr_frequency: u32,
@@ -458,6 +460,7 @@ pub fn system_info(s: &SystemInfo) -> Json {
         .int("flipscreen", s.flip_screen as i64)
         .int("invertscreen", s.invert_screen as i64)
         .int("autoscreenoff", s.auto_screen_off as i64)
+        .int("autoscreenofftimeout", s.auto_screen_off_timeout as i64)
         .int("invertfanpolarity", s.invert_fan_polarity as i64)
         .int("autofanspeed", s.fans[0].mode as i64)
         .int("stratum_keep", s.stratum_keep as i64)
@@ -956,6 +959,8 @@ pub struct V2Settings {
     pub flip_screen: bool,
     pub invert_screen: bool,
     pub auto_screen_off: bool,
+    /// seconds
+    pub auto_screen_off_timeout: u32,
 }
 
 /// `GET /api/v2/settings`
@@ -1032,7 +1037,8 @@ pub fn v2_settings(s: &V2Settings) -> Json {
         .cstr("mempoolUrl", s.mempool_url.as_deref())
         .int("flipScreen", s.flip_screen as i64)
         .int("invertScreen", s.invert_screen as i64)
-        .int("autoScreenOff", s.auto_screen_off as i64);
+        .int("autoScreenOff", s.auto_screen_off as i64)
+        .int("autoScreenOffTimeout", s.auto_screen_off_timeout as i64);
     d.into()
 }
 

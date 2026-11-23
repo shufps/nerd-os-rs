@@ -219,6 +219,7 @@ fn snapshot(r: &mut Rng, temps: &mut Vec<f32>) -> SystemInfo {
         flip_screen: r.bool(),
         invert_screen: r.bool(),
         auto_screen_off: r.bool(),
+        auto_screen_off_timeout: 30,
         invert_fan_polarity: r.bool(),
         stratum_keep: r.bool(),
         vr_frequency: r.next() as u32,
@@ -592,6 +593,7 @@ fn v2_settings() {
             flip_screen: r.bool(),
             invert_screen: r.bool(),
             auto_screen_off: r.bool(),
+            auto_screen_off_timeout: 30,
         };
         let rust = String::from_utf8(http_json::v2_settings(&s).serialize()).unwrap();
         rec.add(rust);

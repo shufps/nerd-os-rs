@@ -460,6 +460,7 @@
     "SETTINGS": "Diverse indstillinger",
     "FLIP_SCREEN": "Vend skærmen",
     "AUTO_SCREEN_OFF": "Automatisk slukning af skærm",
+    "AUTO_SCREEN_OFF_TIMEOUT": "Sluk skærm efter (sekunder)",
     "STRATUM_KEEPALIVE": "Aktivér stratum TCP-keepalive",
     "CUSTOM_MEMPOOL": "Brugerdefineret mempool-endpoint",
     "MEMPOOL_URL": "Mempool-URL"

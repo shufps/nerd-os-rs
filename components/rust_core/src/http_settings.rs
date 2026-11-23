@@ -76,6 +76,8 @@ pub enum Setting {
     DiscordBestDiff = 56,
     DiscordCoinbaseVerify = 57,
     ShowBlockFound = 58,
+    /// seconds without a key press before auto screen off
+    AutoScreenOffTimeout = 64,
     /// CAN node commands (`PATCH /api/v2/can/nodes/{id}`), not config:
     CanFrequency = 60,
     CanVoltage = 61,
@@ -106,6 +108,12 @@ fn field<'a>(v: &'a Json, key: &str) -> &'a Json {
 /// `is<uintN_t>()` with the given maximum.
 fn uint(v: &Json, max: u64) -> Option<u32> {
     v.as_uint(max).map(|n| n as u32)
+}
+
+/// The auto screen off time: 5 s to 1 h, else ignored.
+fn screen_off_secs(v: &Json) -> Option<u32> {
+    uint(v, 0xffff)
+        .filter(|s| (crate::cfg::SCREEN_OFF_MIN_S..=crate::cfg::SCREEN_OFF_MAX_S).contains(s))
 }
 
 fn boolean(v: &Json) -> Option<bool> {
@@ -230,6 +238,11 @@ pub fn settings_v1(doc: &Json, dual_pool: bool) -> Vec<Write> {
     out.num(S::TempControlMode, 0, uint(f("autofanspeed"), 0xffff));
     out.num(S::FanSpeed, 0, uint(f("manualFanSpeed"), 0xffff));
     out.bool(S::AutoScreenOff, 0, boolean(f("autoscreenoff")));
+    out.num(
+        S::AutoScreenOffTimeout,
+        0,
+        screen_off_secs(f("autoscreenofftimeout")),
+    );
     out.bool(S::StratumKeepalive, 0, flag(f("stratum_keep")));
     out.num(S::PidTargetTemp, 0, uint(f("pidTargetTemp"), 0xffff));
     out.num(S::PidP, 0, float(f("pidP")).map(hundredths));
@@ -304,6 +317,11 @@ pub fn settings_v2(doc: &Json) -> Vec<Write> {
     out.bool(S::FlipScreen, 0, boolean(f("flipScreen")));
     out.bool(S::InvertScreen, 0, boolean(f("invertScreen")));
     out.bool(S::AutoScreenOff, 0, boolean(f("autoScreenOff")));
+    out.num(
+        S::AutoScreenOffTimeout,
+        0,
+        screen_off_secs(f("autoScreenOffTimeout")),
+    );
     out.bool(S::MempoolCustom, 0, boolean(f("mempoolCustom")));
     out.text(S::MempoolUrl, 0, string(f("mempoolUrl")));
     out.bool(S::FanPolarity, 0, boolean(f("invertFanPolarity")));
@@ -428,6 +446,23 @@ mod tests {
         assert_eq!(hundredths(1e9), 65535);
         assert_eq!(hundredths(f32::NAN), 0);
         assert_eq!(tenths(2.25), 23);
+    }
+
+    #[test]
+    fn auto_screen_off_timeout_range() {
+        let get = |body: &str| {
+            let doc = crate::ajson::deserialize(body.as_bytes()).unwrap();
+            settings_v2(&doc)
+                .into_iter()
+                .find(|w| w.setting == Setting::AutoScreenOffTimeout)
+                .map(|w| w.num)
+        };
+        assert_eq!(get(r#"{"autoScreenOffTimeout":300}"#), Some(300));
+        assert_eq!(get(r#"{"autoScreenOffTimeout":5}"#), Some(5));
+        assert_eq!(get(r#"{"autoScreenOffTimeout":3600}"#), Some(3600));
+        assert_eq!(get(r#"{"autoScreenOffTimeout":4}"#), None);
+        assert_eq!(get(r#"{"autoScreenOffTimeout":3601}"#), None);
+        assert_eq!(get(r#"{"autoScreenOffTimeout":"60"}"#), None);
     }
 
     #[test]

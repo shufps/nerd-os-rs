@@ -464,6 +464,7 @@
     "SETTINGS": "Verschiedene Einstellungen",
     "FLIP_SCREEN": "Bildschirm drehen",
     "AUTO_SCREEN_OFF": "Automatische Bildschirmabschaltung",
+    "AUTO_SCREEN_OFF_TIMEOUT": "Bildschirm aus nach (Sekunden)",
     "STRATUM_KEEPALIVE": "Stratum TCP Keepalive aktivieren",
     "CUSTOM_MEMPOOL": "Eigener Mempool-Endpunkt",
     "MEMPOOL_URL": "Mempool-URL"

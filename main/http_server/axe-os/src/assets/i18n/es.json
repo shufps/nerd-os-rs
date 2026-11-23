@@ -462,6 +462,7 @@
     "SETTINGS": "Configuración Miscelánea",
     "FLIP_SCREEN": "Voltear Pantalla",
     "AUTO_SCREEN_OFF": "Apagado Automático de Pantalla",
+    "AUTO_SCREEN_OFF_TIMEOUT": "Apagar pantalla tras (segundos)",
     "STRATUM_KEEPALIVE": "Habilitar Stratum TCP Keepalive",
     "CUSTOM_MEMPOOL": "Endpoint Mempool personalizado",
     "MEMPOOL_URL": "URL de Mempool"

@@ -464,6 +464,7 @@
     "SETTINGS": "Misc Settings",
     "FLIP_SCREEN": "Flip Screen",
     "AUTO_SCREEN_OFF": "Automatic Screen Shutdown",
+    "AUTO_SCREEN_OFF_TIMEOUT": "Screen off after (seconds)",
     "STRATUM_KEEPALIVE": "Enable Stratum TCP Keepalive",
     "CUSTOM_MEMPOOL": "Custom Mempool endpoint",
     "MEMPOOL_URL": "Mempool URL"

@@ -80,4 +80,6 @@ export interface ISettingsV2 {
     flipScreen: number;
     invertScreen: number;
     autoScreenOff: number;
+    /** seconds (5 to 3600) */
+    autoScreenOffTimeout?: number;
 }

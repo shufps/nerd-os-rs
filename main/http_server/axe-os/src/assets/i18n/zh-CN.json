@@ -460,6 +460,7 @@
     "SETTINGS": "其他设置",
     "FLIP_SCREEN": "翻转屏幕",
     "AUTO_SCREEN_OFF": "自动关闭屏幕",
+    "AUTO_SCREEN_OFF_TIMEOUT": "屏幕关闭延时（秒）",
     "STRATUM_KEEPALIVE": "启用 Stratum TCP Keepalive",
     "CUSTOM_MEMPOOL": "自定义 Mempool 端点",
     "MEMPOOL_URL": "Mempool URL"

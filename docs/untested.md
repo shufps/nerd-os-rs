@@ -146,3 +146,11 @@ New: a checkbox on the alert page with an interval (1, 2, 4, 6, 12 or 24 hours);
 Still to test:
 - the checkbox and interval select on the alert page in a browser;
 - a real Discord webhook (the message is sent in the same JSON as the alerts).
+
+## TPS546 faults on NerdAxeGamma/Gaia
+
+A latched TPS546 fault (over-current etc.) sets the board error, keeps the ASIC voltage off and is logged; the home page shows the hardware protection errors. Tested on a NerdAxe Gaia: over-current at 970 mV / 440 MHz (34–35 A, limit 33 A) gave `boardError: 4` and `CURRENT PROTECTION` on the display.
+
+Still to test:
+- the home page alert in a browser (standard and Gaia layout);
+- a NerdAxe Gamma.

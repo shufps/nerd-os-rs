@@ -1,8 +1,7 @@
-//! The heartbeat: every N hours a webhook message with mining statistics
-//! (a keepalive for home automation / monitoring). The text is a template
-//! with placeholders like `{hashrate}`; unknown placeholders stay as they
-//! are. The system task calls [`tick`]; the message goes through the alert
-//! queue to the configured webhook.
+//! The hourly metrics message: when enabled, every hour a webhook message
+//! with the mining statistics (a keepalive for home automation /
+//! monitoring). The system task calls [`tick`]; the message goes through
+//! the alert queue to the configured webhook.
 
 use core::ffi::CStr;
 use std::sync::Mutex;
@@ -11,32 +10,9 @@ use crate::log::log;
 
 const TAG: &CStr = c"heartbeat";
 
-/// The longest interval (a week).
-pub const MAX_HOURS: u16 = 168;
-/// The template is cut to this many bytes.
-pub const TEMPLATE_MAX: usize = 500;
-pub const DEFAULT_TEMPLATE: &str = "{hostname}: {hashrate} GH/s, {temp} °C, {power} W, \
-shares {accepted}/{rejected}, best {bestdiff}, uptime {uptime}";
-/// The placeholders, for the help text and the tests.
-pub const PLACEHOLDERS: &[&str] = &[
-    "hostname",
-    "ip",
-    "hashrate",
-    "hashrate_1h",
-    "hashrate_1d",
-    "temp",
-    "vrtemp",
-    "power",
-    "efficiency",
-    "accepted",
-    "rejected",
-    "bestdiff",
-    "sessiondiff",
-    "blocks",
-    "uptime",
-];
+const PERIOD_US: i64 = 3_600_000_000;
 
-/// The values for the placeholders.
+/// The values of the message.
 #[derive(Clone, Debug, Default)]
 pub struct Values {
     pub hostname: String,
@@ -44,7 +20,6 @@ pub struct Values {
     /// GH/s
     pub hashrate: f64,
     pub hashrate_1h: f64,
-    pub hashrate_1d: f64,
     /// °C
     pub temp: f32,
     pub vrtemp: f32,
@@ -68,134 +43,95 @@ fn uptime(s: u64) -> String {
     }
 }
 
-impl Values {
-    fn get(&self, name: &str) -> Option<String> {
-        let diff = |d| crate::suffix::suffix_string(d, 0);
-        Some(match name {
-            "hostname" => self.hostname.clone(),
-            "ip" => self.ip.clone(),
-            "hashrate" => format!("{:.1}", self.hashrate),
-            "hashrate_1h" => format!("{:.1}", self.hashrate_1h),
-            "hashrate_1d" => format!("{:.1}", self.hashrate_1d),
-            "temp" => format!("{:.1}", self.temp),
-            "vrtemp" => format!("{:.1}", self.vrtemp),
-            "power" => format!("{:.1}", self.power),
-            // J/TH
-            "efficiency" if self.hashrate > 0.0 => {
-                format!("{:.1}", self.power as f64 / (self.hashrate / 1000.0))
-            }
-            "efficiency" => "-".into(),
-            "accepted" => self.accepted.to_string(),
-            "rejected" => self.rejected.to_string(),
-            "bestdiff" => diff(self.best_diff),
-            "sessiondiff" => diff(self.session_diff),
-            "blocks" => self.blocks.to_string(),
-            "uptime" => uptime(self.uptime_s),
-            _ => return None,
-        })
-    }
+/// The message.
+pub fn message(v: &Values) -> String {
+    let diff = |d| crate::suffix::suffix_string(d, 0);
+    let efficiency = if v.hashrate > 0.0 {
+        format!("{:.1} J/TH", v.power as f64 / (v.hashrate / 1000.0))
+    } else {
+        "-".into()
+    };
+    format!(
+        ":bar_chart: Hourly metrics\n```\n\
+Hostname: {}\n\
+IP:       {}\n\
+Hashrate: {:.1} GH/s (1h: {:.1} GH/s)\n\
+Temp:     {:.1} °C (VR: {:.1} °C)\n\
+Power:    {:.1} W ({efficiency})\n\
+Shares:   {} accepted / {} rejected\n\
+Best:     {} (session: {})\n\
+Blocks:   {}\n\
+Uptime:   {}\n```",
+        v.hostname,
+        v.ip,
+        v.hashrate,
+        v.hashrate_1h,
+        v.temp,
+        v.vrtemp,
+        v.power,
+        v.accepted,
+        v.rejected,
+        diff(v.best_diff),
+        diff(v.session_diff),
+        v.blocks,
+        uptime(v.uptime_s),
+    )
 }
 
-/// The template with its placeholders replaced.
-pub fn render(template: &str, v: &Values) -> String {
-    let mut out = String::with_capacity(template.len() + 64);
-    let mut rest = template;
-    while let Some(open) = rest.find('{') {
-        out.push_str(&rest[..open]);
-        let after = &rest[open + 1..];
-        match after
-            .find('}')
-            .and_then(|close| Some((close, v.get(&after[..close])?)))
-        {
-            Some((close, value)) => {
-                out.push_str(&value);
-                rest = &after[close + 1..];
-            }
-            None => {
-                out.push('{');
-                rest = after;
-            }
-        }
-    }
-    out.push_str(rest);
-    out
-}
-
-/// The template as stored: cut to [`TEMPLATE_MAX`], the default if empty.
-pub fn template_or_default(t: &str) -> String {
-    let t = t.trim();
-    if t.is_empty() {
-        return DEFAULT_TEMPLATE.into();
-    }
-    let mut end = t.len().min(TEMPLATE_MAX);
-    while !t.is_char_boundary(end) {
-        end -= 1;
-    }
-    t[..end].into()
-}
-
-/// When the next heartbeat is due.
+/// When the next message is due.
 #[derive(Default)]
 struct Schedule {
-    hours: u16,
+    on: bool,
     next_us: i64,
 }
 
 impl Schedule {
-    /// Whether a heartbeat is due at `now_us` with `hours` (0: off); a
-    /// changed interval starts over from now.
-    fn due(&mut self, hours: u16, now_us: i64) -> bool {
-        if hours == 0 {
-            self.hours = 0;
+    /// Whether a message is due at `now_us`; enabling starts the hour.
+    fn due(&mut self, on: bool, now_us: i64) -> bool {
+        if !on {
+            self.on = false;
             return false;
         }
-        let period = hours as i64 * 3_600_000_000;
-        if hours != self.hours {
-            self.hours = hours;
-            self.next_us = now_us + period;
+        if !self.on {
+            self.on = true;
+            self.next_us = now_us + PERIOD_US;
             return false;
         }
         if now_us < self.next_us {
             return false;
         }
-        self.next_us += period;
+        self.next_us += PERIOD_US;
         if self.next_us <= now_us {
             // no catching up after a long stall
-            self.next_us = now_us + period;
+            self.next_us = now_us + PERIOD_US;
         }
         true
     }
 }
 
 static SCHEDULE: Mutex<Schedule> = Mutex::new(Schedule {
-    hours: 0,
+    on: false,
     next_us: 0,
 });
 
-/// Every tick of the system task: queues the heartbeat when it is due.
+/// Every tick of the system task: queues the message when it is due.
 pub fn tick(now_us: i64) {
     let c = crate::alerts::config();
-    let hours = if c.webhook.is_empty() {
-        0
-    } else {
-        c.heartbeat_hours
-    };
+    let on = c.heartbeat && !c.webhook.is_empty();
     if !SCHEDULE
         .lock()
         .unwrap_or_else(|e| e.into_inner())
-        .due(hours, now_us)
+        .due(on, now_us)
     {
         return;
     }
-    let msg = render(&c.heartbeat_template, &values(now_us));
-    if !crate::alerts::enqueue_plain(&msg) {
-        log!(Warn, TAG, "alert queue full, heartbeat dropped");
+    if !crate::alerts::enqueue_plain(&message(&values(now_us))) {
+        log!(Warn, TAG, "alert queue full, metrics message dropped");
     }
 }
 
 #[cfg(target_os = "espidf")]
 fn values(now_us: i64) -> Values {
-    use crate::history::api::history_current;
     use crate::power_mgmt::get;
     let s = crate::pool_manager::get()
         .map(|m| m.summary())
@@ -204,8 +140,7 @@ fn values(now_us: i64) -> Values {
         hostname: crate::system::hostname().to_string_lossy().into_owned(),
         ip: crate::network::preferred_ip().map_or_else(|| "0.0.0.0".into(), |(ip, _)| ip),
         hashrate: crate::system::current_hashrate() as f64,
-        hashrate_1h: history_current(2),
-        hashrate_1d: history_current(3),
+        hashrate_1h: crate::history::api::history_current(2),
         temp: get(3),
         vrtemp: get(4),
         power: get(0),
@@ -227,13 +162,13 @@ fn values(_now_us: i64) -> Values {
 mod tests {
     use super::*;
 
-    fn sample() -> Values {
-        Values {
+    #[test]
+    fn message_text() {
+        let v = Values {
             hostname: "rig".into(),
             ip: "10.0.0.2".into(),
             hashrate: 1234.56,
             hashrate_1h: 1200.0,
-            hashrate_1d: 1190.04,
             temp: 55.25,
             vrtemp: 61.0,
             power: 20.0,
@@ -243,67 +178,38 @@ mod tests {
             session_diff: 1_234_567,
             blocks: 0,
             uptime_s: 2 * 86_400 + 3 * 3600 + 7 * 60 + 5,
-        }
-    }
-
-    #[test]
-    fn renders_placeholders() {
+        };
         assert_eq!(
-            render(DEFAULT_TEMPLATE, &sample()),
-            "rig: 1234.6 GH/s, 55.2 °C, 20.0 W, shares 42/1, best 4.2G, uptime 2d 03h 07m"
+            message(&v),
+            ":bar_chart: Hourly metrics\n```\nHostname: rig\nIP:       10.0.0.2\n\
+Hashrate: 1234.6 GH/s (1h: 1200.0 GH/s)\nTemp:     55.2 °C (VR: 61.0 °C)\n\
+Power:    20.0 W (16.2 J/TH)\nShares:   42 accepted / 1 rejected\n\
+Best:     4.2G (session: 1.23M)\nBlocks:   0\nUptime:   2d 03h 07m\n```"
         );
-        assert_eq!(
-            render(
-                "{ip} {hashrate_1h} {hashrate_1d} {vrtemp} {sessiondiff} {blocks}",
-                &sample()
-            ),
-            "10.0.0.2 1200.0 1190.0 61.0 1.23M 0"
-        );
-        assert_eq!(render("{efficiency} J/TH", &sample()), "16.2 J/TH");
-        assert_eq!(render("{efficiency}", &Values::default()), "-");
+        assert!(message(&Values::default()).contains("Power:    0.0 W (-)"));
         assert_eq!(uptime(59 * 60), "00h 59m");
-        for p in PLACEHOLDERS {
-            assert!(sample().get(p).is_some(), "{p}");
-        }
-    }
-
-    #[test]
-    fn keeps_unknown_and_unbalanced_braces() {
-        let v = sample();
-        assert_eq!(render("{nope} {temp", &v), "{nope} {temp");
-        assert_eq!(render("{{hostname}}", &v), "{rig}");
-        assert_eq!(render("}{", &v), "}{");
-        assert_eq!(render("ä{hostname}ö", &v), "ärigö");
-        assert_eq!(render("", &v), "");
-    }
-
-    #[test]
-    fn template_is_cut_and_defaulted() {
-        assert_eq!(template_or_default("  "), DEFAULT_TEMPLATE);
-        let t = template_or_default(&"ä".repeat(400));
-        assert!(t.len() <= TEMPLATE_MAX && t.len() >= TEMPLATE_MAX - 1);
+        // fits the alert queue's cut
+        assert!(message(&v).len() < 1000);
     }
 
     #[test]
     fn schedule() {
-        let h = 3_600_000_000;
+        let h = PERIOD_US;
         let mut s = Schedule::default();
-        assert!(!s.due(0, 0));
-        // first one an interval after it was enabled
-        assert!(!s.due(2, 10));
-        assert!(!s.due(2, 2 * h));
-        assert!(s.due(2, 2 * h + 10));
-        assert!(!s.due(2, 3 * h));
-        assert!(s.due(2, 4 * h + 10));
-        // a long stall: one heartbeat, no burst
-        assert!(s.due(2, 20 * h));
-        assert!(!s.due(2, 20 * h + 1));
-        // a changed interval starts over
-        assert!(!s.due(1, 21 * h));
-        assert!(s.due(1, 22 * h));
+        assert!(!s.due(false, 0));
+        // the first one an hour after it was enabled
+        assert!(!s.due(true, 10));
+        assert!(!s.due(true, h));
+        assert!(s.due(true, h + 10));
+        assert!(!s.due(true, h + h / 2));
+        assert!(s.due(true, 2 * h + 10));
+        // a long stall: one message, no burst
+        assert!(s.due(true, 20 * h));
+        assert!(!s.due(true, 20 * h + 1));
         // off and on again starts over
-        assert!(!s.due(0, 23 * h));
-        assert!(!s.due(1, 23 * h));
-        assert!(s.due(1, 24 * h));
+        assert!(!s.due(false, 20 * h + 2));
+        assert!(!s.due(true, 21 * h));
+        assert!(!s.due(true, 21 * h + h / 2));
+        assert!(s.due(true, 22 * h));
     }
 }

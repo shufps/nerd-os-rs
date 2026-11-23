@@ -85,8 +85,7 @@ pub enum Setting {
     CanFan = 62,
     /// num: flip screen | auto screen off << 1
     CanDisplay = 63,
-    HeartbeatHours = 65,
-    HeartbeatTemplate = 66,
+    HeartbeatEnable = 65,
 }
 
 /// A value for a setter: numbers and bools as `num`, strings as `text`
@@ -389,12 +388,7 @@ pub fn settings_alert(doc: &Json) -> Vec<Write> {
         boolean(f("coinbaseVerifyEnable")),
     );
     out.bool(S::ShowBlockFound, 0, boolean(f("showBlockFoundScreen")));
-    out.num(
-        S::HeartbeatHours,
-        0,
-        uint(f("heartbeatHours"), crate::heartbeat::MAX_HOURS as u64),
-    );
-    out.text(S::HeartbeatTemplate, 0, string(f("heartbeatTemplate")));
+    out.bool(S::HeartbeatEnable, 0, boolean(f("heartbeatEnable")));
     out.0
 }
 
@@ -479,20 +473,5 @@ mod tests {
         for h in 0..1000u32 {
             assert_eq!(hundredths(h as f32 / 100.0), h);
         }
-    }
-
-    #[test]
-    fn heartbeat_settings() {
-        let parse = |b: &str| settings_alert(&crate::ajson::deserialize(b.as_bytes()).unwrap());
-        let w = parse(r#"{"heartbeatHours":6,"heartbeatTemplate":"{temp} C"}"#);
-        assert_eq!(w.len(), 2);
-        assert_eq!((w[0].setting, w[0].num), (S::HeartbeatHours, 6));
-        assert_eq!(w[1].setting, S::HeartbeatTemplate);
-        assert_eq!(w[1].text.as_deref(), Some(&b"{temp} C"[..]));
-        assert_eq!(parse(r#"{"heartbeatHours":0}"#)[0].num, 0);
-        // out of range or not a number: ignored
-        assert!(parse(r#"{"heartbeatHours":169}"#).is_empty());
-        assert!(parse(r#"{"heartbeatHours":-1}"#).is_empty());
-        assert!(parse(r#"{"heartbeatHours":"6"}"#).is_empty());
     }
 }

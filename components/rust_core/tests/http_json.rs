@@ -490,8 +490,7 @@ fn small_documents() {
             best_diff: r.bool(),
             coinbase_verify: r.bool(),
             show_block_found_screen: r.bool(),
-            heartbeat_hours: 6,
-            heartbeat_template: "{hostname} \"{temp}\"".into(),
+            heartbeat: true,
         };
         let rust = String::from_utf8(http_json::alert_info(&a).serialize()).unwrap();
         rec.add(rust);

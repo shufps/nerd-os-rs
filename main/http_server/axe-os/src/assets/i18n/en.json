@@ -499,10 +499,8 @@
     "BEST_DIFF_FOUND_DESC": "triggers when the device finds a new best difficulty",
     "COINBASE_VERIFY_FAILED": "Coinbase verification failed",
     "COINBASE_VERIFY_FAILED_DESC": "triggers when the pool's coinbase does not contain your address or exceeds the configured fee limit",
-    "HEARTBEAT": "Heartbeat every N hours",
-    "HEARTBEAT_DESC": "sends the message below every N hours as a keepalive with mining statistics (0 = off, max. 168)",
-    "HEARTBEAT_TEMPLATE": "Heartbeat message",
-    "HEARTBEAT_TEMPLATE_HELP": "Empty uses the default text. Placeholders:"
+    "HOURLY_METRICS": "Metrics every hour",
+    "HOURLY_METRICS_DESC": "sends hashrate, temperatures, power, shares and best difficulty every hour"
   },
   "LANGUAGE": {
     "TITLE": "Language / Langue",

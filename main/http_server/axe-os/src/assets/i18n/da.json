@@ -495,10 +495,8 @@
     "BEST_DIFF_FOUND_DESC": "udløses, når enheden finder en ny bedste sværhedsgrad",
     "COINBASE_VERIFY_FAILED": "Coinbase-verifikation mislykkedes",
     "COINBASE_VERIFY_FAILED_DESC": "udløses, når poolens coinbase ikke indeholder din adresse eller overskrider den konfigurerede gebyrgrænse",
-    "HEARTBEAT": "Heartbeat hver N timer",
-    "HEARTBEAT_DESC": "sender beskeden nedenfor hver N timer som livstegn med mining-statistik (0 = fra, maks. 168)",
-    "HEARTBEAT_TEMPLATE": "Heartbeat-besked",
-    "HEARTBEAT_TEMPLATE_HELP": "Tom bruger standardteksten. Pladsholdere:"
+    "HOURLY_METRICS": "Målinger hver time",
+    "HOURLY_METRICS_DESC": "sender hashrate, temperaturer, effekt, shares og bedste sværhedsgrad hver time"
   },
   "LANGUAGE": {
     "TITLE": "Sprog / Language",

@@ -497,10 +497,8 @@
     "BEST_DIFF_FOUND_DESC": "se declanșează când dispozitivul găsește o nouă dificultate optimă",
     "COINBASE_VERIFY_FAILED": "Verificare coinbase eșuată",
     "COINBASE_VERIFY_FAILED_DESC": "se declanșează când coinbase-ul pool-ului nu conține adresa dvs. sau depășește limita de taxe configurată",
-    "HEARTBEAT": "Heartbeat la fiecare N ore",
-    "HEARTBEAT_DESC": "trimite mesajul de mai jos la fiecare N ore ca semn de viață cu statistici de minare (0 = oprit, max. 168)",
-    "HEARTBEAT_TEMPLATE": "Mesaj heartbeat",
-    "HEARTBEAT_TEMPLATE_HELP": "Gol folosește textul implicit. Substituenți:"
+    "HOURLY_METRICS": "Metrici în fiecare oră",
+    "HOURLY_METRICS_DESC": "trimite în fiecare oră hashrate-ul, temperaturile, puterea, share-urile și cea mai bună dificultate"
   },
   "LANGUAGE": {
     "TITLE": "Limbă / Langue",

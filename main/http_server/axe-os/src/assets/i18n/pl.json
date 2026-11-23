@@ -497,10 +497,8 @@
     "BEST_DIFF_FOUND_DESC": "wyzwala się, gdy urządzenie znajdzie nową najlepszą trudność",
     "COINBASE_VERIFY_FAILED": "Weryfikacja coinbase nie powiodła się",
     "COINBASE_VERIFY_FAILED_DESC": "wyzwala się, gdy coinbase poola nie zawiera twojego adresu lub przekracza skonfigurowany limit opłat",
-    "HEARTBEAT": "Heartbeat co N godzin",
-    "HEARTBEAT_DESC": "wysyła poniższą wiadomość co N godzin jako sygnał życia ze statystykami kopania (0 = wył., maks. 168)",
-    "HEARTBEAT_TEMPLATE": "Wiadomość heartbeat",
-    "HEARTBEAT_TEMPLATE_HELP": "Puste używa domyślnego tekstu. Symbole zastępcze:"
+    "HOURLY_METRICS": "Metryki co godzinę",
+    "HOURLY_METRICS_DESC": "wysyła co godzinę hashrate, temperatury, moc, udziały i najlepszą trudność"
   },
   "LANGUAGE": {
     "TITLE": "Język / Langue",

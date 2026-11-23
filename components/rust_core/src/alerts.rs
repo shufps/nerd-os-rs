@@ -18,7 +18,7 @@ use crate::log::log;
 const TAG: &CStr = c"discord";
 /// `ALERTER_MESSAGE_LEN` - 1: a queued message is cut to this many bytes.
 const MESSAGE_MAX: usize = 255;
-/// A message without the device block (the heartbeat) is cut to this many
+/// A message without the device block (the hourly metrics) is cut to this many
 /// bytes (Discord takes up to 2000 characters).
 const PLAIN_MESSAGE_MAX: usize = 1000;
 const QUEUE_LEN: usize = 4;
@@ -31,9 +31,8 @@ pub struct Config {
     pub block_found: bool,
     pub best_diff: bool,
     pub coinbase_verify: bool,
-    /// the heartbeat interval in hours, 0: off
-    pub heartbeat_hours: u16,
-    pub heartbeat_template: String,
+    /// the hourly metrics message
+    pub heartbeat: bool,
 }
 
 static CONFIG: Mutex<Option<Config>> = Mutex::new(None);

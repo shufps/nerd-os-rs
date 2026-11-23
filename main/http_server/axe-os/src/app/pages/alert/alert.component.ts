@@ -11,8 +11,6 @@ import { TranslateService } from '@ngx-translate/core';
 import { OtpAuthService, EnsureOtpResult } from '../../services/otp-auth.service';
 
 const WEBHOOK_URL_PATTERN = /^https?:\/\/.+$/i;
-const HEARTBEAT_MAX_HOURS = 168;
-const HEARTBEAT_TEMPLATE_MAX = 500;
 
 @Component({
   selector: 'app-alert',
@@ -23,10 +21,6 @@ export class AlertComponent implements OnInit {
 
   public form!: FormGroup;
   public hasWebhook = false;
-  public readonly heartbeatPlaceholders = [
-    'hostname', 'ip', 'hashrate', 'hashrate_1h', 'hashrate_1d', 'temp', 'vrtemp', 'power',
-    'efficiency', 'accepted', 'rejected', 'bestdiff', 'sessiondiff', 'blocks', 'uptime',
-  ].map(p => `{${p}}`).join(' ');
   @Input() uri = '';
 
   constructor(
@@ -49,16 +43,8 @@ export class AlertComponent implements OnInit {
           blockFoundEnable: [data?.blockFoundEnable === 1],
           bestDiffEnable: [data?.bestDiffEnable === 1],
           coinbaseVerifyEnable: [data?.coinbaseVerifyEnable === 1],
+          heartbeatEnable: [data?.heartbeatEnable === 1],
           showBlockFoundScreen: [data?.showBlockFoundScreen === 1],
-
-          // Heartbeat: every N hours (0 = off) a message from the template
-          heartbeatHours: [data?.heartbeatHours ?? 0, [
-            Validators.required,
-            Validators.min(0),
-            Validators.max(HEARTBEAT_MAX_HOURS),
-            Validators.pattern(/^\d+$/)
-          ]],
-          heartbeatTemplate: [data?.heartbeatTemplate ?? '', [Validators.maxLength(HEARTBEAT_TEMPLATE_MAX)]],
 
           webhookUrl: [data?.hasWebhook ? 'WEBHOOK' : '', [
             Validators.required,
@@ -75,8 +61,7 @@ export class AlertComponent implements OnInit {
       blockFoundEnable: !!form.blockFoundEnable,
       bestDiffEnable: !!form.bestDiffEnable,
       coinbaseVerifyEnable: !!form.coinbaseVerifyEnable,
-      heartbeatHours: Number(form.heartbeatHours),
-      heartbeatTemplate: form.heartbeatTemplate || '',
+      heartbeatEnable: !!form.heartbeatEnable,
     };
     if (form.webhookUrl !== 'WEBHOOK') {
       payload.webhookUrl = form.webhookUrl || '';
@@ -87,10 +72,6 @@ export class AlertComponent implements OnInit {
       }
       this.form.controls['webhookUrl'].setValue(this.hasWebhook ? 'WEBHOOK' : '');
     });
-  }
-
-  public get heartbeatInvalid(): boolean {
-    return this.form.controls['heartbeatHours'].invalid || this.form.controls['heartbeatTemplate'].invalid;
   }
 
   public saveDisplay() {

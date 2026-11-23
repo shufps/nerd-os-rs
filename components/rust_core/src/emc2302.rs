@@ -38,10 +38,11 @@ fn base(channel: c_int) -> u8 {
 pub fn init(bus: &mut impl RegBus, invert_polarity: bool) -> bool {
     log!(Info, TAG, "initializing EMC2302");
     // polarity of both channels; push-pull outputs; 19.53 kHz base
-    // frequency; manual control with 5 tach edges (2 poles)
+    // frequency on both (PMB1 bits 1:0, PMB2 bits 3:2 = 01; the former 0x09
+    // set PWM2 to 4.882 kHz); manual control with 5 tach edges (2 poles)
     bus.write(ADDR, POLARITY, if invert_polarity { 0x03 } else { 0x00 })
         && bus.write(ADDR, OUTPUT_CONFIG, 0x03)
-        && bus.write(ADDR, BASE_F123, (0x01 << 0) | (0x01 << 3))
+        && bus.write(ADDR, BASE_F123, (0x01 << 0) | (0x01 << 2))
         && bus.write(ADDR, FAN1 + OFS_FAN_CONFIG1, 0b01 << 3)
         && bus.write(ADDR, FAN2 + OFS_FAN_CONFIG1, 0b01 << 3)
 }

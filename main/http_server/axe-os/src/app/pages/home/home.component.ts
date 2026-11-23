@@ -60,7 +60,7 @@ import { NbTrigger } from '@nebular/theme';
 import { TranslateService } from '@ngx-translate/core';
 import { LocalStorageService } from '../../services/local-storage.service';
 import {
-  getPoolIconUrl as resolvePoolIconUrl,
+  getPoolIconCandidates,
   getQuickLink,
   supportsPing,
   isLocalHost,
@@ -933,18 +933,36 @@ export class HomeComponent implements AfterViewChecked, OnInit, OnDestroy {
   }
 
   private readonly poolIconErrorCache = new Set<string>();
+  /** Candidate icon URLs per host (see getPoolIconCandidates), computed once. */
+  private readonly poolIconCandidates = new Map<string, string[]>();
+  /** Index of the candidate currently tried per host. */
+  private readonly poolIconIndex = new Map<string, number>();
+
+  private poolIconCandidatesFor(key: string): string[] {
+    let list = this.poolIconCandidates.get(key);
+    if (!list) {
+      list = getPoolIconCandidates(key);
+      this.poolIconCandidates.set(key, list);
+    }
+    return list;
+  }
+
+  private poolIconFallback(key: string): string {
+    return isLocalHost(key) ? DEFAULT_POOL_ICON_URL : DEFAULT_EXTERNAL_POOL_ICON_URL;
+  }
 
   /**
    * Resolves the icon URL for a given pool host.
    *
    * Logic:
-   * - Uses the existing pool registry / quicklink resolution via `getPoolIconUrl`
-   * - If the pool host previously failed to load an icon (favicon or registry icon),
-   *   the default pool icon is returned immediately
+   * - Uses the pool registry / quicklink resolution via `getPoolIconCandidates`
+   *   (registry icon or https://<host>/favicon..., then parent-domain favicons)
+   * - Returns the candidate currently being tried for this host
+   * - If all candidates failed to load, the default pool icon is returned
    * - This guarantees a valid icon for:
    *   - local pools
    *   - registered pools
-   *   - unknown public pools
+   *   - unknown public pools (incl. per-coin subdomains like nito.coinxpool.com)
    *
    * @param host Pool hostname
    * @returns URL to the pool icon or the default pool icon
@@ -954,10 +972,11 @@ export class HomeComponent implements AfterViewChecked, OnInit, OnDestroy {
     if (!key) return DEFAULT_POOL_ICON_URL;
 
     if (this.poolIconErrorCache.has(key)) {
-      return isLocalHost(key) ? DEFAULT_POOL_ICON_URL : DEFAULT_EXTERNAL_POOL_ICON_URL;
+      return this.poolIconFallback(key);
     }
 
-    return resolvePoolIconUrl(key);
+    const candidates = this.poolIconCandidatesFor(key);
+    return candidates[this.poolIconIndex.get(key) ?? 0] ?? this.poolIconFallback(key);
   }
 
   /**
@@ -965,8 +984,9 @@ export class HomeComponent implements AfterViewChecked, OnInit, OnDestroy {
    *
    * When a favicon or registry-provided icon cannot be loaded (e.g. 404, CORS),
    * this method:
-   * - stores the host in an internal error cache
-   * - replaces the broken image with the default pool icon
+   * - advances to the next candidate (e.g. the parent domain's favicon)
+   * - once all candidates failed, stores the host in an internal error cache
+   *   and replaces the broken image with the default pool icon
    * - prevents repeated failing network requests for the same pool
    *
    * This ensures graceful fallback behavior for unknown public pools.
@@ -976,18 +996,39 @@ export class HomeComponent implements AfterViewChecked, OnInit, OnDestroy {
    */
   public onPoolIconError(evt: Event, host: string | undefined | null): void {
     const key = (host ?? '').trim().toLowerCase();
-    if (key) this.poolIconErrorCache.add(key);
-
     const img = evt.target as HTMLImageElement | null;
-    if (!img) return;
+    const fallback = this.poolIconFallback(key);
 
-    const fallback = isLocalHost(key)
-      ? DEFAULT_POOL_ICON_URL
-      : DEFAULT_EXTERNAL_POOL_ICON_URL;
+    // The default icon itself failed: nothing left to try.
+    if (img && img.src.includes(fallback)) return;
 
-    if (img.src.includes(fallback)) return;
+    let next: string = fallback;
+    if (key && !this.poolIconErrorCache.has(key)) {
+      const candidates = this.poolIconCandidatesFor(key);
+      const current = this.poolIconIndex.get(key) ?? 0;
+      // Several <img> may share a host (dual pool): advance relative to the
+      // URL that actually failed so a late error doesn't skip a candidate.
+      const failed = img ? candidates.findIndex((c) => this.sameUrl(c, img.src)) : -1;
+      const nextIdx = Math.max(current, failed + 1, failed === -1 ? current + 1 : 0);
+      if (nextIdx < candidates.length) {
+        this.poolIconIndex.set(key, nextIdx);
+        next = candidates[nextIdx];
+      } else {
+        this.poolIconErrorCache.add(key);
+      }
+    }
 
-    img.src = fallback;
+    if (img && !this.sameUrl(next, img.src)) {
+      img.src = next;
+    }
+  }
+
+  private sameUrl(candidate: string, absolute: string): boolean {
+    try {
+      return new URL(candidate, document.baseURI).href === absolute;
+    } catch {
+      return candidate === absolute;
+    }
   }
 
   // LocalStorage can throw (privacy mode/quota) and may be unavailable in some environments.

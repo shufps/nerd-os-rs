@@ -405,6 +405,8 @@
     "STEP_REBOOTING": "Redémarrage...",
     "STEP_ERROR": "Erreur",
     "STEP_UNKNOWN": "Inconnu",
+    "GITHUB_ERROR": "La mise à jour depuis GitHub a échoué. Consultez le journal de l'appareil pour plus de détails.",
+    "GITHUB_ERROR_STEP": "La mise à jour depuis GitHub a échoué pendant « {{step}} ». Consultez le journal de l'appareil pour plus de détails.",
     "RELEASE_AND_UPDATE": "Version et mise à jour",
     "EXPECTED_FILE": "Fichier attendu",
     "SELECT_RELEASE": "Sélectionner la version",

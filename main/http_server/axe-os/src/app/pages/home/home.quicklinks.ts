@@ -12,6 +12,13 @@
  *   1) Manual icon override (PoolMeta.iconUrl)
  *   2) Custom favicon path (PoolMeta.faviconPath + faviconHost)
  *   3) Default favicon fallback: https://<host>/favicon.ico
+ *   4) Parent-domain favicons: https://<parent>/favicon.ico, stripping one
+ *      leading label at a time down to the registrable domain
+ *      (e.g. nito.coinxpool.com -> coinxpool.com). Per-coin stratum
+ *      subdomains often have no website of their own.
+ *
+ * The UI walks the candidate list (getPoolIconCandidates) on each <img>
+ * load error and finally falls back to a local default icon.
  *
  * Additionally:
  * - Local pools (private IP/localhost/.local) are handled via registry rule
@@ -116,6 +123,57 @@ function isPrivateIp(host: string): boolean {
   if (a === 192 && b === 168) return true;
   if (a === 172 && b >= 16 && b <= 31) return true;
   return false;
+}
+
+/** IPv4 or IPv6 literal (IPv6 as returned by URL.hostname: "[::1]", or bare). */
+function isIpLiteral(host: string): boolean {
+  return isIp(host) || host.includes(':') || host.startsWith('[');
+}
+
+/**
+ * Common multi-label public suffixes (eTLD), so we never try e.g.
+ * https://co.uk/favicon.ico. Not exhaustive (no full Public Suffix List
+ * in the firmware UI); an unknown one only costs one failing request.
+ */
+const MULTI_LABEL_PUBLIC_SUFFIXES = new Set<string>([
+  'co.uk', 'org.uk', 'me.uk', 'ac.uk', 'gov.uk', 'ltd.uk', 'plc.uk',
+  'com.au', 'net.au', 'org.au',
+  'co.nz', 'net.nz', 'org.nz',
+  'co.jp', 'ne.jp', 'or.jp',
+  'co.kr', 'or.kr',
+  'com.br', 'net.br', 'org.br',
+  'com.cn', 'net.cn', 'org.cn',
+  'com.tw', 'com.hk', 'com.sg', 'com.my',
+  'com.ar', 'com.mx', 'com.co', 'com.tr', 'com.ua', 'com.pl',
+  'co.in', 'co.za', 'co.il', 'co.id', 'co.th',
+]);
+
+/**
+ * Returns the parent domains of a hostname, nearest first, never going
+ * below the registrable domain (two labels, or three for known multi-label
+ * public suffixes like co.uk).
+ *
+ * Examples:
+ *  - 'nito.coinxpool.com'      -> ['coinxpool.com']
+ *  - 'a.b.example.com'         -> ['b.example.com', 'example.com']
+ *  - 'stratum.solohash.co.uk'  -> ['solohash.co.uk']
+ *  - 'coinxpool.com', 'localhost', IP literals -> []
+ */
+export function getParentDomains(host: string): string[] {
+  const h = (host ?? '').trim().toLowerCase().replace(/\.$/, '');
+  if (!h || isIpLiteral(h)) return [];
+
+  const labels = h.split('.');
+  if (labels.some((l) => !l)) return [];
+
+  const suffix2 = labels.slice(-2).join('.');
+  const minLabels = MULTI_LABEL_PUBLIC_SUFFIXES.has(suffix2) ? 3 : 2;
+
+  const parents: string[] = [];
+  for (let i = 1; labels.length - i >= minLabels; i++) {
+    parents.push(labels.slice(i).join('.'));
+  }
+  return parents;
 }
 
 /**
@@ -374,40 +432,55 @@ export function supportsPing(stratumURL: string): boolean {
 }
 
 /**
- * Resolves a pool icon URL.
+ * Returns the ordered list of pool icon URLs to try.
  *
  * Priority:
- * 1) Manual icon override (PoolMeta.iconUrl)
+ * 1) Manual icon override (PoolMeta.iconUrl) - only candidate
  * 2) Custom favicon path (PoolMeta.faviconPath + faviconHost)
- * 3) Default favicon.ico at https://<host>/favicon.ico
+ *    or default favicon.ico at https://<host>/favicon.ico
+ * 3) https://<parent>/favicon.ico for each parent domain of the favicon host,
+ *    nearest first, down to the registrable domain
  *
  * Local pools are handled by a registry rule which sets iconUrl to DEFAULT_POOL_ICON_URL.
+ * The caller falls back to a local default icon once all candidates failed.
  *
  * @param stratumURL Stratum pool URL or host
- * @returns Icon URL (may be DEFAULT_POOL_ICON_URL)
  */
-export function getPoolIconUrl(stratumURL: string): string {
+export function getPoolIconCandidates(stratumURL: string): string[] {
   const safeUrl = stratumURL ?? '';
   const pool = detectPoolMeta(safeUrl);
 
   // 1) Manual icon override (including local-pool rule)
   if (pool?.iconUrl?.trim()) {
-    return pool.iconUrl.trim();
+    return [pool.iconUrl.trim()];
   }
 
   const host = extractHost(safeUrl);
-  const faviconHost = (pool?.faviconHost ?? host).trim();
+  const faviconHost = (pool?.faviconHost ?? host).trim().toLowerCase();
 
   // If we cannot derive a host, fall back to a local default icon
   if (!faviconHost) {
-    return DEFAULT_POOL_ICON_URL;
+    return [DEFAULT_POOL_ICON_URL];
   }
 
-  // 2) Custom favicon path (svg/png/etc.)
-  if (pool?.faviconPath?.trim()) {
-    return `https://${faviconHost}${pool.faviconPath.trim()}`;
-  }
+  // 2) Custom favicon path (svg/png/etc.) or default favicon.ico
+  const path = pool?.faviconPath?.trim() || '/favicon.ico';
+  const candidates = [`https://${faviconHost}${path}`];
 
-  // 3) Default favicon.ico
-  return `https://${faviconHost}/favicon.ico`;
+  // 3) Parent-domain favicons (per-coin / regional stratum subdomains)
+  for (const parent of getParentDomains(faviconHost)) {
+    const url = `https://${parent}/favicon.ico`;
+    if (!candidates.includes(url)) candidates.push(url);
+  }
+  return candidates;
+}
+
+/**
+ * Resolves the primary pool icon URL (first entry of getPoolIconCandidates).
+ *
+ * @param stratumURL Stratum pool URL or host
+ * @returns Icon URL (may be DEFAULT_POOL_ICON_URL)
+ */
+export function getPoolIconUrl(stratumURL: string): string {
+  return getPoolIconCandidates(stratumURL)[0];
 }

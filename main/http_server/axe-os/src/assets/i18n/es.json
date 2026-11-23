@@ -405,6 +405,8 @@
     "STEP_REBOOTING": "Reiniciando...",
     "STEP_ERROR": "Error",
     "STEP_UNKNOWN": "Desconocido",
+    "GITHUB_ERROR": "La actualización desde GitHub ha fallado. Consulta el registro del dispositivo para más detalles.",
+    "GITHUB_ERROR_STEP": "La actualización desde GitHub ha fallado durante \"{{step}}\". Consulta el registro del dispositivo para más detalles.",
     "RELEASE_AND_UPDATE": "Versión y actualización",
     "EXPECTED_FILE": "Archivo esperado",
     "SELECT_RELEASE": "Seleccionar versión",

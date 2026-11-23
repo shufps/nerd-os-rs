@@ -106,6 +106,9 @@ Web-UI: {{ currentWebVersion }}<br/>
             {{ 'UPDATE.KEEP_CONFIG' | translate }}
           </nb-checkbox>
         </div>
+        <div class="ota-error mt-2" *ngIf="otaError && !isOneClickUpdate" role="alert">
+          <nb-icon icon="alert-triangle-outline" pack="eva"></nb-icon>&nbsp;{{ otaError }}
+        </div>
       </div>
 
       <div class="progress-wrapper" *ngIf="isOneClickUpdate">

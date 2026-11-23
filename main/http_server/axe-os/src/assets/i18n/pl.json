@@ -405,6 +405,8 @@
     "STEP_REBOOTING": "Ponowny rozruch...",
     "STEP_ERROR": "Błąd",
     "STEP_UNKNOWN": "Nieznany",
+    "GITHUB_ERROR": "Aktualizacja z GitHub nie powiodła się. Szczegóły znajdziesz w logu urządzenia.",
+    "GITHUB_ERROR_STEP": "Aktualizacja z GitHub nie powiodła się podczas kroku \"{{step}}\". Szczegóły znajdziesz w logu urządzenia.",
     "RELEASE_AND_UPDATE": "Wydanie i aktualizacja",
     "EXPECTED_FILE": "Oczekiwany plik",
     "SELECT_RELEASE": "Wybierz wydanie",

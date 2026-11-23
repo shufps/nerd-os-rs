@@ -100,14 +100,6 @@ Still to test:
   freeing them when the driver refuses to uninstall. Needs a W5500 that fails
   after the driver install, for example a missing interrupt line.
 
-## GitHub updater on the Rust repository (`webflasher-rs`)
-
-The web UI's updater lists the releases of `shufps/nerd-os-rs`, and the factory update only accepts URLs under that repository's release downloads (`http_ota.rs`, host-tested); the CI uploads to `webflasher-rs/` in the R2 bucket. Switching between the Rust and the C firmware is meant to go through the web flasher only.
-
-Tested with the first release (v2.0.0-alpha.1): the CI upload into `webflasher-rs/`, and the web flasher installing it on a NerdQAxe++ and the Q1373.
-
-Tested with v2.0.0-alpha.4 on a NerdQAxe++: the updater listing the releases (pre-releases shown with the checkbox) and the factory update from one of them with "Keep Settings".
-
 ## Settings profiles: the profile "default"
 
 On the first access to the profiles of a device that never had profiles (no `profiles` blob in NVS: a new device or one updated from v2.0.0-alpha.1 or the C firmware), the profile "default" is created from the current settings and marked active.

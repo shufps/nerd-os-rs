@@ -50,7 +50,7 @@ button {
 .cb-line .cb-desc { opacity: 0.78; font-size: 0.95rem; }
 
 /* metrics interval: under the checkbox text, aligned with it */
-.metrics-interval { margin-top: -.5rem; padding-left: 1.75rem; }
+.metrics-interval { margin-top: -.5rem; padding-left: calc(1.75rem + 10px); }
 .metrics-select { min-width: 9rem; }
 
 /* tighten checkbox spacing a bit */

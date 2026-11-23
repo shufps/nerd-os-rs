@@ -407,8 +407,6 @@
     "STEP_REBOOTING": "Neustart...",
     "STEP_ERROR": "Fehler",
     "STEP_UNKNOWN": "Unbekannt",
-    "GITHUB_ERROR": "Das Update von GitHub ist fehlgeschlagen. Details stehen im Geräte-Log.",
-    "GITHUB_ERROR_STEP": "Das Update von GitHub ist bei \"{{step}}\" fehlgeschlagen. Details stehen im Geräte-Log.",
     "RELEASE_AND_UPDATE": "Release & Update",
     "EXPECTED_FILE": "Erwartete Datei",
     "SELECT_RELEASE": "Release auswählen",

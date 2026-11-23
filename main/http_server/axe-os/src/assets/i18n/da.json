@@ -403,8 +403,6 @@
     "STEP_REBOOTING": "Genstarter...",
     "STEP_ERROR": "Fejl",
     "STEP_UNKNOWN": "Ukendt",
-    "GITHUB_ERROR": "Opdateringen fra GitHub mislykkedes. Se enhedens log for detaljer.",
-    "GITHUB_ERROR_STEP": "Opdateringen fra GitHub mislykkedes under \"{{step}}\". Se enhedens log for detaljer.",
     "RELEASE_AND_UPDATE": "Udgivelse & opdatering",
     "EXPECTED_FILE": "Forventet fil",
     "SELECT_RELEASE": "Vælg udgivelse",

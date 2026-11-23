@@ -405,8 +405,6 @@
     "STEP_REBOOTING": "Repornire...",
     "STEP_ERROR": "Eroare",
     "STEP_UNKNOWN": "Necunoscut",
-    "GITHUB_ERROR": "Actualizarea de pe GitHub a eșuat. Verifică jurnalul dispozitivului pentru detalii.",
-    "GITHUB_ERROR_STEP": "Actualizarea de pe GitHub a eșuat la pasul \"{{step}}\". Verifică jurnalul dispozitivului pentru detalii.",
     "RELEASE_AND_UPDATE": "Versiune și actualizare",
     "EXPECTED_FILE": "Fișier așteptat",
     "SELECT_RELEASE": "Selectează versiune",

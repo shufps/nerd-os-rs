@@ -407,8 +407,6 @@
     "STEP_REBOOTING": "Rebooting...",
     "STEP_ERROR": "Error",
     "STEP_UNKNOWN": "Unknown",
-    "GITHUB_ERROR": "The update from GitHub failed. Check the device log for details.",
-    "GITHUB_ERROR_STEP": "The update from GitHub failed during \"{{step}}\". Check the device log for details.",
     "RELEASE_AND_UPDATE": "Release & Update",
     "EXPECTED_FILE": "Expected file",
     "SELECT_RELEASE": "Select release",

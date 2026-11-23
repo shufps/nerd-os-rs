@@ -185,14 +185,6 @@ a {
 .update-section {
   margin-bottom: 1.5rem;
 
-  // GitHub update error (stays until the next attempt)
-  .ota-error {
-    display: flex;
-    align-items: center;
-    font-size: 0.9em;
-    color: var(--text-danger-color, var(--color-danger-500));
-  }
-
   h6 {
     margin-bottom: 0.75rem;
     color: var(--text-hint-color);

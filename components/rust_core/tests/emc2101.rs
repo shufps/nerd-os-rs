@@ -1,10 +1,10 @@
 //! Golden tests of the EMC2101 fan controller/temperature sensor:
-//! rust_core::emc2101 on a recording register bus (register accesses and
+//! rust_core::drivers::emc2101 on a recording register bus (register accesses and
 //! results) against the outputs of the former C/C++ code
 //! (tests/golden/emc2101.txt, recorded by the differential tests).
 
-use rust_core::emc2101;
-use rust_core::i2c::RegBus;
+use rust_core::drivers::emc2101;
+use rust_core::drivers::i2c::RegBus;
 
 mod golden;
 use golden::Rec;

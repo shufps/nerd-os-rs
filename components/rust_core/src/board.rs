@@ -22,13 +22,13 @@ use crate::board_core::{self, Limits};
 use crate::board_power::{self as power, Params, Variant};
 use crate::board_profile::{self, BoardId, Detect, Pid, Profile};
 use crate::config;
-use crate::fxl6408::Fxl6408;
-use crate::i2c::Master;
+use crate::drivers::fxl6408::Fxl6408;
+use crate::drivers::i2c::Master;
+use crate::drivers::tmp451::{RealClock, Tmp451};
+use crate::drivers::tps536x7::{Chip, Tps536x7};
+use crate::drivers::tps546::{self, Tps546};
 use crate::idf::i2c::SmBus;
 use crate::log::log;
-use crate::tmp451::{RealClock, Tmp451};
-use crate::tps536x7::{Chip, Tps536x7};
-use crate::tps546::{self, Tps546};
 
 use BoardId::*;
 
@@ -176,7 +176,7 @@ const GAIA_ETH: EthPins = EthPins {
 };
 
 fn eth_probe(p: &EthPins) -> bool {
-    crate::w5500::probe(p.sclk, p.mosi, p.miso, p.cs)
+    crate::drivers::w5500::probe(p.sclk, p.mosi, p.miso, p.cs)
 }
 
 /// How a TMP451's multiplexer is switched.
@@ -561,14 +561,14 @@ impl power::Hw for PowerHw<'_> {
     }
     fn dac_set(&mut self, code: u8) {
         if is_axe(self.id) {
-            crate::ds4432u::set_code(&mut crate::i2c::Master, 0, code);
+            crate::drivers::ds4432u::set_code(&mut crate::drivers::i2c::Master, 0, code);
         }
     }
     fn serial_clear(&mut self) {
-        crate::serial::clear()
+        crate::drivers::serial::clear()
     }
     fn serial_set_baud(&mut self, baud: c_int) {
-        crate::serial::set_baud(baud)
+        crate::drivers::serial::set_baud(baud)
     }
     fn asic_init(
         &mut self,
@@ -763,7 +763,7 @@ impl Board {
             return self.init_axe(id, fan_invert, fan_perc);
         }
 
-        crate::serial::init();
+        crate::drivers::serial::init();
         if crate::idf::i2c::init() != 0 {
             log!(Error, t, "I2C initializing failed");
             return false;
@@ -798,7 +798,7 @@ impl Board {
                 log!(Info, t, "No CAN extension board");
             }
         }
-        crate::emc2302::init(&mut crate::i2c::Master, fan_invert);
+        crate::drivers::emc2302::init(&mut crate::drivers::i2c::Master, fan_invert);
         self.set_fan_speed(fan_perc);
         self.set_fan_speed(fan_perc);
         gpio_output(QAXE_VREG_EN, false);
@@ -879,7 +879,7 @@ impl Board {
 
     fn init_q1370(&self, fan_invert: bool, fan_perc: f32) -> bool {
         let t = tag(self.id());
-        crate::emc2302::init(&mut crate::i2c::Master, fan_invert);
+        crate::drivers::emc2302::init(&mut crate::drivers::i2c::Master, fan_invert);
         self.set_fan_speed(fan_perc);
         self.set_fan_speed(fan_perc);
         let mut hw = self.hw();
@@ -912,20 +912,26 @@ impl Board {
             delay_ms(100);
         }
         crate::idf::adc::init();
-        crate::serial::init();
+        crate::drivers::serial::init();
         if crate::idf::i2c::init() != 0 {
             log!(Error, t, "I2C initializing failed");
             return false;
         }
-        crate::emc2101::init(&mut crate::i2c::Master, fan_invert);
+        crate::drivers::emc2101::init(&mut crate::drivers::i2c::Master, fan_invert);
         if id == NerdAxe {
             self.set_fan_speed(fan_perc);
             gpio_output(AXE_PWR_EN, true);
             gpio_output(AXE_ASIC_RST, false);
             return true;
         }
-        crate::emc2101::set_ideality_factor(&mut crate::i2c::Master, EMC2101_IDEALITY_1_0319);
-        crate::emc2101::set_beta_compensation(&mut crate::i2c::Master, EMC2101_BETA_11);
+        crate::drivers::emc2101::set_ideality_factor(
+            &mut crate::drivers::i2c::Master,
+            EMC2101_IDEALITY_1_0319,
+        );
+        crate::drivers::emc2101::set_beta_compensation(
+            &mut crate::drivers::i2c::Master,
+            EMC2101_BETA_11,
+        );
         self.set_fan_speed(fan_perc);
         let tps = axe_tps();
         if id == NerdAxeGaia {
@@ -1056,10 +1062,10 @@ impl Board {
     pub fn set_fan_speed_ch(&self, ch: c_int, perc: f32) {
         if is_axe(self.id()) {
             if ch == 0 {
-                crate::emc2101::set_speed(&mut crate::i2c::Master, perc);
+                crate::drivers::emc2101::set_speed(&mut crate::drivers::i2c::Master, perc);
             }
         } else {
-            crate::emc2302::set_speed(&mut crate::i2c::Master, ch, perc);
+            crate::drivers::emc2302::set_speed(&mut crate::drivers::i2c::Master, ch, perc);
         }
     }
 
@@ -1071,17 +1077,17 @@ impl Board {
 
     pub fn fan_rpm(&self, ch: c_int) -> u16 {
         if is_axe(self.id()) {
-            crate::emc2101::speed(&mut crate::i2c::Master)
+            crate::drivers::emc2101::speed(&mut crate::drivers::i2c::Master)
         } else {
-            crate::emc2302::speed(&mut crate::i2c::Master, ch).unwrap_or(0)
+            crate::drivers::emc2302::speed(&mut crate::drivers::i2c::Master, ch).unwrap_or(0)
         }
     }
 
     pub fn set_fan_polarity(&self, invert: bool) {
         if is_axe(self.id()) {
-            crate::emc2101::set_polarity(&mut crate::i2c::Master, invert);
+            crate::drivers::emc2101::set_polarity(&mut crate::drivers::i2c::Master, invert);
         } else {
-            crate::emc2302::set_polarity(&mut crate::i2c::Master, invert);
+            crate::drivers::emc2302::set_polarity(&mut crate::drivers::i2c::Master, invert);
         }
     }
 
@@ -1096,17 +1102,20 @@ impl Board {
                 if index > 0 {
                     0.0
                 } else {
-                    crate::emc2101::internal_temp(&mut crate::i2c::Master) as f32 + 5.0
+                    crate::drivers::emc2101::internal_temp(&mut crate::drivers::i2c::Master) as f32
+                        + 5.0
                 }
             }
             NerdAxeGamma | NerdAxeGaia => {
                 if !initialized {
-                    return crate::emc2101::internal_temp(&mut crate::i2c::Master) as f32 + 5.0;
+                    return crate::drivers::emc2101::internal_temp(&mut crate::drivers::i2c::Master)
+                        as f32
+                        + 5.0;
                 }
                 if index > 0 {
                     return 0.0;
                 }
-                let t = crate::emc2101::external_temp(&mut crate::i2c::Master);
+                let t = crate::drivers::emc2101::external_temp(&mut crate::drivers::i2c::Master);
                 log!(
                     Info,
                     tag(id),
@@ -1120,7 +1129,7 @@ impl Board {
                     return 0.0;
                 }
                 // the sensor at index 1 is the VR's
-                let t = crate::tmp1075::read_temperature(index + (index != 0) as c_int);
+                let t = crate::drivers::tmp1075::read_temperature(index + (index != 0) as c_int);
                 // the chips are hotter than the board sensors
                 let offset = if is_q1370(id) {
                     3.0
@@ -1156,7 +1165,7 @@ impl Board {
                 let hw = self.hw();
                 let t = match &hw.buck {
                     Buck::Rev7(d) => d.temperature(&mut SmBus),
-                    _ => crate::tmp1075::read_temperature(VR_TMP1075),
+                    _ => crate::drivers::tmp1075::read_temperature(VR_TMP1075),
                 };
                 // the TPS53667 reads 8 °C low on the NerdOCTAXE-γ
                 if id == NerdOctaxeGamma && hw.tps53667 {
@@ -1182,9 +1191,9 @@ impl Board {
         let id = self.id();
         match id {
             NerdAxe => match what {
-                0 => crate::ina260::voltage(&mut crate::i2c::Master) / 1000.0,
-                1 => crate::ina260::current(&mut crate::i2c::Master) / 1000.0,
-                2 => crate::ina260::power(&mut crate::i2c::Master) / 1000.0,
+                0 => crate::drivers::ina260::voltage(&mut crate::drivers::i2c::Master) / 1000.0,
+                1 => crate::drivers::ina260::current(&mut crate::drivers::i2c::Master) / 1000.0,
+                2 => crate::drivers::ina260::power(&mut crate::drivers::i2c::Master) / 1000.0,
                 3 => crate::idf::adc::vcore_mv() as f32 / 1000.0,
                 _ => 0.0,
             },
@@ -1503,7 +1512,7 @@ fn detect_num_temp_sensors(t: &CStr) -> c_int {
         if i == VR_TMP1075 {
             continue;
         }
-        if crate::tmp1075::read_temperature(i) == 0.0 {
+        if crate::drivers::tmp1075::read_temperature(i) == 0.0 {
             break;
         }
         log!(Info, t, "found asic temp sensor {i}");
@@ -1527,7 +1536,7 @@ pub mod api {
         };
         let _ = BOARD.set(Board::new(id));
         // the board's ASIC chain on the UART
-        if let Some(asic) = Asics::new(board_asic_chip(), crate::serial::uart()) {
+        if let Some(asic) = Asics::new(board_asic_chip(), crate::drivers::serial::uart()) {
             let _ = b().asic.set(Box::leak(Box::new(asic)));
         }
         true

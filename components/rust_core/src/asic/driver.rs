@@ -1,7 +1,7 @@
 //! The BM13xx chain driver (port of the `Asic` class and the chip classes
 //! `BM1366`/`BM1368`/`BM1370`/`BM1373`): init sequences, chip enumeration,
 //! jobs, responses, ticket mask, hash and version rolling frequency. The UART
-//! is `serial.rs`, reached through [`Uart`].
+//! is `drivers/serial.rs`, reached through [`Uart`].
 //!
 //! Several tasks use one driver at the same time (jobs, results, counters,
 //! frequency changes), as before; the state is behind a mutex that is never

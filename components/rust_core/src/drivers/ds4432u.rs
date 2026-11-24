@@ -7,7 +7,7 @@
 
 use core::ffi::CStr;
 
-use crate::i2c::RegBus;
+use crate::drivers::i2c::RegBus;
 use crate::log::log;
 
 const TAG: &CStr = c"DS4432U";

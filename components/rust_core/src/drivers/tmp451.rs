@@ -10,7 +10,7 @@ use core::ffi::{c_int, CStr};
 use std::sync::Mutex;
 use std::time::{Duration, Instant};
 
-use crate::i2c::RegBus;
+use crate::drivers::i2c::RegBus;
 use crate::log::log;
 
 const TAG: &CStr = c"Tmp451";

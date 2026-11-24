@@ -336,7 +336,7 @@ pub fn init() -> EspErr {
 /// drivers (on the host every transaction fails).
 pub struct SmBus;
 
-impl crate::tps536x7::Bus for SmBus {
+impl crate::drivers::tps536x7::Bus for SmBus {
     fn read_byte(&mut self, addr: u8, cmd: u8) -> Option<u8> {
         let mut v = 0;
         (smbus_read_byte(addr, cmd, &mut v) == ESP_OK).then_some(v)
@@ -356,21 +356,21 @@ impl crate::tps536x7::Bus for SmBus {
     }
 }
 
-impl crate::tps546::Bus for SmBus {
+impl crate::drivers::tps546::Bus for SmBus {
     fn read_byte(&mut self, addr: u8, cmd: u8) -> Option<u8> {
-        crate::tps536x7::Bus::read_byte(self, addr, cmd)
+        crate::drivers::tps536x7::Bus::read_byte(self, addr, cmd)
     }
     fn read_word(&mut self, addr: u8, cmd: u8) -> Option<u16> {
-        crate::tps536x7::Bus::read_word(self, addr, cmd)
+        crate::drivers::tps536x7::Bus::read_word(self, addr, cmd)
     }
     fn write_byte(&mut self, addr: u8, cmd: u8, data: u8) -> bool {
-        crate::tps536x7::Bus::write_byte(self, addr, cmd, data)
+        crate::drivers::tps536x7::Bus::write_byte(self, addr, cmd, data)
     }
     fn write_word(&mut self, addr: u8, cmd: u8, data: u16) -> bool {
-        crate::tps536x7::Bus::write_word(self, addr, cmd, data)
+        crate::drivers::tps536x7::Bus::write_word(self, addr, cmd, data)
     }
     fn write_command(&mut self, addr: u8, cmd: u8) -> bool {
-        crate::tps536x7::Bus::write_command(self, addr, cmd)
+        crate::drivers::tps536x7::Bus::write_command(self, addr, cmd)
     }
     fn read_block(&mut self, addr: u8, cmd: u8, out: &mut [u8]) -> bool {
         out.len() <= MAX_BLOCK_LEN && smbus_read_block(addr, cmd, out) == ESP_OK

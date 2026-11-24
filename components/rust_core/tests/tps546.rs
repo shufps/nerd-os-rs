@@ -3,7 +3,7 @@
 //! contents, against the outputs of the former C++ drivers
 //! (tests/golden/tps546.txt, recorded by the differential tests).
 
-use rust_core::tps546::{probe, Bus, Config, Tps546, Variant};
+use rust_core::drivers::tps546::{probe, Bus, Config, Tps546, Variant};
 
 mod golden;
 use golden::Rec;

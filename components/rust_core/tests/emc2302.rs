@@ -1,10 +1,10 @@
-//! Golden tests of the EMC2302 fan controller driver: rust_core::emc2302 on
+//! Golden tests of the EMC2302 fan controller driver: rust_core::drivers::emc2302 on
 //! a recording register bus (register accesses and results) against the
 //! outputs of the former C/C++ code (tests/golden/emc2302.txt, recorded by
 //! the differential tests).
 
-use rust_core::emc2302;
-use rust_core::i2c::RegBus;
+use rust_core::drivers::emc2302;
+use rust_core::drivers::i2c::RegBus;
 
 mod golden;
 use golden::Rec;

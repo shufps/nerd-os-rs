@@ -6,9 +6,9 @@
 use std::cell::RefCell;
 use std::time::Duration;
 
-use rust_core::fxl6408::Fxl6408;
-use rust_core::i2c::RegBus;
-use rust_core::tmp451::{Clock, Tmp451};
+use rust_core::drivers::fxl6408::Fxl6408;
+use rust_core::drivers::i2c::RegBus;
+use rust_core::drivers::tmp451::{Clock, Tmp451};
 
 mod golden;
 use golden::Rec;

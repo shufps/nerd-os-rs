@@ -1,10 +1,10 @@
-//! Golden tests of the buck controller drivers: rust_core::tps536x7 (the
+//! Golden tests of the buck controller drivers: rust_core::drivers::tps536x7 (the
 //! TPS53647/TPS53667 variants of both builds) on a recording SMBus fake
 //! (operations and values for random register contents) against the outputs
 //! of the former C/C++ code (tests/golden/tps536x7.txt, recorded by the
 //! differential tests).
 
-use rust_core::tps536x7::{Bus, Chip, Tps536x7};
+use rust_core::drivers::tps536x7::{Bus, Chip, Tps536x7};
 
 mod golden;
 use golden::Rec;

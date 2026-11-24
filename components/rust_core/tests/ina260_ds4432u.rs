@@ -5,8 +5,8 @@
 //! the current deliberately differs: the Rust version reads a signed
 //! register).
 
-use rust_core::i2c::RegBus;
-use rust_core::{ds4432u, ina260};
+use rust_core::drivers::i2c::RegBus;
+use rust_core::{drivers::ds4432u, drivers::ina260};
 
 mod golden;
 use golden::Rec;

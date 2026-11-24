@@ -233,13 +233,13 @@ impl Hooks for Firmware {
         // a HAT on the board's pins (no reset line, no interrupt), else the
         // on-board W5500's defaults
         if let Some(p) = crate::board::get().and_then(|b| b.eth_pins()) {
-            crate::w5500::set_pins(
+            crate::drivers::w5500::set_pins(
                 p.sclk,
                 p.mosi,
                 p.miso,
                 p.cs,
-                crate::w5500::GPIO_NC,
-                crate::w5500::GPIO_NC,
+                crate::drivers::w5500::GPIO_NC,
+                crate::drivers::w5500::GPIO_NC,
             );
         }
         crate::network::api::network_early_eth_init();

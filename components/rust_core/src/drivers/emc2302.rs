@@ -11,7 +11,7 @@
 use core::ffi::{c_int, CStr};
 
 use crate::cutil::fixed;
-use crate::i2c::RegBus;
+use crate::drivers::i2c::RegBus;
 use crate::log::log;
 
 const TAG: &CStr = c"emc2302";

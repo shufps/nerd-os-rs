@@ -838,7 +838,7 @@ fn net_init() -> EspErr {
             return e;
         }
     }
-    crate::w5500::api::w5500_set_hooks(Some(eth_got_ip), Some(eth_link_down));
+    crate::drivers::w5500::api::w5500_set_hooks(Some(eth_got_ip), Some(eth_link_down));
     NET_INITED.store(true, Ordering::Release);
     ESP_OK
 }
@@ -851,7 +851,7 @@ pub fn start(ssid: &[u8], pass: &[u8], hostname: &CStr, has_eth: bool) -> EspErr
     }
     wifi_init(ssid, pass, hostname);
     if has_eth {
-        let e = crate::w5500::start();
+        let e = crate::drivers::w5500::start();
         if e != ESP_OK {
             log!(Warn, TAG_NET, "ETH init failed: {}", err_name(e));
         }
@@ -878,7 +878,7 @@ pub fn shutdown_ap_once() {
 
 /// An interface event: the decisions in `netmgr.rs`, the actions here.
 fn on_event(ev: Event) {
-    let eth = crate::w5500::netif();
+    let eth = crate::drivers::w5500::netif();
     let sta = NETIF_STA.get();
     let (a, preferred) = netmgr::netmgr_event(ev as c_int, eth.is_some(), sta.is_some());
 
@@ -950,8 +950,8 @@ fn on_event(ev: Event) {
 /// The preferred interface's address (Ethernet first) and whether it is
 /// Ethernet; `None` without one.
 pub fn preferred_ip() -> Option<(String, bool)> {
-    if netmgr::netmgr_eth_has_ip() && crate::w5500::has_ip() {
-        return Some((crate::w5500::ip(), true));
+    if netmgr::netmgr_eth_has_ip() && crate::drivers::w5500::has_ip() {
+        return Some((crate::drivers::w5500::ip(), true));
     }
     if netmgr::netmgr_wifi_has_ip() {
         if let Some(ip) = wifi_state::wifi_state_ip().filter(|ip| !ip.is_empty()) {
@@ -970,7 +970,7 @@ pub(crate) mod api {
 
     /// The Ethernet setup before the board init; a failure is logged.
     pub fn network_early_eth_init() {
-        let e = crate::w5500::early_init();
+        let e = crate::drivers::w5500::early_init();
         if e != ESP_OK {
             log!(
                 Error,

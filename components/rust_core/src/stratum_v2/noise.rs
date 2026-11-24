@@ -256,12 +256,17 @@ impl Sender {
         Some((header, payload))
     }
 
-    /// Encrypts and sends a complete SV2 frame (header and payload).
+    /// Encrypts and sends a complete SV2 frame (header and payload) in one
+    /// write: as two writes the payload could wait for the pool's (delayed)
+    /// ACK of the header.
     pub fn send(&mut self, wire: &mut impl Wire, frame: &[u8]) -> bool {
-        let Some((header, payload)) = self.encrypt_frame(frame) else {
+        let Some((mut header, payload)) = self.encrypt_frame(frame) else {
             return false;
         };
-        wire.write_all(&header) && payload.map_or(true, |p| wire.write_all(&p))
+        if let Some(p) = payload {
+            header.extend_from_slice(&p);
+        }
+        wire.write_all(&header)
     }
 }
 
@@ -581,5 +586,53 @@ mod tests {
         };
         assert_eq!(open.check_validity(0), Ok(()));
         assert_eq!(open.check_validity(u32::MAX), Ok(()));
+    }
+
+    /// Records the writes; reads from what was written.
+    #[derive(Default)]
+    struct Pipe {
+        writes: Vec<Vec<u8>>,
+        rd: usize,
+    }
+
+    impl Wire for Pipe {
+        fn read_exact(&mut self, buf: &mut [u8]) -> bool {
+            let all: Vec<u8> = self.writes.concat();
+            if self.rd + buf.len() > all.len() {
+                return false;
+            }
+            buf.copy_from_slice(&all[self.rd..self.rd + buf.len()]);
+            self.rd += buf.len();
+            true
+        }
+        fn write_all(&mut self, buf: &[u8]) -> bool {
+            self.writes.push(buf.to_vec());
+            true
+        }
+    }
+
+    #[test]
+    fn a_frame_is_one_write() {
+        let mut tx = Sender {
+            key: [7; 32],
+            nonce: 0,
+        };
+        let mut rx = Receiver {
+            key: [7; 32],
+            nonce: 0,
+        };
+        let mut pipe = Pipe::default();
+        // extension 0, message type 0x1b, payload length 3
+        let frame = [0, 0, 0x1b, 3, 0, 0, 0xaa, 0xbb, 0xcc];
+        assert!(tx.send(&mut pipe, &frame));
+        // a header-only frame
+        assert!(tx.send(&mut pipe, &[0, 0, 0x1c, 0, 0, 0]));
+        assert_eq!(pipe.writes.len(), 2);
+        assert_eq!(pipe.writes[0].len(), ENC_HEADER_LEN + 3 + TAG_LEN);
+        assert_eq!(pipe.writes[1].len(), ENC_HEADER_LEN);
+        let mut buf = [0u8; 16];
+        assert_eq!(rx.recv(&mut pipe, &mut buf), Some([0, 0, 0x1b, 3, 0, 0]));
+        assert_eq!(&buf[..3], &[0xaa, 0xbb, 0xcc]);
+        assert_eq!(rx.recv(&mut pipe, &mut buf), Some([0, 0, 0x1c, 0, 0, 0]));
     }
 }

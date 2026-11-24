@@ -154,3 +154,9 @@ A latched TPS546 fault (over-current etc.) sets the board error, keeps the ASIC 
 Still to test:
 - the home page alert in a browser (standard and Gaia layout);
 - a NerdAxe Gamma.
+
+## SV2: a frame in one write
+
+Stratum V2 frames (encrypted header and payload) go out in one write instead of two (old repo #744, bitaxe #1771). TCP_NODELAY and the partial-write loop were already in place. Host-tested (one write per frame, decrypts on the other side).
+
+Still to test: shares on an SV2 pool (e.g. the Q1373's blitzpool) and the share response time.

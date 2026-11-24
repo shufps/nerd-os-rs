@@ -7,7 +7,7 @@
 use crate::idf::idf_const;
 use core::ffi::{c_void, CStr};
 
-use crate::http_data::Partition;
+use crate::http::data::Partition;
 use crate::idf::httpd::{self, err, Request};
 use crate::idf::nvs::err_name;
 use crate::idf::{EspErr, ESP_FAIL, ESP_OK};
@@ -178,7 +178,7 @@ pub fn handler(req: &mut Request) -> EspErr {
         );
     };
 
-    crate::http_server::with_scratch(req, |req, chunk| send_dump(req, chunk, p, size))
+    crate::http::server::with_scratch(req, |req, chunk| send_dump(req, chunk, p, size))
         .unwrap_or(ESP_FAIL)
 }
 

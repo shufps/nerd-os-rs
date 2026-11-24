@@ -1,9 +1,9 @@
-//! Golden tests of the HTTP API authentication: rust_core::http_auth
+//! Golden tests of the HTTP API authentication: rust_core::http::auth
 //! (base32, OTP parsing, TOTP with replay state, session tokens, rate limit,
 //! IPv4 parsing, network check) against the outputs of the former code
 //! (tests/golden/http_auth.txt, recorded by the differential tests).
 
-use rust_core::http_auth::{self, RateLimit, ReplayState};
+use rust_core::http::auth::{self, RateLimit, ReplayState};
 use std::cell::Cell;
 
 mod golden;
@@ -42,7 +42,7 @@ fn base32_matches_reference() {
     let mut rec = Rec::new("http_auth", "base32_matches_reference");
     for _ in 0..20_000 {
         let data = rng.bytes(rng.below(40) as usize);
-        let encoded = http_auth::base32_encode(&data);
+        let encoded = auth::base32_encode(&data);
 
         // decode: valid, lowercase, junk, too long for the buffer
         let text = rng.text(
@@ -51,7 +51,7 @@ fn base32_matches_reference() {
         );
         let cap = rng.below(40) as usize;
         let mut b = vec![0u8; cap];
-        let n_new = http_auth::base32_decode(&text, &mut b);
+        let n_new = auth::base32_decode(&text, &mut b);
         rec.add(format!(
             "{} -> {encoded}\n\"{}\" cap {cap} -> {n_new} {}",
             data.escape_ascii(),
@@ -68,7 +68,7 @@ fn otp6_parsing_matches_reference() {
     let mut rec = Rec::new("http_auth", "otp6_parsing_matches_reference");
     for _ in 0..50_000 {
         let text = rng.text(b"0123456789 a-+\t", 10);
-        let parsed = http_auth::parse_otp6(&text);
+        let parsed = auth::parse_otp6(&text);
         rec.add(format!("\"{}\" -> {parsed:?}", text.escape_ascii()));
     }
     rec.finish();
@@ -88,12 +88,12 @@ fn totp_matches_reference() {
             t += [0, 1, 15, 29, 30, 31, 60, 95, -30, -61][rng.below(10) as usize];
             let step = t / 30;
             let code = match rng.below(4) {
-                0 => http_auth::hotp(&key, (step + rng.below(5) as i64 - 2) as u64),
-                1 => http_auth::hotp(&key, step as u64),
+                0 => auth::hotp(&key, (step + rng.below(5) as i64 - 2) as u64),
+                1 => auth::hotp(&key, step as u64),
                 2 => rng.below(1_000_000) as u32,
-                _ => http_auth::hotp(&key, (step - 1) as u64),
+                _ => auth::hotp(&key, (step - 1) as u64),
             };
-            let ok_new = http_auth::totp_verify(&key, t, code, &mut state);
+            let ok_new = auth::totp_verify(&key, t, code, &mut state);
             rec.add(format!(
                 "key {:02x?} t {t} code {code} -> {ok_new} base {} mask {:#04x}",
                 key, state.base_step, state.mask
@@ -112,7 +112,7 @@ fn session_tokens_match_reference() {
         let boot = rng.next() as u32;
         let now = 1_700_000_000 + rng.below(1 << 24) as i64;
         let ttl = *rng.pick(&[0u32, 1, 60, 86_400, u32::MAX]);
-        let minted = http_auth::mint_session_token(&key, boot, now, ttl).map(String::into_bytes);
+        let minted = auth::mint_session_token(&key, boot, now, ttl).map(String::into_bytes);
         rec.add(format!(
             "key {:02x?} boot {boot} now {now} ttl {ttl} -> {:?}",
             key,
@@ -142,7 +142,7 @@ fn session_tokens_match_reference() {
             };
             let at =
                 now + [-301i64, -1, 0, 1, 299, 300, 86_399, 86_400, 1 << 33][rng.below(9) as usize];
-            let ok = http_auth::verify_session_token(&k, b, at, &t);
+            let ok = auth::verify_session_token(&k, b, at, &t);
             rec.add(format!(
                 "verify \"{}\" key {:02x} boot {b} at {at} -> {ok}",
                 t.escape_ascii(),
@@ -224,7 +224,7 @@ fn inet_addr_matches_lwip() {
     let mut rec = Rec::new("http_auth", "inet_addr_matches_lwip");
     for _ in 0..100_000 {
         let text = ipv4_text(&rng);
-        let parsed = http_auth::parse_ipv4(&text);
+        let parsed = auth::parse_ipv4(&text);
         rec.add(format!("\"{}\" -> {:x?}", text.escape_ascii(), parsed));
     }
     rec.finish();
@@ -273,7 +273,7 @@ fn network_check_matches_reference_except_origin() {
             o.truncate(127);
             o
         });
-        let current = http_auth::network_allowed(
+        let current = auth::network_allowed(
             ap,
             std::net::IpAddr::V4(ip.into()),
             origin.as_deref(),

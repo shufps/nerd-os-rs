@@ -1,11 +1,11 @@
 //! Golden tests of the settings bodies: the Rust parsers
-//! (rust_core::http_settings) and settings_apply writing into a recording
+//! (rust_core::http::settings) and settings_apply writing into a recording
 //! config layer, against the NVS writes of the former ArduinoJson handling
 //! (tests/golden/http_settings.txt, recorded by the differential tests).
 
 use std::cell::{Cell, RefCell};
 
-use rust_core::http_settings::{self, Write};
+use rust_core::http::settings::{self, Write};
 use rust_core::settings_apply::{apply, Applied, Store};
 
 mod golden;
@@ -306,12 +306,12 @@ fn run(
 }
 
 fn settings_v1(body: &[u8], dual_pool: bool) -> (bool, String) {
-    let ((ok, _), log) = run(body, |d| http_settings::settings_v1(d, dual_pool));
+    let ((ok, _), log) = run(body, |d| settings::settings_v1(d, dual_pool));
     (ok, log)
 }
 
 fn settings_v2(body: &[u8]) -> ((bool, [bool; 2]), String) {
-    let ((ok, a), log) = run(body, http_settings::settings_v2);
+    let ((ok, a), log) = run(body, settings::settings_v2);
     ((ok, a.verify_changed), log)
 }
 

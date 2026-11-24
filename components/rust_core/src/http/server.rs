@@ -1,7 +1,7 @@
 //! The HTTP server (port of `main/http_server/http_server.cpp`,
 //! `http_cors.cpp` and `http_utils.cpp`): starts `esp_http_server`
 //! (wildcard URIs, 10 sockets, LRU purge, no keep-alive), registers the
-//! routes of `http_routes.rs` with one trampoline that carries out the
+//! routes of `http/routes.rs` with one trampoline that carries out the
 //! checks (network, CORS headers, OTP) before the handler, answers unknown
 //! URIs with a redirect to `/` (captive portal), serves the recovery page
 //! and the CORS preflights, and starts the captive portal DNS server. The
@@ -11,7 +11,7 @@ use core::ffi::{c_int, c_void, CStr};
 use std::sync::atomic::{AtomicBool, AtomicPtr, Ordering};
 use std::sync::Mutex;
 
-use crate::http_routes::{self, flag, Handler, Method, Route, ROUTES};
+use crate::http::routes::{self, flag, Handler, Method, Route, ROUTES};
 use crate::idf::httpd::{self, err, Req, Request};
 use crate::idf::{EspErr, ESP_FAIL, ESP_OK};
 use crate::log::log;
@@ -76,7 +76,7 @@ pub fn with_scratch<T>(
     Some(f(req, &mut buf))
 }
 
-/// `is_network_allowed()`: the decision is `http_auth.rs`.
+/// `is_network_allowed()`: the decision is `http/auth.rs`.
 fn network_allowed(req: &mut Request) -> bool {
     const T: &CStr = c"http_cors";
     let ap_mode = crate::system::ap_state();
@@ -101,7 +101,7 @@ fn network_allowed(req: &mut Request) -> bool {
     // an Origin header that does not fit counts as none, as before
     let origin = req.header(c"Origin", 128);
     let hostname = crate::system::hostname();
-    if crate::http_auth::network_allowed(
+    if crate::http::auth::network_allowed(
         ap_mode,
         ip,
         origin.as_deref().map(CStr::to_bytes),
@@ -252,7 +252,7 @@ unsafe extern "C" fn not_found_handler(req: *mut Req, _: httpd::ErrCode) -> EspE
 
 unsafe extern "C" fn close_cb(_: httpd::Handle, fd: c_int) {
     // our web socket being closed resets the logging
-    crate::http_ws::on_close(fd);
+    crate::http::ws::on_close(fd);
     if fd >= 0 {
         httpd::lwip_close(fd);
     }
@@ -271,7 +271,7 @@ fn checks_and_handler(req: &mut Request, rc: &RouteCtx) -> EspErr {
         req.send_err(err::E500_INTERNAL_SERVER_ERROR, None);
         return ESP_FAIL;
     }
-    if http_routes::needs_otp(rc.route, recovery()) {
+    if routes::needs_otp(rc.route, recovery()) {
         // forced: also with OTP disabled, and no session token
         let force = flags & flag::OTP_FORCE != 0;
         if validate_otp(req, force) != ESP_OK {
@@ -316,27 +316,27 @@ unsafe fn register_routes() {
     let s = server();
     // the extra routes first: the table ends with the file handler's
     // wildcard, which would shadow them
-    for rt in http_routes::EXTRA.iter().chain(ROUTES.iter()) {
+    for rt in routes::EXTRA.iter().chain(ROUTES.iter()) {
         let builtin = matches!(rt.handler, Handler::Recovery | Handler::Options);
         let cpp = if builtin {
             None
         } else {
-            crate::http_handlers::handler(rt.handler)
+            crate::http::handlers::handler(rt.handler)
                 .or(match rt.handler {
-                    Handler::Websocket => Some(crate::http_ws::handler as httpd::HandlerFn),
-                    Handler::File => Some(crate::http_files::file_handler as httpd::HandlerFn),
+                    Handler::Websocket => Some(crate::http::ws::handler as httpd::HandlerFn),
+                    Handler::File => Some(crate::http::files::file_handler as httpd::HandlerFn),
                     Handler::Ota => Some(crate::ota_upload::firmware_update as httpd::HandlerFn),
                     Handler::OtaWww => Some(crate::ota_upload::www_update as httpd::HandlerFn),
-                    Handler::Coredump => Some(crate::http_coredump::handler as httpd::HandlerFn),
+                    Handler::Coredump => Some(crate::http::coredump::handler as httpd::HandlerFn),
                     #[cfg(feature = "screenshot")]
                     Handler::Screenshot => Some(crate::display_shot::handler as httpd::HandlerFn),
                     #[cfg(feature = "screenshot")]
                     Handler::Press => Some(crate::display_shot::press as httpd::HandlerFn),
-                    Handler::CanNodes => Some(crate::http_can::nodes as httpd::HandlerFn),
-                    Handler::CanSlaveAction => Some(crate::http_can::action as httpd::HandlerFn),
-                    Handler::CanSlavePatch => Some(crate::http_can::patch as httpd::HandlerFn),
-                    Handler::CanSlaveDelete => Some(crate::http_can::delete as httpd::HandlerFn),
-                    Handler::WifiScan => Some(crate::http_handlers::wifi_scan as httpd::HandlerFn),
+                    Handler::CanNodes => Some(crate::http::can::nodes as httpd::HandlerFn),
+                    Handler::CanSlaveAction => Some(crate::http::can::action as httpd::HandlerFn),
+                    Handler::CanSlavePatch => Some(crate::http::can::patch as httpd::HandlerFn),
+                    Handler::CanSlaveDelete => Some(crate::http::can::delete as httpd::HandlerFn),
+                    Handler::WifiScan => Some(crate::http::handlers::wifi_scan as httpd::HandlerFn),
                     Handler::ProfilesGet => Some(crate::profiles::http::get as httpd::HandlerFn),
                     Handler::ProfilesPatch => {
                         Some(crate::profiles::http::patch as httpd::HandlerFn)
@@ -350,9 +350,9 @@ unsafe fn register_routes() {
                     }
                     _ => None,
                 })
-                .or_else(|| crate::http_data::handler(rt.handler))
+                .or_else(|| crate::http::data::handler(rt.handler))
         };
-        if !http_routes::active(rt, recovery(), COREDUMP) || (!builtin && cpp.is_none()) {
+        if !routes::active(rt, recovery(), COREDUMP) || (!builtin && cpp.is_none()) {
             continue;
         }
         let rc: &'static RouteCtx = Box::leak(Box::new(RouteCtx {
@@ -390,7 +390,7 @@ unsafe fn register_routes() {
 /// `start_rest_server()`
 pub fn start() -> EspErr {
     // the web UI filesystem missing: recovery mode
-    if crate::http_files::init_fs() != ESP_OK {
+    if crate::http::files::init_fs() != ESP_OK {
         ENTER_RECOVERY.store(true, Ordering::Release);
     }
 
@@ -430,7 +430,7 @@ pub fn start() -> EspErr {
         httpd::httpd_register_err_handler(handle, err::E404_NOT_FOUND, Some(not_found_handler));
     }
     // the queue and the task of the log over the web socket
-    crate::http_ws::start();
+    crate::http::ws::start();
 
     // the captive portal: every A query answered with the access point's
     // address

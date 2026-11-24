@@ -6,8 +6,8 @@
 
 use std::cell::{Cell, RefCell};
 
-use rust_core::http_query::{self, NodeId};
-use rust_core::http_settings::{self, Setting, Write};
+use rust_core::http::query::{self, NodeId};
+use rust_core::http::settings::{self, Setting, Write};
 use rust_core::settings_apply::{apply, Applied, Store};
 
 mod golden;
@@ -69,10 +69,10 @@ fn settings(body: &[u8], parse: impl Fn(&rust_core::ajson::Json) -> Vec<Write>) 
 
 /// 0: ok (`enabled` set), 1: invalid JSON, 2: no bool `enabled`.
 fn otp(body: &[u8]) -> (i32, bool) {
-    match http_settings::otp_body(body) {
-        http_settings::OtpBody::Invalid => (1, false),
-        http_settings::OtpBody::NoEnabled => (2, false),
-        http_settings::OtpBody::Enabled(b) => (0, b),
+    match settings::otp_body(body) {
+        settings::OtpBody::Invalid => (1, false),
+        settings::OtpBody::NoEnabled => (2, false),
+        settings::OtpBody::Enabled(b) => (0, b),
     }
 }
 
@@ -83,7 +83,7 @@ fn can_body(body: &[u8], slave: u8) -> (bool, String) {
         return (false, String::new());
     };
     let mut log = String::new();
-    for w in http_settings::can_node(&doc) {
+    for w in settings::can_node(&doc) {
         let n = w.num;
         let line = match w.setting {
             Setting::CanFrequency => format!("freq {slave} {}", n as u16),
@@ -106,7 +106,7 @@ fn can_body(body: &[u8], slave: u8) -> (bool, String) {
 
 /// The node ID, or -1 (missing), -2 (invalid).
 fn can_node_id(uri: &[u8]) -> i32 {
-    match http_query::can_node_id(uri) {
+    match query::can_node_id(uri) {
         NodeId::Missing => -1,
         NodeId::Invalid => -2,
         NodeId::Id(id) => id as i32,
@@ -115,7 +115,7 @@ fn can_node_id(uri: &[u8]) -> i32 {
 
 /// -2: no ID, -3: unknown action, else 100 * (action + 1) + ID.
 fn can_action(uri: &[u8]) -> i32 {
-    match http_query::can_node_action(uri) {
+    match query::can_node_action(uri) {
         (NodeId::Id(id), Some(a)) => 100 * (a as i32 + 1) + id as i32,
         (NodeId::Id(_), None) => -3,
         _ => -2,
@@ -226,10 +226,10 @@ fn influx_alert_otp_bodies_match_reference() {
     ];
     for _ in 0..20_000 {
         let b = body(&rng, &influx);
-        let new = settings(b.as_bytes(), http_settings::settings_influx);
+        let new = settings(b.as_bytes(), settings::settings_influx);
         rec.add(format!("influx {b:?} -> {}\n{}", new.0, new.1));
         let b = body(&rng, &alert);
-        let new = settings(b.as_bytes(), http_settings::settings_alert);
+        let new = settings(b.as_bytes(), settings::settings_alert);
         rec.add(format!("alert {b:?} -> {}\n{}", new.0, new.1));
         let b = body(&rng, &["enabled"]);
         let (new, e1) = otp(b.as_bytes());
@@ -376,13 +376,13 @@ fn query_parameters_match_reference() {
             format!("{q:?}")
         };
         for v2 in [false, true] {
-            let new = http_query::history_query(fits(arg, 128), v2);
+            let new = query::history_query(fits(arg, 128), v2);
             out += &format!(
                 "\nv2 {v2} -> start {} cur {} span {} limit {} requested {}",
                 new.start, new.current, new.span_ms, new.limit, new.requested
             );
         }
-        let all = http_query::all_time(fits(arg, 32));
+        let all = query::all_time(fits(arg, 32));
         rec.add(format!("{out}\nallTime {all}"));
     }
     rec.finish();

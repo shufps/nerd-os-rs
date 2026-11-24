@@ -8,9 +8,9 @@ use core::ffi::{c_int, CStr};
 use std::ffi::CString;
 
 use crate::can;
-use crate::http_json::{CanMasterNode, FanInfo};
-use crate::http_query::{can_node_action, can_node_id, NodeAction, NodeId};
-use crate::http_settings::Setting;
+use crate::http::json::{CanMasterNode, FanInfo};
+use crate::http::query::{can_node_action, can_node_id, NodeAction, NodeId};
+use crate::http::settings::Setting;
 use crate::idf::httpd::{self, err, Request};
 use crate::idf::{EspErr, ESP_FAIL, ESP_OK};
 use crate::log::log;
@@ -79,8 +79,8 @@ pub fn nodes(req: &mut Request) -> EspErr {
         fan_count: b.num_fans,
         fans,
     };
-    let doc = crate::http_json::can_swarm(&m);
-    crate::http_server::send_json(req, &doc.serialize())
+    let doc = crate::http::json::can_swarm(&m);
+    crate::http::server::send_json(req, &doc.serialize())
 }
 
 /// `PATCH /api/v2/can/nodes/{id}`: frequency, voltage, fans, display
@@ -90,7 +90,7 @@ pub fn patch(req: &mut Request) -> EspErr {
         Ok(id) => id,
         Err(e) => return e,
     };
-    let Ok(body) = crate::http_server::read_body(req) else {
+    let Ok(body) = crate::http::server::read_body(req) else {
         return ESP_FAIL;
     };
     let Ok(doc) = crate::ajson::deserialize(&body) else {
@@ -98,7 +98,7 @@ pub fn patch(req: &mut Request) -> EspErr {
         send_err(req, err::E400_BAD_REQUEST, c"Invalid JSON");
         return ESP_FAIL;
     };
-    for w in crate::http_settings::can_node(&doc) {
+    for w in crate::http::settings::can_node(&doc) {
         let n = w.num;
         match w.setting {
             Setting::CanFrequency => can::set_slave_freq(slave, n as u16),

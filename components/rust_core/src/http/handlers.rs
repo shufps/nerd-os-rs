@@ -4,17 +4,17 @@
 //! `v2/handler_v2_system.cpp`) and the settings bodies of the C++ ones
 //! (`apply_pool_settings()`, formerly `settings_apply.cpp` behind
 //! `applySettingsBody()`). The routes and their checks are in
-//! `http_server.rs`; the documents are built by `http_json.rs`.
+//! `http/server.rs`; the documents are built by `http/json.rs`.
 
 use crate::idf::idf_const;
 use core::ffi::{c_int, CStr};
 
 use crate::ajson::Json;
 use crate::config;
-use crate::http_json;
-use crate::http_routes::Handler;
-use crate::http_server::read_body;
-use crate::http_settings::{self, Write};
+use crate::http::json;
+use crate::http::routes::Handler;
+use crate::http::server::read_body;
+use crate::http::settings::{self, Write};
 use crate::idf::httpd::{err, HandlerFn, Request};
 use crate::idf::{EspErr, ESP_FAIL, ESP_OK};
 use crate::log::log;
@@ -72,7 +72,7 @@ fn set_json(req: &mut Request) {
 
 /// A document in 2048 byte chunks (`sendJsonBuffer()`).
 fn send_doc(req: &mut Request, doc: Json) -> EspErr {
-    crate::http_server::send_json(req, &doc.serialize())
+    crate::http::server::send_json(req, &doc.serialize())
 }
 
 /// A config string with its default (`cfgGetStrAlloc()`), NUL-terminated.
@@ -144,7 +144,7 @@ fn board_info() -> crate::board::api::Info {
 fn v2_identify(req: &mut Request) -> EspErr {
     set_json(req);
     let b = board_info();
-    let v = http_json::V2Identify {
+    let v = json::V2Identify {
         device_model: Some(b.device_model.into()),
         default_theme: Some(b.default_theme.into()),
         otp: cfg_flag(b"otp_enabled", 0),
@@ -152,7 +152,7 @@ fn v2_identify(req: &mut Request) -> EspErr {
         core_dump_download: k::ESP_COREDUMP_ENABLE_TO_FLASH,
         can_enabled: cfg_flag(b"can_enabled", 0),
     };
-    send_doc(req, http_json::v2_identify(&v))
+    send_doc(req, json::v2_identify(&v))
 }
 
 fn v2_system(req: &mut Request) -> EspErr {
@@ -163,7 +163,7 @@ fn v2_system(req: &mut Request) -> EspErr {
     let version = std::ffi::CString::new(crate::mdns::fw_version()).unwrap_or_default();
     let ip = crate::system::ip();
     let wifi_status = crate::system::wifi_status();
-    let v = http_json::V2System {
+    let v = json::V2System {
         device_model: Some(b.device_model.into()),
         asic_model: Some(b.asic_model.into()),
         version: Some(version),
@@ -178,7 +178,7 @@ fn v2_system(req: &mut Request) -> EspErr {
         free_heap: crate::idf::task::free_heap(CAP_SPIRAM) as u64,
         free_heap_int: crate::idf::task::free_heap(CAP_INTERNAL) as u64,
     };
-    send_doc(req, http_json::v2_system(&v))
+    send_doc(req, json::v2_system(&v))
 }
 
 // ---------------------------------------------------------------------------
@@ -190,7 +190,7 @@ fn influx_get(req: &mut Request) -> EspErr {
     let bucket = cfg_str(b"influx_bucket", k::INFLUX_BUCKET);
     let org = cfg_str(b"influx_org", k::INFLUX_ORG);
     let prefix = cfg_str(b"influx_prefix", k::INFLUX_PREFIX);
-    let i = http_json::InfluxInfo {
+    let i = json::InfluxInfo {
         url: Some(url),
         port: config::get_u16(b"influx_port", k::INFLUX_PORT as u16),
         bucket: Some(bucket),
@@ -198,12 +198,12 @@ fn influx_get(req: &mut Request) -> EspErr {
         prefix: Some(prefix),
         enabled: cfg_flag(b"influx_enable", k::INFLUX_ENABLE_VALUE),
     };
-    send_doc(req, http_json::influx_info(&i))
+    send_doc(req, json::influx_info(&i))
 }
 
 fn influx_patch(req: &mut Request) -> EspErr {
     let mut a = Applied::default();
-    if apply_settings(req, c"http_utils", http_settings::settings_influx, &mut a) != ESP_OK {
+    if apply_settings(req, c"http_utils", settings::settings_influx, &mut a) != ESP_OK {
         return ESP_FAIL;
     }
     crate::config_nvs::request_flush();
@@ -217,7 +217,7 @@ fn influx_patch(req: &mut Request) -> EspErr {
 fn alert_get(req: &mut Request) -> EspErr {
     set_json(req);
     let webhook = cfg_str(b"alrt_disc_url", k::ALERT_DISCORD_URL);
-    let a = http_json::AlertInfo {
+    let a = json::AlertInfo {
         has_webhook: !webhook.is_empty(),
         watchdog: cfg_flag(b"alrt_disc_en", k::ALERT_DISCORD_WATCHDOG_ENABLE_VALUE),
         block_found: cfg_flag(
@@ -229,12 +229,12 @@ fn alert_get(req: &mut Request) -> EspErr {
         show_block_found_screen: cfg_flag(b"block_found_en", k::SHOW_BLOCK_FOUND_ENABLE_VALUE),
         heartbeat_hours: config::get_u16(b"alrt_hb_intv", 0).min(crate::heartbeat::MAX_HOURS),
     };
-    send_doc(req, http_json::alert_info(&a))
+    send_doc(req, json::alert_info(&a))
 }
 
 fn alert_patch(req: &mut Request) -> EspErr {
     let mut a = Applied::default();
-    if apply_settings(req, c"http_utils", http_settings::settings_alert, &mut a) != ESP_OK {
+    if apply_settings(req, c"http_utils", settings::settings_alert, &mut a) != ESP_OK {
         return ESP_FAIL;
     }
     crate::config_nvs::request_flush();
@@ -294,14 +294,14 @@ fn otp_patch(req: &mut Request) -> EspErr {
         Ok(b) => b,
         Err(e) => return e,
     };
-    let enabled = match http_settings::otp_body(&body) {
-        http_settings::OtpBody::Enabled(b) => b,
-        http_settings::OtpBody::Invalid => {
+    let enabled = match settings::otp_body(&body) {
+        settings::OtpBody::Enabled(b) => b,
+        settings::OtpBody::Invalid => {
             log!(Error, c"http_otp", "JSON parsing failed");
             send_err(req, err::E400_BAD_REQUEST, c"Invalid JSON");
             return ESP_FAIL;
         }
-        http_settings::OtpBody::NoEnabled => {
+        settings::OtpBody::NoEnabled => {
             log!(Error, c"http_otp", "invalid enabled state");
             send_err(
                 req,
@@ -319,10 +319,7 @@ fn otp_patch(req: &mut Request) -> EspErr {
 }
 
 fn otp_status(req: &mut Request) -> EspErr {
-    send_doc(
-        req,
-        http_json::otp_status(crate::otp::api::otp_is_enabled()),
-    )
+    send_doc(req, json::otp_status(crate::otp::api::otp_is_enabled()))
 }
 
 fn otp_session(req: &mut Request) -> EspErr {
@@ -355,7 +352,7 @@ fn otp_session(req: &mut Request) -> EspErr {
         return send_err(req, err::E500_INTERNAL_SERVER_ERROR, c"Session error");
     };
     let expires_ms = crate::clock::now_ms() + SESSION_TTL_S as u64 * 1000;
-    let doc = http_json::otp_session(token.as_bytes(), SESSION_TTL_S, expires_ms).serialize();
+    let doc = json::otp_session(token.as_bytes(), SESSION_TTL_S, expires_ms).serialize();
     set_json(req);
     req.send(&doc);
     ESP_OK
@@ -372,14 +369,9 @@ pub(crate) fn apply_pool_settings(
 ) -> Result<[bool; 2], EspErr> {
     let mut a = Applied::default();
     let r = if v1 {
-        apply_settings(
-            req,
-            tag,
-            |d| http_settings::settings_v1(d, dual_pool),
-            &mut a,
-        )
+        apply_settings(req, tag, |d| settings::settings_v1(d, dual_pool), &mut a)
     } else {
-        apply_settings(req, tag, http_settings::settings_v2, &mut a)
+        apply_settings(req, tag, settings::settings_v2, &mut a)
     };
     if r == ESP_OK {
         Ok(a.verify_changed)
@@ -403,7 +395,7 @@ pub fn wifi_scan(req: &mut Request) -> EspErr {
         );
     }
     set_json(req);
-    if !crate::http_server::set_cors_headers(req) {
+    if !crate::http::server::set_cors_headers(req) {
         // httpd_resp_send_500()
         req.send_err(err::E500_INTERNAL_SERVER_ERROR, None);
         return ESP_FAIL;
@@ -420,13 +412,13 @@ pub fn wifi_scan(req: &mut Request) -> EspErr {
             return send_err(req, err::E500_INTERNAL_SERVER_ERROR, c"WiFi scan failed");
         }
     };
-    let list: Vec<http_json::WifiNetwork> = nets
+    let list: Vec<json::WifiNetwork> = nets
         .into_iter()
-        .map(|n| http_json::WifiNetwork {
+        .map(|n| json::WifiNetwork {
             ssid: n.ssid,
             rssi: n.rssi,
             authmode: n.authmode,
         })
         .collect();
-    send_doc(req, http_json::wifi_scan(&list))
+    send_doc(req, json::wifi_scan(&list))
 }

@@ -3,7 +3,7 @@
 //! every handler): URI, method, handler, and what runs before the handler:
 //! `Connection: close` (closed after the response), the network check (401),
 //! the CORS headers (500 if they cannot be set) and the OTP check (required,
-//! forced, or skipped in recovery mode). The server (`http_server.rs`)
+//! forced, or skipped in recovery mode). The server (`http/server.rs`)
 //! registers the routes in this order (the first match of a wildcard wins)
 //! with one trampoline that carries out the checks and then calls the
 //! handler.

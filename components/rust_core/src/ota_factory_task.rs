@@ -14,8 +14,8 @@ use core::ffi::{c_char, c_int, c_void, CStr};
 use std::ffi::CString;
 
 #[cfg(not(target_os = "espidf"))]
-use crate::http_data::Partition;
-use crate::http_ota::{factory_body, factory_url_ok, FactoryBody};
+use crate::http::data::Partition;
+use crate::http::ota::{factory_body, factory_url_ok, FactoryBody};
 use crate::idf::http_client::{self, Event};
 use crate::idf::httpd::{self, err, Request};
 use crate::idf::{EspErr, ESP_FAIL, ESP_OK};

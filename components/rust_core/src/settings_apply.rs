@@ -1,11 +1,11 @@
-//! Applies the writes of a settings body (`http_settings.rs`) to the
+//! Applies the writes of a settings body (`http/settings.rs`) to the
 //! config (port of `main/http_server/settings_apply.cpp`): each setting
 //! goes to its NVS key, per pool or fan channel where it has an index. The
 //! config is reached through [`Store`] (a recording one in the tests).
 
 use crate::ajson::{Json, Num};
 use crate::config;
-use crate::http_settings::{Setting, Write};
+use crate::http::settings::{Setting, Write};
 
 /// What applying a body changed beyond the config.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]

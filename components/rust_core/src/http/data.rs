@@ -2,7 +2,7 @@
 //! `GET_system_asic()`, `POST_reset_stats()`, `PATCH_update_settings()` in
 //! `main/http_server/handler_system.cpp`, and of
 //! `v2/handler_v2_dashboard.cpp` and `v2/handler_v2_settings.cpp`): they
-//! fill the snapshots of `http_json.rs` from the board, the power
+//! fill the snapshots of `http/json.rs` from the board, the power
 //! management, the system, the pool manager and the config, the same
 //! fields from the same sources as before. The core dump download stays in
 //! C++ (built only with core dumps in flash).
@@ -14,8 +14,8 @@ use std::ffi::CString;
 use crate::board::api::Info as BoardInfo;
 use crate::cfg;
 use crate::history::api::{history_current, history_current_timestamp};
-use crate::http_json::{self, AsicInfo, Dashboard, FanInfo, SystemInfo, V2Settings};
-use crate::http_routes::Handler;
+use crate::http::json::{self, AsicInfo, Dashboard, FanInfo, SystemInfo, V2Settings};
+use crate::http::routes::Handler;
 use crate::idf::httpd::{HandlerFn, Request};
 use crate::idf::{EspErr, ESP_FAIL, ESP_OK};
 use crate::log::log;
@@ -87,7 +87,7 @@ fn stats() -> crate::pool_stats::Summary {
     crate::pool_manager::get().map_or_else(Default::default, |m| m.summary())
 }
 
-fn manager_info() -> http_json::ManagerInfo {
+fn manager_info() -> json::ManagerInfo {
     crate::pool_manager::get().map_or_else(Default::default, |m| m.info())
 }
 
@@ -104,9 +104,9 @@ fn now_ms() -> u64 {
 }
 
 /// The history query of the request (`?ts=..&limit=..`).
-fn history_query(req: &mut Request, v2: bool) -> crate::http_query::HistoryQuery {
+fn history_query(req: &mut Request, v2: bool) -> crate::http::query::HistoryQuery {
     let q = req.query(128);
-    crate::http_query::history_query(q.as_deref().map(CStr::to_bytes), v2)
+    crate::http::query::history_query(q.as_deref().map(CStr::to_bytes), v2)
 }
 
 /// The fan settings of channel `ch` (as shown by the settings pages).
@@ -127,7 +127,7 @@ fn fan_settings(b: &BoardInfo, ch: usize) -> FanInfo {
 }
 
 fn send_doc(req: &mut Request, doc: crate::ajson::Json) -> EspErr {
-    crate::http_server::send_json(req, &doc.serialize())
+    crate::http::server::send_json(req, &doc.serialize())
 }
 
 fn set_json(req: &mut Request) {
@@ -306,7 +306,7 @@ fn system_info(req: &mut Request) -> EspErr {
     s.running_partition = Some(partition);
     s.default_theme = Some(b.default_theme.into());
 
-    send_doc(req, http_json::system_info(&s))
+    send_doc(req, json::system_info(&s))
 }
 
 fn system_asic(req: &mut Request) -> EspErr {
@@ -327,15 +327,15 @@ fn system_asic(req: &mut Request) -> EspErr {
         frequency_options: b.frequencies.to_vec(),
         voltage_options: b.voltages.to_vec(),
     };
-    send_doc(req, http_json::asic_info(&a))
+    send_doc(req, json::asic_info(&a))
 }
 
 /// `?allTime=1` also clears the persisted all-time stats; that cannot be
 /// undone, so it needs OTP (when enabled).
 fn reset_stats(req: &mut Request) -> EspErr {
     let q = req.query(32);
-    let all_time = crate::http_query::all_time(q.as_deref().map(CStr::to_bytes));
-    if all_time && crate::http_server::validate_otp(req, false) != ESP_OK {
+    let all_time = crate::http::query::all_time(q.as_deref().map(CStr::to_bytes));
+    if all_time && crate::http::server::validate_otp(req, false) != ESP_OK {
         return ESP_FAIL;
     }
     crate::pool_manager::api::pool_mgr_reset_session_stats();
@@ -358,7 +358,7 @@ fn reset_stats(req: &mut Request) -> EspErr {
 
 fn settings_patch(req: &mut Request) -> EspErr {
     let dual = crate::pool_manager::api::pool_mgr_is_dual();
-    if crate::http_handlers::apply_pool_settings(req, true, dual, c"system").is_err() {
+    if crate::http::handlers::apply_pool_settings(req, true, dual, c"system").is_err() {
         return ESP_FAIL;
     }
     crate::config_nvs::request_flush();
@@ -466,7 +466,7 @@ fn dashboard(req: &mut Request) -> EspErr {
     d.history_limit = q.limit;
     d.now_ms = now_ms();
 
-    send_doc(req, http_json::dashboard(&d))
+    send_doc(req, json::dashboard(&d))
 }
 
 fn v2_settings_get(req: &mut Request) -> EspErr {
@@ -553,14 +553,14 @@ pub(crate) fn v2_settings_doc() -> crate::ajson::Json {
     v.auto_screen_off = cfg::auto_screen_off();
     v.auto_screen_off_timeout = cfg::screen_off_secs();
 
-    http_json::v2_settings(&v)
+    json::v2_settings(&v)
 }
 
 /// The same structure as `GET /api/v2/settings`, all fields optional; the
 /// pools as a `pools[]` array.
 fn v2_settings_patch(req: &mut Request) -> EspErr {
     let Ok(verify_changed) =
-        crate::http_handlers::apply_pool_settings(req, false, false, c"v2_settings")
+        crate::http::handlers::apply_pool_settings(req, false, false, c"v2_settings")
     else {
         return ESP_FAIL;
     };

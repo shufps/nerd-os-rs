@@ -418,7 +418,7 @@ impl Hooks for Firmware {
 
         // the REST server for the AP fallback / config (also reachable over
         // LAN and WiFi)
-        crate::http_server::api::start_rest_server(core::ptr::null_mut());
+        crate::http::server::api::start_rest_server(core::ptr::null_mut());
 
         loop {
             if crate::network::wait_any_ip(Duration::from_secs(30)) != 0 {

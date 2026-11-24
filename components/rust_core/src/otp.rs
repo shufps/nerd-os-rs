@@ -3,7 +3,7 @@
 //! state, persisted in the configuration; checking a TOTP code with replay
 //! protection, minting and checking session tokens, and the `otpauth://`
 //! URI of a new enrollment (its QR code: `otp_device.rs`).
-//! The algorithms are in `http_auth.rs`.
+//! The algorithms are in `http/auth.rs`.
 //!
 //! All state is behind one lock, including the secret, the enabled flag
 //! and loading/saving the settings.
@@ -14,7 +14,7 @@ use std::sync::Mutex;
 use crate::ajson::{Json, Num};
 use crate::config;
 use crate::cutil::url_encode;
-use crate::http_auth::{
+use crate::http::auth::{
     base32_decode, base32_encode, mint_session_token, verify_session_token, verify_totp_code,
     ReplayState,
 };
@@ -273,7 +273,7 @@ pub fn request(
     time_synced: bool,
     now_ms: u64,
 ) -> Auth {
-    use crate::http_auth::api::{auth_rate_limit_blocked, auth_rate_limit_failure};
+    use crate::http::auth::api::{auth_rate_limit_blocked, auth_rate_limit_failure};
     if auth_rate_limit_blocked(now_ms) {
         return Auth::Blocked;
     }
@@ -298,7 +298,7 @@ pub fn request(
 /// The TOTP login of `/api/v2/otp/session` behind the rate limit (the TOTP
 /// header must be present); a wrong code is counted.
 pub fn login(totp: &[u8], now: i64, time_synced: bool, now_ms: u64) -> Auth {
-    use crate::http_auth::api::{auth_rate_limit_blocked, auth_rate_limit_failure};
+    use crate::http::auth::api::{auth_rate_limit_blocked, auth_rate_limit_failure};
     if auth_rate_limit_blocked(now_ms) {
         return Auth::Blocked;
     }
@@ -382,7 +382,7 @@ mod tests {
     }
 
     use super::*;
-    use crate::http_auth::hotp;
+    use crate::http::auth::hotp;
 
     #[test]
     fn uri_like_the_cpp_code() {

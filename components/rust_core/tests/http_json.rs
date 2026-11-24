@@ -1,11 +1,11 @@
-//! Golden tests of the GET documents: rust_core::http_json on random
+//! Golden tests of the GET documents: rust_core::http::json on random
 //! snapshots against the outputs of the former ArduinoJson code
 //! (tests/golden/http_json.txt, recorded by the differential tests).
 
 use std::ffi::{c_int, CString};
 use std::sync::Mutex;
 
-use rust_core::http_json::{
+use rust_core::http::json::{
     self, AlertInfo, AsicInfo, CanMasterNode, DashCoinbase, Dashboard, FanInfo, InfluxInfo,
     ManagerInfo, ManagerPool, SettingsPool, SystemInfo, V2Identify, V2Settings, V2System,
     WifiNetwork,
@@ -258,7 +258,7 @@ fn system_info() {
         s.history_start = s.history_current - r.below(4_000_000);
         s.history_span_ms = r.below(4_000_000);
         s.history_limit = [0u32, 1, 10, 100, 2000][r.below(5) as usize];
-        let rust = String::from_utf8(http_json::system_info(&s).serialize()).unwrap();
+        let rust = String::from_utf8(json::system_info(&s).serialize()).unwrap();
         rec.add(format!(
             "start {} cur {} span {} limit {} requested {} now {}\n{rust}",
             s.history_start,
@@ -276,7 +276,7 @@ fn system_info() {
     let mut temps = Vec::new();
     let mut s = snapshot(&mut r, &mut temps);
     s.vout = f32::NAN;
-    let rust = String::from_utf8(http_json::system_info(&s).serialize()).unwrap();
+    let rust = String::from_utf8(json::system_info(&s).serialize()).unwrap();
     assert!(rust.contains("\"coreVoltageActual\":0,"));
     // not vacuous: histories with rows were compared
     assert!(checked_history > 100, "{checked_history}");
@@ -306,7 +306,7 @@ fn asic_info() {
             frequency_options: freqs.clone(),
             voltage_options: volts.clone(),
         };
-        let rust = String::from_utf8(http_json::asic_info(&a).serialize()).unwrap();
+        let rust = String::from_utf8(json::asic_info(&a).serialize()).unwrap();
         rec.add(rust);
     }
     rec.finish();
@@ -416,7 +416,7 @@ fn dashboard() {
         d.history_start = d.history_current - r.below(4_000_000);
         d.history_span_ms = r.below(4_000_000);
         d.history_limit = [0u32, 1, 10, 100, 2000][r.below(5) as usize];
-        let rust = String::from_utf8(http_json::dashboard(&d).serialize()).unwrap();
+        let rust = String::from_utf8(json::dashboard(&d).serialize()).unwrap();
         rec.add(format!(
             "start {} cur {} span {} limit {} requested {} now {}\n{rust}",
             d.history_start,
@@ -453,7 +453,7 @@ fn v2_system_and_identify() {
             free_heap: r.u64() & 0xffff_ffff,
             free_heap_int: r.u64() & 0xffff_ffff,
         };
-        let rust = String::from_utf8(http_json::v2_system(&v).serialize()).unwrap();
+        let rust = String::from_utf8(json::v2_system(&v).serialize()).unwrap();
         rec.add(rust);
         let i = V2Identify {
             device_model: pick(&mut r),
@@ -464,13 +464,13 @@ fn v2_system_and_identify() {
             core_dump_download: true,
             can_enabled: r.bool(),
         };
-        let rust = String::from_utf8(http_json::v2_identify(&i).serialize()).unwrap();
+        let rust = String::from_utf8(json::v2_identify(&i).serialize()).unwrap();
         rec.add(rust);
         let without = V2Identify {
             core_dump_download: false,
             ..i
         };
-        let rust = String::from_utf8(http_json::v2_identify(&without).serialize()).unwrap();
+        let rust = String::from_utf8(json::v2_identify(&without).serialize()).unwrap();
         assert!(rust.contains("\"coreDumpDownload\":false,"));
     }
     rec.finish();
@@ -492,7 +492,7 @@ fn small_documents() {
             show_block_found_screen: r.bool(),
             heartbeat_hours: 6,
         };
-        let rust = String::from_utf8(http_json::alert_info(&a).serialize()).unwrap();
+        let rust = String::from_utf8(json::alert_info(&a).serialize()).unwrap();
         rec.add(rust);
 
         let i = InfluxInfo {
@@ -503,19 +503,18 @@ fn small_documents() {
             prefix: pick(&mut r),
             enabled: r.bool(),
         };
-        let rust = String::from_utf8(http_json::influx_info(&i).serialize()).unwrap();
+        let rust = String::from_utf8(json::influx_info(&i).serialize()).unwrap();
         rec.add(rust);
 
         let e = r.bool();
-        let rust = String::from_utf8(http_json::otp_status(e).serialize()).unwrap();
+        let rust = String::from_utf8(json::otp_status(e).serialize()).unwrap();
         rec.add(rust);
 
         let token = CString::new(format!("tok.{:x}.\"\\{}", r.next(), r.below(1000))).unwrap();
         let ttl = [24 * 3600, 1, 0, u32::MAX, r.next() as u32][r.below(5) as usize];
         let expires = [1_794_940_377_000u64, 0, 12_345, r.next()][r.below(4) as usize];
-        let rust =
-            String::from_utf8(http_json::otp_session(token.as_bytes(), ttl, expires).serialize())
-                .unwrap();
+        let rust = String::from_utf8(json::otp_session(token.as_bytes(), ttl, expires).serialize())
+            .unwrap();
         rec.add(rust);
 
         // ssids are char[33] in the scan records: never NULL, at most 32 bytes
@@ -526,7 +525,7 @@ fn small_documents() {
                 authmode: r.below(12) as c_int,
             })
             .collect();
-        let rust = String::from_utf8(http_json::wifi_scan(&nets).serialize()).unwrap();
+        let rust = String::from_utf8(json::wifi_scan(&nets).serialize()).unwrap();
         rec.add(rust);
     }
     rec.finish();
@@ -596,10 +595,10 @@ fn v2_settings() {
             auto_screen_off: r.bool(),
             auto_screen_off_timeout: 30,
         };
-        let rust = String::from_utf8(http_json::v2_settings(&s).serialize()).unwrap();
+        let rust = String::from_utf8(json::v2_settings(&s).serialize()).unwrap();
         rec.add(rust);
         s.has_pid_use_max = true;
-        let rust = String::from_utf8(http_json::v2_settings(&s).serialize()).unwrap();
+        let rust = String::from_utf8(json::v2_settings(&s).serialize()).unwrap();
         rec.add(format!("NerdAxe\n{rust}"));
         assert!(rust.contains("\"pidUseMax\":"));
     }
@@ -700,7 +699,7 @@ fn can_swarm() {
             fans,
         };
         // raw bytes: the slaves' model strings may be any bytes
-        let rust = http_json::can_swarm(&m).serialize();
+        let rust = json::can_swarm(&m).serialize();
         rec.add(text_or_bytes(rust));
     }
     assert!(slaves_seen > 5000, "{slaves_seen}");

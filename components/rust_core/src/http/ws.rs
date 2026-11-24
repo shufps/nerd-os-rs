@@ -126,7 +126,7 @@ fn send(line: &mut [u8]) {
     // the socket number is reused after a close: send only while it is a
     // web socket (the close callback resets FD before)
     let fd = FD.load(Ordering::Acquire);
-    let server = crate::http_server::HTTP_SERVER.load(Ordering::Acquire);
+    let server = crate::http::server::HTTP_SERVER.load(Ordering::Acquire);
     if server.is_null() || fd < 0 {
         return;
     }

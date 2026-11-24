@@ -2,15 +2,15 @@
 //! firmware image into the next OTA partition (`POST /api/system/OTA`,
 //! then the restart into it) and a web UI image into the `www` partition
 //! (`POST /api/system/OTAWWW`). The body is received and written by
-//! `http_ota.rs`; both write under the hardware lock, the firmware upload
+//! `http/ota.rs`; both write under the hardware lock, the firmware upload
 //! with the board shut down (I2C traffic during flash writes upset the
 //! PID), and a failed firmware upload restarts the device to mine again.
 
 use crate::idf::idf_const;
 use core::ffi::{c_int, c_void, CStr};
 
-use crate::http_data::Partition;
-use crate::http_ota::{receive_upload, UploadError, UploadIo};
+use crate::http::data::Partition;
+use crate::http::ota::{receive_upload, UploadError, UploadIo};
 use crate::idf::httpd::{self, err, Request};
 use crate::idf::{EspErr, ESP_FAIL, ESP_OK};
 use crate::log::log;

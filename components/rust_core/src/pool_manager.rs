@@ -31,7 +31,7 @@ use std::sync::{Arc, Mutex, MutexGuard, OnceLock};
 
 use crate::ajson::{Json, Num};
 use crate::config;
-use crate::http_json::{ManagerInfo, ManagerPool};
+use crate::http::json::{ManagerInfo, ManagerPool};
 use crate::log::log;
 use crate::pool::block;
 use crate::pool::{self as policy, Event as PolicyEvent};

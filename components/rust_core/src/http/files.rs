@@ -1,7 +1,7 @@
 //! The web UI files (port of `main/http_server/handler_file.cpp`): mounts
 //! the SPIFFS partition (`init_fs()`; a failure means recovery mode) and
 //! serves its gzipped files with the type and cache policy of
-//! `http_file.rs`; a missing page redirects to the portal, a missing asset
+//! `http/file.rs`; a missing page redirects to the portal, a missing asset
 //! is a 404.
 
 use crate::idf::idf_const;
@@ -111,7 +111,7 @@ pub fn file_handler(req: &mut Request) -> EspErr {
     // the base path of the server context is "" (it stays zeroed)
     let uri: CString = req.uri().into();
     let Some(f) =
-        crate::http_file::resolve(b"", uri.to_bytes()).filter(|f| f.path.len() < FILE_PATH_MAX)
+        crate::http::file::resolve(b"", uri.to_bytes()).filter(|f| f.path.len() < FILE_PATH_MAX)
     else {
         return req.send_err(err::E500_INTERNAL_SERVER_ERROR, Some(c"File path too long"));
     };
@@ -150,7 +150,7 @@ pub fn file_handler(req: &mut Request) -> EspErr {
         req.set_hdr(c"Cache-Control", f.cache_control);
         req.set_hdr(c"Content-Encoding", c"gzip");
     };
-    crate::http_server::with_scratch(req, |req, chunk| {
+    crate::http::server::with_scratch(req, |req, chunk| {
         send_file(req, &mut file, chunk, &path, start)
     })
     .unwrap_or(ESP_FAIL)

@@ -91,6 +91,10 @@ pub enum Event {
     ShareRejected(Vec<u8>),
     /// The connection is unusable (e.g. the pool forbids version rolling).
     SetupFailed,
+    /// A prevhash arrived that none of the waiting jobs is for: the work for
+    /// the old block is void, and there is none for the new block until the
+    /// pool sends a job.
+    Invalidate,
     /// A prevhash arrived: the pool sends valid work.
     ValidNotify,
 }
@@ -437,6 +441,17 @@ impl Session {
             }
         }
 
+        // No job went out for the new block: without this the miner would
+        // keep hashing the old one until the pool sends the next job.
+        if self.clean_pending {
+            log!(
+                Warn,
+                TAG,
+                "No job is waiting for prev_hash job_id={job_id}: the old work is dropped"
+            );
+            self.events.push_back(Event::Invalidate);
+        }
+
         self.events.push_back(Event::ValidNotify);
     }
 
@@ -671,6 +686,7 @@ mod tests {
             })
             .collect();
         assert_eq!(ids, [(2, true), (1, false)]);
+        assert!(!ev.contains(&Event::Invalidate));
         assert!(matches!(
             ev.first(),
             Some(Event::NetworkDifficulty(0x1703_4219))
@@ -765,10 +781,18 @@ mod tests {
         s.handle(MSG_SET_NEW_PREV_HASH, &prev_hash(1, 1000));
         assert_eq!(jobs(&mut s), [(1, true)]);
 
-        // job 9 was never sent, and job 17 has taken its slot
+        // job 9 was never sent, and job 17 has taken its slot: the work for
+        // the old block is invalidated
         s.handle(MSG_NEW_EXTENDED_MINING_JOB, &ext_job(17, None, true));
         s.handle(MSG_SET_NEW_PREV_HASH, &prev_hash(9, 1002));
-        assert!(jobs(&mut s).is_empty());
+        assert_eq!(
+            events(&mut s),
+            [
+                Event::NetworkDifficulty(0x1703_4219),
+                Event::Invalidate,
+                Event::ValidNotify
+            ]
+        );
         // the first job of the new block still drops the old block's jobs
         s.handle(MSG_NEW_EXTENDED_MINING_JOB, &ext_job(18, Some(1003), true));
         assert_eq!(jobs(&mut s), [(18, true)]);
@@ -788,7 +812,7 @@ mod tests {
                 .collect()
         };
         s.handle(MSG_SET_NEW_PREV_HASH, &prev_hash(1, 1000));
-        assert!(jobs(&mut s).is_empty());
+        assert!(events(&mut s).contains(&Event::Invalidate));
         s.handle(MSG_NEW_MINING_JOB, &std_job(2, Some(1001)));
         assert_eq!(jobs(&mut s), [(2, true)]);
         s.handle(MSG_NEW_MINING_JOB, &std_job(3, Some(1002)));

@@ -197,6 +197,8 @@ fn handle_v2(
         Event::ShareRejected(_) => stats.with(|s| s.share_result(pool, false, now_us)),
         // drop the connection like a pool error instead of silently mining nothing
         Event::SetupFailed => h.setup_failed(pool),
+        // a new block without a job for it: no more jobs on the old prev hash
+        Event::Invalidate => jobs::invalidate(pool),
         // used by the manager for pool selection
         Event::ValidNotify => h.valid_notify(pool),
     }
@@ -504,6 +506,29 @@ mod tests {
         // SetTarget changed the standard channel's difficulty in place
         let (pool_diff, _, job_id, _, _, mask) = job(0).unwrap();
         assert_eq!((pool_diff, job_id.as_str(), mask), (1024, "5", 0x1fffe000));
+    }
+
+    #[test]
+    fn sv2_invalidate_drops_the_work_and_the_jobs() {
+        let mut t = V2::new();
+        t.drain(vec![Event::StandardJob {
+            job: old_job(),
+            pool_difficulty: 512,
+            clean: false,
+        }]);
+        jobs::JOB_TABLES[0].store(jobs::build(0, 0, false, |d| d).unwrap(), 3);
+        // a standard job builds once: sent again, the pool has valid work
+        t.drain(vec![Event::StandardJob {
+            job: old_job(),
+            pool_difficulty: 512,
+            clean: false,
+        }]);
+        assert!(jobs::JOB_TABLES[0].clone_job(3).is_some());
+
+        t.drain(vec![Event::Invalidate, Event::ValidNotify]);
+        assert!(job(0).is_none());
+        assert!(jobs::JOB_TABLES[0].clone_job(3).is_none());
+        assert_eq!(t.rec.calls, ["valid_notify 0"]);
     }
 
     #[test]

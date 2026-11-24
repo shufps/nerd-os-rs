@@ -385,17 +385,17 @@ impl Session {
             "New prev_hash: job_id={job_id}, ntime={ntime}, nbits={nbits:08x}"
         );
         self.events.push_back(Event::NetworkDifficulty(nbits));
-        let first = self.prev.is_none();
-        // a pool may repeat the prev hash it sent last: the work is still good
-        let new_block = self.prev.as_ref().map_or(true, |p| p.hash != hash);
         self.prev = Some(PrevHash { hash, ntime, nbits });
         let slot = job_id as usize % PENDING_JOBS;
         // the first job emitted for the new block drops the old block's jobs,
         // also when it is not one of the jobs activated here
         self.clean_pending = true;
 
-        // Standard channel: the job this prevhash is for, and on the first
-        // prevhash all others that were waiting.
+        // Spec 5.3.17: only the job the prevhash names is valid, all other
+        // queued jobs are invalid (also when the prev hash repeats).
+
+        // Standard channel: the job this prevhash is for; the others waiting
+        // are dropped.
         let standard = |(id, version, merkle_root): (u32, u32, [u8; 32])| StandardJob {
             job_id: id,
             version,
@@ -405,17 +405,9 @@ impl Session {
             nbits,
         };
         if let Some(pending) = self.pending_standard[slot].filter(|&(id, _, _)| id == job_id) {
-            self.pending_standard[slot] = None;
             self.emit_standard(standard(pending));
         }
-        if first {
-            for i in 0..PENDING_JOBS {
-                if let Some(pending) = self.pending_standard[i].filter(|&(id, _, _)| id != job_id) {
-                    self.pending_standard[i] = None;
-                    self.emit_standard(standard(pending));
-                }
-            }
-        }
+        self.pending_standard = Default::default();
 
         // Extended channel: the same.
         let activate = |mut job: ExtendedJob| {
@@ -431,21 +423,13 @@ impl Session {
             let job = self.pending_extended[slot].take().unwrap();
             self.emit_extended(activate(job));
         }
-        if first {
-            for i in 0..PENDING_JOBS {
-                if self.pending_extended[i]
-                    .as_ref()
-                    .is_some_and(|j| j.job_id != job_id)
-                {
-                    let job = self.pending_extended[i].take().unwrap();
-                    self.emit_extended(activate(job));
-                }
-            }
-        }
+        self.pending_extended = Default::default();
 
-        // No job went out for the new block: without this the miner would
-        // keep hashing the old one until the pool sends the next job.
-        if self.clean_pending && new_block {
+        // No job went out for the new prev hash (the server must not name a
+        // job it has not sent, but a slot may have been overwritten or the
+        // job failed to parse): the queued work is invalid, so the miner has
+        // none until the pool sends the next job.
+        if self.clean_pending {
             log!(
                 Warn,
                 TAG,
@@ -670,8 +654,8 @@ mod tests {
         s.handle(MSG_NEW_EXTENDED_MINING_JOB, &ext_job(2, None, true));
         assert!(events(&mut s).is_empty());
 
-        // The first prevhash activates the job it names and all others; only
-        // the first of them drops the older jobs.
+        // Spec 5.3.17: the prevhash activates only the job it names; the
+        // other waiting job is invalid and dropped.
         s.handle(MSG_SET_NEW_PREV_HASH, &prev_hash(2, 1000));
         let ev = events(&mut s);
         let ids: Vec<(u32, bool)> = ev
@@ -692,7 +676,7 @@ mod tests {
                 _ => None,
             })
             .collect();
-        assert_eq!(ids, [(2, true), (1, false)]);
+        assert_eq!(ids, [(2, true)]);
         assert!(!ev.contains(&Event::Invalidate));
         assert!(matches!(
             ev.first(),
@@ -724,6 +708,13 @@ mod tests {
             .collect();
         // a new block: the old block's jobs are dropped
         assert_eq!(ids, [(5, true)]);
+
+        // job 4 was dropped with prevhash 5: a prevhash naming it finds no
+        // job, so the queued work is void
+        s.handle(MSG_SET_NEW_PREV_HASH, &prev_hash_of(4, 1003, 0xce));
+        let ev = events(&mut s);
+        assert!(!ev.iter().any(|e| matches!(e, Event::ExtendedJob { .. })));
+        assert!(ev.contains(&Event::Invalidate));
     }
 
     fn std_job(job_id: u32, min_ntime: Option<u32>) -> Vec<u8> {
@@ -807,12 +798,16 @@ mod tests {
         s.handle(MSG_NEW_EXTENDED_MINING_JOB, &ext_job(19, Some(1004), true));
         assert_eq!(jobs(&mut s), [(19, false)]);
 
-        // the same prev hash again, for a job that is not waiting: the work
-        // is for this block and stays
+        // the same prev hash again, for a job that is not waiting: spec
+        // 5.3.17 makes every other job invalid, also for the same block
         s.handle(MSG_SET_NEW_PREV_HASH, &prev_hash_of(99, 1005, 0xce));
         assert_eq!(
             events(&mut s),
-            [Event::NetworkDifficulty(0x1703_4219), Event::ValidNotify]
+            [
+                Event::NetworkDifficulty(0x1703_4219),
+                Event::Invalidate,
+                Event::ValidNotify
+            ]
         );
 
         // Standard channel: the prevhash arrives before any job.
@@ -844,18 +839,24 @@ mod tests {
         s.handle(MSG_NEW_EXTENDED_MINING_JOB, &ext_job(1, None, true));
         s.handle(MSG_SET_EXTRANONCE_PREFIX, &prefix_msg(b"\x02\x02"));
         s.handle(MSG_NEW_EXTENDED_MINING_JOB, &ext_job(2, None, true));
+        // each future job is activated by its own prevhash
+        let prefixes = |s: &mut Session| -> Vec<(u32, Vec<u8>)> {
+            events(s)
+                .into_iter()
+                .filter_map(|e| {
+                    if let Event::ExtendedJob { job, .. } = e {
+                        Some((job.job_id, job.extranonce_prefix))
+                    } else {
+                        None
+                    }
+                })
+                .collect()
+        };
         s.handle(MSG_SET_NEW_PREV_HASH, &prev_hash(1, 1000));
-        let prefixes: Vec<(u32, Vec<u8>)> = events(&mut s)
-            .into_iter()
-            .filter_map(|e| {
-                if let Event::ExtendedJob { job, .. } = e {
-                    Some((job.job_id, job.extranonce_prefix))
-                } else {
-                    None
-                }
-            })
-            .collect();
-        assert_eq!(prefixes, [(1, vec![1]), (2, vec![2, 2])]);
+        assert_eq!(prefixes(&mut s), [(1, vec![1])]);
+        s.handle(MSG_NEW_EXTENDED_MINING_JOB, &ext_job(2, None, true));
+        s.handle(MSG_SET_NEW_PREV_HASH, &prev_hash_of(2, 1001, 0xce));
+        assert_eq!(prefixes(&mut s), [(2, vec![2, 2])]);
     }
 
     #[test]

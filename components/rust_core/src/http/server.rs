@@ -328,9 +328,9 @@ unsafe fn register_routes() {
                 Handler::OtaWww => Some(crate::ota_upload::www_update as httpd::HandlerFn),
                 Handler::Coredump => Some(crate::http::coredump::handler as httpd::HandlerFn),
                 #[cfg(feature = "screenshot")]
-                Handler::Screenshot => Some(crate::display_shot::handler as httpd::HandlerFn),
+                Handler::Screenshot => Some(crate::display::shot::handler as httpd::HandlerFn),
                 #[cfg(feature = "screenshot")]
-                Handler::Press => Some(crate::display_shot::press as httpd::HandlerFn),
+                Handler::Press => Some(crate::display::shot::press as httpd::HandlerFn),
                 Handler::ProfilesGet => Some(crate::profiles::http::get as httpd::HandlerFn),
                 Handler::ProfilesPatch => Some(crate::profiles::http::patch as httpd::HandlerFn),
                 Handler::ProfileApply => Some(crate::profiles::http::apply as httpd::HandlerFn),

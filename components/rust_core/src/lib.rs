@@ -34,11 +34,6 @@ pub mod crypto;
 pub mod cutil;
 pub mod discord;
 pub mod display;
-pub mod display_button;
-#[cfg(target_os = "espidf")]
-pub mod display_driver;
-pub mod display_shot;
-pub mod display_text;
 pub mod dns;
 pub mod drivers;
 pub mod fan_control;
@@ -50,9 +45,6 @@ pub mod idf;
 pub mod influx;
 pub mod jobs;
 mod log;
-/// LVGL (the display): firmware only
-#[cfg(target_os = "espidf")]
-pub mod lvgl;
 pub mod mdns;
 pub mod mining;
 pub mod mining_tasks;
@@ -85,7 +77,5 @@ pub mod stratum_v2;
 pub mod suffix;
 pub mod system;
 pub mod tasks;
-#[cfg(target_os = "espidf")]
-pub mod ui;
 pub mod wifi;
 pub mod wifi_health;

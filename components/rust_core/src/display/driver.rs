@@ -1,7 +1,7 @@
 //! The display driver (port of `main/displays/displayDriver.cpp`): the
 //! LilyGO T-Display-S3 panel (ST7789 on an Intel 8080 bus), LVGL with its
 //! task, the two buttons and the screen state machine. The screens are in
-//! [`crate::ui`]; the rest of the firmware uses [`crate::display`].
+//! [`crate::display::ui`]; the rest of the firmware uses [`crate::display`].
 //!
 //! LVGL is not thread-safe: the driver, with the [`Ui`] and the [`Lvgl`]
 //! token, is behind one lock ([`DRIVER`]), which the LVGL task holds for
@@ -20,12 +20,12 @@ use std::ffi::CString;
 use std::sync::atomic::{AtomicBool, AtomicU8, Ordering};
 use std::sync::{Mutex, MutexGuard};
 
+use crate::display::button::{self as btn, Button};
+use crate::display::lvgl::{self as lv, Anim, Lvgl, Obj};
+use crate::display::ui::{NetIcon, Screen, Ui};
 use crate::display::Msg;
-use crate::display_button::{self as btn, Button};
 use crate::idf::raw;
 use crate::log::log;
-use crate::lvgl::{self as lv, Anim, Lvgl, Obj};
-use crate::ui::{NetIcon, Screen, Ui};
 
 const TAG: &CStr = c"TDisplayS3";
 
@@ -478,7 +478,7 @@ impl Driver {
         let mut e1 = self.buttons[0].event();
         let mut e2 = self.buttons[1].event();
         // simulated short presses (development builds only)
-        let sim = crate::display_shot::take_press();
+        let sim = crate::display::shot::take_press();
         if sim & 1 != 0 {
             e1 |= btn::SHORTPRESS;
         }
@@ -635,7 +635,7 @@ unsafe extern "C" fn flush(
     let (x1, y1, x2, y2) = (a.x1 as i32, a.y1 as i32, a.x2 as i32, a.y2 as i32);
     // SAFETY: `px` holds the area's pixels (LVGL's draw buffer)
     unsafe {
-        crate::display_shot::shadow_flush(x1, y1, x2, y2, px as *const u16);
+        crate::display::shot::shadow_flush(x1, y1, x2, y2, px as *const u16);
         raw::esp_lcd_panel_draw_bitmap(panel, x1, y1, x2 + 1, y2 + 1, px as *const c_void);
     }
 }

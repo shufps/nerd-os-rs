@@ -1,13 +1,24 @@
 //! The display for the rest of the firmware: the driver's functions
-//! ([`crate::display_driver`], no-ops on the host) and the messages to the
+//! ([`crate::display::driver`], no-ops on the host) and the messages to the
 //! LVGL task (formerly `main/displays/ui_ipc.cpp`), which the HTTP server
 //! and the CAN bus send.
+
+pub mod button;
+#[cfg(target_os = "espidf")]
+pub mod driver;
+/// LVGL: firmware only
+#[cfg(target_os = "espidf")]
+pub mod lvgl;
+pub mod shot;
+pub mod text;
+#[cfg(target_os = "espidf")]
+pub mod ui;
 
 use std::collections::VecDeque;
 use std::sync::Mutex;
 
 #[cfg(target_os = "espidf")]
-pub use crate::display_driver::api::*;
+pub use crate::display::driver::api::*;
 #[cfg(not(target_os = "espidf"))]
 pub use host::*;
 

@@ -2,7 +2,7 @@
 //! functions of `displayDriver.cpp`): the splash, portal, mining, settings,
 //! BTC and global stats screens, the log, QR and power-off screens, the
 //! error and image overlays, and the values shown on them, read directly
-//! from the Rust modules. The display driver (`display_driver.rs`: panel,
+//! from the Rust modules. The display driver (`display/driver.rs`: panel,
 //! LVGL task, state machine, buttons) owns the [`Ui`] under its LVGL lock and
 //! loads the screens it gets from here.
 //!
@@ -14,9 +14,9 @@
 
 use core::ffi::{c_int, CStr};
 
-use crate::display_text as text;
+use crate::display::lvgl::{self as lv, color, Canvas, Font, Image, Lvgl, Obj};
+use crate::display::text;
 use crate::idf::raw;
-use crate::lvgl::{self as lv, color, Canvas, Font, Image, Lvgl, Obj};
 use qrcodegen::{QrCode, QrCodeEcc, QrSegment, Version};
 
 /// Where the display code links the converted assets (C arrays).
@@ -329,7 +329,7 @@ fn uncache(_: &Lvgl, img: &'static Image) {
 
 /// A screen load animation ended (LVGL event, in the LVGL task).
 unsafe extern "C" fn on_screen_loaded(_: *mut raw::lv_event_t) {
-    crate::display_driver::screen_loaded();
+    crate::display::driver::screen_loaded();
 }
 
 struct Mining {

@@ -24,7 +24,7 @@ use rust_core::can_master::{
     delete as can_master_delete, frame as can_master_frame,
     load_registry as can_master_load_registry, tick as can_master_tick,
 };
-use rust_core::history::{init as history_init, push as history_push};
+use rust_core::mining::history::{init as history_init, push as history_push};
 
 static LOCK: Mutex<()> = Mutex::new(());
 

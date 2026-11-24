@@ -6,7 +6,6 @@ use std::ffi::CString;
 
 use crate::ajson::Json;
 use crate::cfg;
-use crate::history::api::{history_current, history_current_timestamp};
 use crate::http::json::{cstr, float, floats, history, int, manager_info, ManagerInfo, Obj};
 use crate::http::reply::{send_doc, set_json};
 use crate::http::sources::{
@@ -15,6 +14,7 @@ use crate::http::sources::{
 };
 use crate::idf::httpd::Request;
 use crate::idf::EspErr;
+use crate::mining::history::api::{history_current, history_current_timestamp};
 use crate::power_mgmt;
 
 /// One pool's coinbase data of the dashboard.
@@ -274,9 +274,11 @@ pub(crate) fn get(req: &mut Request) -> EspErr {
     // per chip: valid and error hashrate (GH/s, the ASIC counters), temp
     for i in 0..b.asic_count.max(0) {
         d.chip_hashrate
-            .push(crate::hashrate::api::hashrate_monitor_chip(i));
+            .push(crate::mining::hashrate::api::hashrate_monitor_chip(i));
         d.chip_error_rate
-            .push(crate::hashrate::api::hashrate_monitor_chip_errors(i));
+            .push(crate::mining::hashrate::api::hashrate_monitor_chip_errors(
+                i,
+            ));
         d.asic_temps
             .push(crate::board::board_core::CHIP_TEMPS.get(i));
     }

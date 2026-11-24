@@ -6,8 +6,8 @@
 use std::cell::Cell;
 use std::collections::VecDeque;
 
-use rust_core::asic::driver::{Driver, Uart};
-use rust_core::asic::{Chip, TaskResult};
+use rust_core::mining::asic::driver::{Driver, Uart};
+use rust_core::mining::asic::{Chip, TaskResult};
 
 mod golden;
 use golden::Rec;

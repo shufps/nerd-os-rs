@@ -17,8 +17,8 @@ use crate::can_slave::{self, api as slave};
 use crate::idf::nvs::{err_name, Nvs};
 use crate::idf::twai::{self, Message};
 use crate::idf::{ms_to_ticks, EspErr, ESP_OK};
-use crate::jobs::JOB_TABLES;
 use crate::log::log;
+use crate::mining::jobs::JOB_TABLES;
 use crate::mining::nonce_difficulty;
 
 const TAG: &CStr = c"can";
@@ -269,7 +269,7 @@ pub fn send_settings_cmd(slave_id: u8, payload: &[u8]) {
 
 /// A job for a slave's ASICs: the `BM1368_job` bytes the chips get and the
 /// pool difficulty (the slave filters its nonces with it).
-pub fn send_raw_job(slave_id: u8, job_id: u8, job: &crate::jobs::BmJob) {
+pub fn send_raw_job(slave_id: u8, job_id: u8, job: &crate::mining::jobs::BmJob) {
     let mut p = [0u8; can_slave::JOB_LEN + 4];
     p[0] = job_id;
     p[1] = 0x01; // midstates
@@ -476,7 +476,7 @@ fn telemetry() -> [u8; can_master::TELEMETRY_LEN] {
     put(37, &((vout * 1000.0) as u16).to_le_bytes());
     put(
         39,
-        &crate::hashrate::api::hashrate_monitor_total().to_le_bytes(),
+        &crate::mining::hashrate::api::hashrate_monitor_total().to_le_bytes(),
     );
     put(
         43,
@@ -656,7 +656,7 @@ fn slave_loop() -> ! {
 
 /// A nonce back to the master: nonce, rolled version, job ID (9 bytes, 2
 /// frames, without the TX lock as before).
-fn send_nonce(slave_id: u8, r: &crate::asic::TaskResult) {
+fn send_nonce(slave_id: u8, r: &crate::mining::asic::TaskResult) {
     let mut b = [0u8; can_master::NONCE_LEN];
     b[..4].copy_from_slice(&r.nonce.to_le_bytes());
     b[4..8].copy_from_slice(&r.rolled_version.to_le_bytes());
@@ -685,11 +685,11 @@ fn slave_result_loop() -> ! {
         if r.is_reg_resp != 0 {
             match r.reg {
                 0xb4 => {
-                    if let Some(t) = crate::mining_tasks::chip_temp(r.data) {
+                    if let Some(t) = crate::mining::tasks::chip_temp(r.data) {
                         crate::board::board_core::CHIP_TEMPS.set(r.asic_nr, t);
                     }
                 }
-                0x90 => crate::hashrate::on_counter(r.asic_nr, r.data),
+                0x90 => crate::mining::hashrate::on_counter(r.asic_nr, r.data),
                 _ => {}
             }
             continue;

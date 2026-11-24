@@ -13,7 +13,7 @@
 
 use core::ffi::{c_int, CStr};
 
-use crate::asic::Chip;
+use crate::mining::asic::Chip;
 
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]

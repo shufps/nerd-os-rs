@@ -7,8 +7,8 @@ use crate::idf::idf_const;
 use core::ffi::{c_int, c_void, CStr};
 use std::sync::Mutex;
 
-use crate::asic::driver::api::CUart;
 use crate::log::log;
+use crate::mining::asic::driver::api::CUart;
 
 const TAG: &CStr = c"serial";
 

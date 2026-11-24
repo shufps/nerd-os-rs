@@ -169,7 +169,7 @@ pub fn manager_info(m: &ManagerInfo, verbose: bool) -> Obj {
 /// The `history` object between the client timestamps.
 pub fn history(start: u64, end: u64, current: u64, limit: u32, now_ms: u64) -> Obj {
     let mut cols: [Vec<Json>; 7] = Default::default();
-    let more = crate::history::export(start, end, current, limit, now_ms, |r| {
+    let more = crate::mining::history::export(start, end, current, limit, now_ms, |r| {
         for (col, v) in cols.iter_mut().zip([
             r.hashrate_1m as i64,
             r.hashrate_10m as i64,

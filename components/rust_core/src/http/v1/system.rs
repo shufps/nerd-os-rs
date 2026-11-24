@@ -8,7 +8,6 @@ use std::ffi::CString;
 
 use super::json::{self, AsicInfo, SystemInfo};
 use crate::cfg;
-use crate::history::api::{history_current, history_current_timestamp};
 use crate::http::json::FanInfo;
 use crate::http::ota::running_partition;
 use crate::http::reply::{send_doc, send_str, set_json};
@@ -19,6 +18,7 @@ use crate::http::sources::{
 use crate::idf::httpd::Request;
 use crate::idf::{EspErr, ESP_FAIL, ESP_OK};
 use crate::log::log;
+use crate::mining::history::api::{history_current, history_current_timestamp};
 use crate::power_mgmt;
 
 pub(crate) fn restart(req: &mut Request) -> EspErr {
@@ -123,7 +123,7 @@ pub(crate) fn info(req: &mut Request) -> EspErr {
 
     s.last_ping_rtt = crate::pool::manager::api::pool_mgr_ping_rtt();
     s.recent_ping_loss = crate::pool::manager::api::pool_mgr_ping_loss();
-    s.duplicate_hw_nonces = crate::mining_tasks::api::asic_result_duplicates();
+    s.duplicate_hw_nonces = crate::mining::tasks::api::asic_result_duplicates();
 
     s.pool_difficulty = st.pool_difficulty;
     s.network_difficulty = st.network_difficulty;

@@ -286,7 +286,7 @@ impl Master {
                     u16_at(t, tel::VOUT),
                     if t[tel::SHUTDOWN] != 0 { "SHUTDOWN" } else { "ok" }
                 );
-                crate::hashrate::set_external(self.total_hashrate());
+                crate::mining::hashrate::set_external(self.total_hashrate());
                 Event::default()
             }
             _ => {
@@ -340,7 +340,7 @@ impl Master {
             }
         }
         if changed {
-            crate::hashrate::set_external(self.total_hashrate());
+            crate::mining::hashrate::set_external(self.total_hashrate());
         }
     }
 
@@ -571,7 +571,7 @@ mod tests {
 
     #[test]
     fn telemetry_hashrate_timeout_and_fleet() {
-        let _g = crate::hashrate::tests_lock();
+        let _g = crate::mining::hashrate::tests_lock();
         let mut m = Master::new();
         m.slots[1].used = true;
         m.slots[2].used = true;
@@ -590,7 +590,7 @@ mod tests {
             1_000_000,
         );
         assert_eq!(m.total_hashrate(), 150.5);
-        assert_eq!(crate::hashrate::external(), 150.5);
+        assert_eq!(crate::mining::hashrate::external(), 150.5);
         assert!(
             m.slots[2].telemetry[tel::SHUTDOWN] != 0 && m.slots[1].telemetry[tel::SHUTDOWN] == 0
         );
@@ -601,7 +601,7 @@ mod tests {
         m.slots[1].last_telemetry_us = 10_000_000;
         m.tick(11_500_000);
         assert!(!m.slots[2].online && m.slots[1].online);
-        assert_eq!(crate::hashrate::external(), 100.0);
+        assert_eq!(crate::mining::hashrate::external(), 100.0);
         m.delete(1);
         assert!(!m.slots[1].used);
     }

@@ -1,7 +1,7 @@
 //! The mining tasks' and the telemetry tasks' entries (port of
 //! `main/tasks/create_jobs_task.cpp`, `asic_result_task.cpp`,
 //! `influx_task.cpp` and `hashrate_monitor_task.cpp`): the loops were
-//! Rust already (`mining_tasks.rs`, `influx.rs`, `hashrate.rs`); what they
+//! Rust already (`mining/tasks.rs`, `influx.rs`, `mining/hashrate.rs`); what they
 //! reach (the ASIC chain, the board, the pool manager, the CAN slaves, the
 //! HTTP client) is now reached directly instead of through C++ hook
 //! tables.
@@ -10,12 +10,12 @@ use core::ffi::{c_int, c_void, CStr};
 use std::ffi::CString;
 use std::time::Duration;
 
-use crate::asic::driver::api as asic;
 use crate::influx::{Inputs, Method, Response};
-use crate::jobs::BmJob;
 use crate::log::log;
-use crate::mining_tasks::TaskResult;
-use crate::mining_tasks::{JobEnv, ResultEnv};
+use crate::mining::asic::driver::api as asic;
+use crate::mining::jobs::BmJob;
+use crate::mining::tasks::TaskResult;
+use crate::mining::tasks::{JobEnv, ResultEnv};
 use crate::pool::manager::api as mgr;
 
 /// the influx client's answer limit (`influx.rs`)
@@ -119,7 +119,7 @@ impl ResultEnv for Results {
         crate::suffix::suffix_string(best, 3)
     }
     fn push_share(&mut self, asic_nr: c_int) {
-        crate::history::api::history_push_share(asic_nr);
+        crate::mining::history::api::history_push_share(asic_nr);
     }
     fn submit_share(
         &mut self,
@@ -229,10 +229,10 @@ impl crate::influx::TaskEnv for Influx {
     fn inputs(&mut self) -> Inputs {
         let mut i = Inputs {
             hashrate: crate::system::current_hashrate(),
-            hashrate_1m: crate::history::api::history_current(0) as f32,
+            hashrate_1m: crate::mining::history::api::history_current(0) as f32,
             last_ping_rtt: mgr::pool_mgr_ping_rtt(),
             recent_ping_loss: mgr::pool_mgr_ping_loss(),
-            duplicates: crate::mining_tasks::api::asic_result_duplicates(),
+            duplicates: crate::mining::tasks::api::asic_result_duplicates(),
             ..Inputs::default()
         };
         if let Some(m) = crate::pool::manager::get() {
@@ -258,7 +258,7 @@ impl crate::influx::TaskEnv for Influx {
 struct Counters(&'static asic::Handle);
 const HR_TAG: &CStr = c"hashrate_monitor";
 
-impl crate::hashrate::Env for Counters {
+impl crate::mining::hashrate::Env for Counters {
     fn suspend_if_shutdown(&mut self) {
         suspend_if_shutdown(HR_TAG);
     }
@@ -273,7 +273,7 @@ impl crate::hashrate::Env for Counters {
 unsafe extern "C" fn hashrate_task(arg: *mut c_void) {
     // SAFETY: the board's driver (it lives as long as the board), see
     // hashrate_monitor_start()
-    crate::hashrate::run(&mut Counters(&*(arg as *const asic::Handle)))
+    crate::mining::hashrate::run(&mut Counters(&*(arg as *const asic::Handle)))
 }
 
 pub(crate) mod api {
@@ -291,7 +291,7 @@ pub(crate) mod api {
             board_info().job_interval_ms
         );
         log!(Info, JOBS_TAG, "ASIC Ready!");
-        crate::mining_tasks::JobTask::default().run(&mut Jobs)
+        crate::mining::tasks::JobTask::default().run(&mut Jobs)
     }
 
     /// The result task (`ASIC_result_task`); never returns.
@@ -300,7 +300,7 @@ pub(crate) mod api {
     /// A FreeRTOS task entry.
     #[allow(non_snake_case)]
     pub unsafe extern "C" fn ASIC_result_task(_: *mut c_void) {
-        crate::mining_tasks::ResultTask::default().run(&mut Results)
+        crate::mining::tasks::ResultTask::default().run(&mut Results)
     }
 
     /// The InfluxDB task (`influx_task`); never returns.
@@ -331,7 +331,7 @@ pub(crate) mod api {
             );
             return false;
         };
-        crate::hashrate::api::hashrate_monitor_init(board_info().asic_count);
+        crate::mining::hashrate::api::hashrate_monitor_init(board_info().asic_count);
         crate::idf::task::spawn_psram(
             hashrate_task,
             c"hr_monitor",

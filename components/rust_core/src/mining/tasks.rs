@@ -2,7 +2,7 @@
 //! `create_jobs_task.cpp` and `ASIC_result_task()` in
 //! `asic_result_task.cpp`): building jobs from the pools' work and sending
 //! them to the ASICs and CAN slaves, and checking the nonces the ASICs
-//! return (counter registers go to the hashrate monitor, `hashrate.rs`).
+//! return (counter registers go to the hashrate monitor, `mining/hashrate.rs`).
 //! The ASIC driver, CAN, board, statistics and the pool manager are reached
 //! through hooks (`tasks.rs`).
 //!
@@ -18,9 +18,9 @@ use std::sync::{Condvar, Mutex};
 use std::time::{Duration, Instant};
 
 use crate::cutil::fixed;
-use crate::hashrate;
-use crate::jobs::{self, BmJob, CAN_SLAVE_MAX, JOB_TABLES};
 use crate::log::log;
+use crate::mining::hashrate;
+use crate::mining::jobs::{self, BmJob, CAN_SLAVE_MAX, JOB_TABLES};
 use crate::mining::nonce_difficulty;
 
 // ---------------------------------------------------------------------------
@@ -338,7 +338,7 @@ pub(crate) mod api {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::jobs::test_support::fresh;
+    use crate::mining::jobs::test_support::fresh;
     use crate::pool::stratum_v2::session::{ExtendedJob, StandardJob};
 
     #[derive(Default)]

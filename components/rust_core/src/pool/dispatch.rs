@@ -1,7 +1,7 @@
 //! What the pool manager does with pool messages (port of
 //! `StratumManager::dispatch()` for Stratum v1 and
 //! `StratumTaskV2::drainEvents()` for Stratum v2): statistics and stored
-//! extranonce and the job sources (`jobs.rs`) here, connection flags and
+//! extranonce and the job sources (`mining/jobs.rs`) here, connection flags and
 //! coinbase verification through the manager's [`V1Hooks`] / [`V2Hooks`].
 //!
 //! `SubmitShares.Success` counts its shares at once instead of once per
@@ -10,8 +10,8 @@
 use core::ffi::{c_int, CStr};
 use std::sync::Mutex;
 
-use crate::jobs;
 use crate::log::log;
+use crate::mining::jobs;
 use crate::pool::coinbase_verify::Handle as Coinbase;
 use crate::pool::stats::Handle as Stats;
 use crate::pool::stratum_v1::method::*;
@@ -250,7 +250,7 @@ pub fn drain_v2(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::jobs::test_support::{fresh, take};
+    use crate::mining::jobs::test_support::{fresh, take};
     use crate::pool::stats::PoolSummary;
 
     /// What the hooks saw, in order.

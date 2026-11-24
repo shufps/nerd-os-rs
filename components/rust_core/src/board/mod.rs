@@ -19,8 +19,8 @@ pub mod boot_firmware;
 pub mod power;
 pub mod profile;
 
-use crate::asic::driver::api::Handle as Asics;
 use crate::idf::idf_const;
+use crate::mining::asic::driver::api::Handle as Asics;
 use core::ffi::{c_int, CStr};
 use std::sync::{Mutex, MutexGuard, OnceLock};
 use std::time::Instant;

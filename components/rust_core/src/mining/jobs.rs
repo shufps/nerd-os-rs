@@ -518,7 +518,7 @@ fn pool_str(pool: c_int) -> &'static str {
 fn trigger() {
     #[cfg(not(target_os = "espidf"))]
     TRIGGERS.fetch_add(1, core::sync::atomic::Ordering::Relaxed);
-    crate::mining_tasks::trigger();
+    crate::mining::tasks::trigger();
 }
 
 #[cfg(not(target_os = "espidf"))]

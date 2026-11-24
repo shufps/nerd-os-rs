@@ -5,6 +5,12 @@
 //! Port of parts of the former `components/bm1397/mining.cpp`, verified
 //! against its outputs by `tests/mining.rs`.
 
+pub mod asic;
+pub mod hashrate;
+pub mod history;
+pub mod jobs;
+pub mod tasks;
+
 /// SHA-256. On the device this is mbedTLS, which uses the ESP32 SHA
 /// accelerator (as the C code did); on the host the `sha2` crate.
 pub fn sha256(data: &[u8]) -> [u8; 32] {

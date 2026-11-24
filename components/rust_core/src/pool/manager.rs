@@ -328,7 +328,7 @@ impl Task {
                 if sv2 { "v2" } else { "v1" }
             );
             // the jobs of the old protocol's session are void
-            crate::jobs::invalidate(self.pool as c_int);
+            crate::mining::jobs::invalidate(self.pool as c_int);
             self.valid_notify.store(false, Release);
             *cur = Arc::new(Proto::new(sv2));
         }
@@ -820,7 +820,7 @@ impl V2Hooks for V2Loop<'_> {
                 );
             }
         }
-        crate::jobs::sv2_extended(
+        crate::mining::jobs::sv2_extended(
             c.t.pool as c_int,
             job,
             clean,
@@ -1010,7 +1010,7 @@ impl Manager {
         };
         for i in 0..2 {
             if a.invalidate[i] {
-                crate::jobs::invalidate(i as c_int);
+                crate::mining::jobs::invalidate(i as c_int);
                 if let Some(t) = self.task(i) {
                     t.valid_notify.store(false, Release);
                 }
@@ -1700,7 +1700,7 @@ mod tests {
         let _g = crate::config::tests::LOCK
             .lock()
             .unwrap_or_else(|e| e.into_inner());
-        let _j = crate::jobs::test_support::fresh();
+        let _j = crate::mining::jobs::test_support::fresh();
         let m = manager(false);
         m.initialized.store(true, Release);
         let (t0, t1) = (m.task(0).unwrap(), m.task(1).unwrap());
@@ -1739,7 +1739,7 @@ mod tests {
     #[test]
     fn protocol_switches_between_connections() {
         // the switch drops the pool's jobs: the job tables are shared
-        let _j = crate::jobs::test_support::fresh();
+        let _j = crate::mining::jobs::test_support::fresh();
         let t = Task::new(1, PoolConfig::load(1));
         let v1 = t.proto();
         assert!(!v1.is_v2());
@@ -1778,7 +1778,7 @@ mod tests {
     #[test]
     fn actions_drive_the_tasks() {
         // invalidates pool 0's work: the job state is shared with other tests
-        let _j = crate::jobs::test_support::fresh();
+        let _j = crate::mining::jobs::test_support::fresh();
         let m = manager(false);
         let (p, s) = (m.task(0).unwrap(), m.task(1).unwrap());
         p.valid_notify.store(true, Release);
@@ -1804,7 +1804,7 @@ mod tests {
     #[test]
     fn failover_events() {
         // invalidates pool 0's work: the job state is shared with other tests
-        let _j = crate::jobs::test_support::fresh();
+        let _j = crate::mining::jobs::test_support::fresh();
         let m = manager(false);
         let (p, s) = (m.task(0).unwrap(), m.task(1).unwrap());
         p.stop.store(false, Release);

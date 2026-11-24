@@ -6,8 +6,8 @@ use core::ffi::c_char;
 use std::io::Write;
 
 use super::{MiningNotify, EXTRANONCE2_LEN};
-use crate::cutil::hex2bin;
 use crate::mining::{merkle_root, JobHashes};
+use crate::util::cutil::hex2bin;
 
 /// Longest extranonce2 hex string plus NUL.
 pub const EXTRANONCE2_HEX_MAX: usize = 2 * 16 + 1;

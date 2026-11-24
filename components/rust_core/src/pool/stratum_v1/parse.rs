@@ -2,8 +2,8 @@
 
 use super::session::Request;
 use super::*;
-use crate::ajson::{self, Json};
-use crate::cutil::{hex2bin, strtoul32_hex, until_nul};
+use crate::util::ajson::{self, Json};
+use crate::util::cutil::{hex2bin, strtoul32_hex, until_nul};
 
 /// Whether `line` is one JSON value as ArduinoJson reads it (the former
 /// `deserializeJson()` check of the connection loop).

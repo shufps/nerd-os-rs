@@ -33,11 +33,11 @@ pub(crate) fn coinbase_info(pool: c_int) -> Option<crate::pool::coinbase_verify:
 }
 
 pub(crate) fn uptime_seconds() -> i64 {
-    (crate::cutil::now_us() - crate::system::start_us()) / 1_000_000
+    (crate::util::cutil::now_us() - crate::system::start_us()) / 1_000_000
 }
 
 pub(crate) fn now_ms() -> u64 {
-    (crate::cutil::now_us() / 1000) as u64
+    (crate::util::cutil::now_us() / 1000) as u64
 }
 
 /// The history query of the request (`?ts=..&limit=..`).

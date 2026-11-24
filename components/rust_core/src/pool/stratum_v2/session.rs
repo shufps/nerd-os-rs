@@ -484,7 +484,7 @@ impl Session {
         let job_id = strtoul32_dec(job_id);
         if self.extended && !extranonce2_hex.is_empty() {
             let mut en2 = vec![0u8; extranonce2_hex.len() / 2];
-            crate::cutil::hex2bin(extranonce2_hex, &mut en2);
+            crate::util::cutil::hex2bin(extranonce2_hex, &mut en2);
             // The C++ code built the frame into a 63-byte buffer: at most 32
             // extranonce bytes fit.
             if en2.len() > 32 {
@@ -515,7 +515,7 @@ impl Session {
 /// `strtoul(s, NULL, 10)` with a 32-bit `unsigned long` (job IDs are our own
 /// "%lu" strings, so only the plain case matters).
 fn strtoul32_dec(s: &[u8]) -> u32 {
-    let s = crate::cutil::until_nul(s);
+    let s = crate::util::cutil::until_nul(s);
     let mut v: u32 = 0;
     for &c in s.iter().skip_while(|c| c.is_ascii_whitespace()) {
         if !c.is_ascii_digit() {
@@ -533,7 +533,7 @@ fn strtoul32_dec(s: &[u8]) -> u32 {
 }
 
 fn hex(b: &[u8]) -> String {
-    crate::cutil::to_hex(b)
+    crate::util::cutil::to_hex(b)
 }
 
 #[cfg(test)]

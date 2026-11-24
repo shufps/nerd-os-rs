@@ -59,10 +59,13 @@ impl Store for Log<'_> {
 
 /// As the handlers (settings_apply): invalid JSON applies nothing. The
 /// result and the config writes.
-fn settings(body: &[u8], parse: impl Fn(&rust_core::ajson::Json) -> Vec<Write>) -> (bool, String) {
+fn settings(
+    body: &[u8],
+    parse: impl Fn(&rust_core::util::ajson::Json) -> Vec<Write>,
+) -> (bool, String) {
     let log = RefCell::new(String::new());
     let mut a = Applied::default();
-    let Ok(doc) = rust_core::ajson::deserialize(body) else {
+    let Ok(doc) = rust_core::util::ajson::deserialize(body) else {
         return (false, log.into_inner());
     };
     for w in parse(&doc) {
@@ -83,7 +86,7 @@ fn otp(body: &[u8]) -> (i32, bool) {
 /// The CAN node commands as the CAN sink of handler_can_swarm.cpp logged
 /// them ("can=s:...").
 fn can_body(body: &[u8], slave: u8) -> (bool, String) {
-    let Ok(doc) = rust_core::ajson::deserialize(body) else {
+    let Ok(doc) = rust_core::util::ajson::deserialize(body) else {
         return (false, String::new());
     };
     let mut log = String::new();

@@ -18,9 +18,9 @@ use core::ffi::{c_int, CStr};
 use std::sync::Mutex;
 use std::time::{Duration, Instant};
 
-use crate::ajson;
-use crate::cutil::{fixed, json_escape, url_encode};
 use crate::log::log;
+use crate::util::ajson;
+use crate::util::cutil::{fixed, json_escape, url_encode};
 
 const TAG: &CStr = c"InfluxDB";
 const TASK_TAG: &CStr = c"influx_task";

@@ -10,7 +10,7 @@ use crate::config::sdkconfig as k;
 
 fn s(key: &[u8], def: &str) -> CString {
     let v = config::get_str(key)
-        .map(|v| crate::cutil::until_nul(&v).to_vec())
+        .map(|v| crate::util::cutil::until_nul(&v).to_vec())
         .unwrap_or_else(|| def.as_bytes().to_vec());
     CString::new(v).unwrap_or_default()
 }

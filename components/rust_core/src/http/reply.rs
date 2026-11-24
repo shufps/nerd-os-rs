@@ -4,7 +4,6 @@
 
 use core::ffi::CStr;
 
-use crate::ajson::Json;
 use crate::config;
 use crate::config::settings_apply::{self, Applied};
 use crate::http::server::read_body;
@@ -12,6 +11,7 @@ use crate::http::settings::Write;
 use crate::idf::httpd::{err, Request};
 use crate::idf::{EspErr, ESP_FAIL, ESP_OK};
 use crate::log::log;
+use crate::util::ajson::Json;
 
 pub(crate) fn send_err(req: &mut Request, code: crate::idf::httpd::ErrCode, msg: &CStr) -> EspErr {
     req.send_err(code, Some(msg))
@@ -38,7 +38,7 @@ pub(crate) fn send_doc(req: &mut Request, doc: Json) -> EspErr {
 /// A config string with its default (`cfgGetStrAlloc()`), NUL-terminated.
 pub(crate) fn cfg_str(key: &[u8], def: &str) -> std::ffi::CString {
     let v = config::get_str(key)
-        .map(|v| crate::cutil::until_nul(&v).to_vec())
+        .map(|v| crate::util::cutil::until_nul(&v).to_vec())
         .unwrap_or_else(|| def.as_bytes().to_vec());
     std::ffi::CString::new(v).unwrap_or_default()
 }

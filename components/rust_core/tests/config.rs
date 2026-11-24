@@ -6,8 +6,8 @@
 
 use std::ffi::CString;
 
-use rust_core::ajson::{Json, Num};
 use rust_core::config;
+use rust_core::util::ajson::{Json, Num};
 
 mod golden;
 use golden::Rec;

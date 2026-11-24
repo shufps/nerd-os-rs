@@ -112,7 +112,7 @@ fn cut(mut s: String, max: usize) -> String {
 pub fn payload(message: &str) -> String {
     format!(
         "{{\"content\": \"{}\"}}",
-        crate::cutil::json_escape(message)
+        crate::util::cutil::json_escape(message)
     )
 }
 
@@ -311,7 +311,7 @@ mod tests {
             "{\"content\": \"hi\\n```\\nHostname: rig\\\"1\\\\x\\nIP:       10.0.0.2\\nMAC:      AA:BB\\n```\"}"
         );
         // it parses, and the content is the message
-        let v = crate::ajson::deserialize(p.as_bytes()).unwrap();
+        let v = crate::util::ajson::deserialize(p.as_bytes()).unwrap();
         assert_eq!(v.get("content").as_cstr().unwrap(), msg.as_bytes());
     }
 

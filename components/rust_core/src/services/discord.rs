@@ -12,7 +12,7 @@ use crate::idf::http_client::{Client, METHOD_POST};
 use crate::idf::{nvs::err_name, task, ESP_OK};
 use crate::log::log;
 use crate::services::alerts;
-use crate::suffix::suffix_string;
+use crate::util::suffix::suffix_string;
 
 const TAG: &CStr = c"discord";
 
@@ -20,7 +20,7 @@ const TAG: &CStr = c"discord";
 pub fn load_config() {
     let get_str = |key: &[u8], def: &str| {
         config::get_str(key)
-            .map(|v| String::from_utf8_lossy(crate::cutil::until_nul(&v)).into_owned())
+            .map(|v| String::from_utf8_lossy(crate::util::cutil::until_nul(&v)).into_owned())
             .unwrap_or_else(|| def.to_string())
     };
     let on = |key: &[u8], def: i64| config::get_u16(key, def as u16) != 0;

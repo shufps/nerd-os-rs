@@ -21,8 +21,8 @@
 use core::ffi::{c_int, CStr};
 use std::sync::Mutex;
 
-use crate::cutil::fixed;
 use crate::log::log;
+use crate::util::cutil::fixed;
 
 const TAG: &CStr = c"fan_ctrl";
 pub const MAX_FANS: usize = 2;

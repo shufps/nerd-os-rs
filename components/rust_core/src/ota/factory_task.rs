@@ -546,7 +546,7 @@ pub fn post_handler(req: &mut Request) -> EspErr {
         off += n as usize;
     }
     // as the C string it was
-    let body = crate::cutil::until_nul(&body);
+    let body = crate::util::cutil::until_nul(&body);
     let (url, keep_config) = match factory_body(body) {
         FactoryBody::Invalid => {
             log!(Error, TAG, "JSON parsing failed");
@@ -555,7 +555,7 @@ pub fn post_handler(req: &mut Request) -> EspErr {
         FactoryBody::NoUrl => return send_err(req, err::E400_BAD_REQUEST, c"`url` missing"),
         FactoryBody::Ok { url, keep_config } => (url, keep_config),
     };
-    let url = crate::cutil::until_nul(&url).to_vec();
+    let url = crate::util::cutil::until_nul(&url).to_vec();
     let text = String::from_utf8_lossy(&url).into_owned();
     if !factory_url_ok(&url) {
         log!(Error, TAG, "Rejected URL: {text}");

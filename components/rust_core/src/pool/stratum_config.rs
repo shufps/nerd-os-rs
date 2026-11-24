@@ -30,7 +30,7 @@ pub struct PoolConfig {
 
 fn text(key: &[u8], def: &str) -> CString {
     let v = config::get_str(key)
-        .map(|v| crate::cutil::until_nul(&v).to_vec())
+        .map(|v| crate::util::cutil::until_nul(&v).to_vec())
         .unwrap_or_else(|| def.as_bytes().to_vec());
     CString::new(v).unwrap_or_default()
 }
@@ -105,11 +105,11 @@ mod tests {
         assert!(!p.reload());
         crate::config::set(
             b"stratumurl",
-            crate::ajson::Json::Str(b"pool.example".to_vec()),
+            crate::util::ajson::Json::Str(b"pool.example".to_vec()),
         );
         crate::config::set(
             b"sv2_proto",
-            crate::ajson::Json::Num(crate::ajson::Num::U(1)),
+            crate::util::ajson::Json::Num(crate::util::ajson::Num::U(1)),
         );
         assert!(p.reload());
         assert_eq!(p.host.to_str().unwrap(), "pool.example");
@@ -132,13 +132,13 @@ mod tests {
         let mut f = PoolConfig::load(1);
         crate::config::set(
             b"sv2_reqauth",
-            crate::ajson::Json::Num(crate::ajson::Num::U(1)),
+            crate::util::ajson::Json::Num(crate::util::ajson::Num::U(1)),
         );
         assert!(p.reload());
         assert!(!f.reload());
         crate::config::set(
             b"fbsv2_authpk",
-            crate::ajson::Json::Str(
+            crate::util::ajson::Json::Str(
                 b"9c4zpyJ2ndm4e8sP2uNc1VNCGxYjqaxWS6wUCjk8zFj6njFquH6".to_vec(),
             ),
         );

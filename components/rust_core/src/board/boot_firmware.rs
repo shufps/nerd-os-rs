@@ -163,7 +163,7 @@ pub struct Firmware {
 
 fn cfg_str(key: &[u8], def: &str) -> Vec<u8> {
     crate::config::get_str(key)
-        .map(|v| crate::cutil::until_nul(&v).to_vec())
+        .map(|v| crate::util::cutil::until_nul(&v).to_vec())
         .unwrap_or_else(|| def.as_bytes().to_vec())
 }
 
@@ -325,7 +325,7 @@ impl Hooks for Firmware {
         if all {
             crate::config::set(
                 b"selftest",
-                crate::ajson::Json::Num(crate::ajson::Num::U(0)),
+                crate::util::ajson::Json::Num(crate::util::ajson::Num::U(0)),
             );
             crate::config::nvs::request_flush();
         }

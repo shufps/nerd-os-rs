@@ -1,10 +1,10 @@
 //! The body of `PATCH /api/system` (v1, with `StratumManager::saveSettings()`).
 
-use crate::ajson::Json;
 use crate::http::settings::{
     boolean, fans, field, flag, hundredths, nonzero, num_f32, screen_off_secs, string, uint, Out,
     Setting as S, Write,
 };
+use crate::util::ajson::Json;
 
 /// `PATCH /api/system` (v1): the flat fields, then `fans`, then the flat
 /// stratum fields of `StratumManager::saveSettings()`; in dual pool mode

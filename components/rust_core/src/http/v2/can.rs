@@ -7,7 +7,6 @@ use crate::idf::idf_const;
 use core::ffi::{c_int, CStr};
 use std::ffi::CString;
 
-use crate::ajson::Json;
 use crate::can;
 use crate::http::json::{float, FanInfo, Obj};
 use crate::http::query::{can_node_action, can_node_id, NodeAction, NodeId};
@@ -16,6 +15,7 @@ use crate::idf::httpd::{self, err, Request};
 use crate::idf::{EspErr, ESP_FAIL, ESP_OK};
 use crate::log::log;
 use crate::power::mgmt;
+use crate::util::ajson::Json;
 
 idf_const!(CAP_INTERNAL: u32 = MALLOC_CAP_INTERNAL, 1 << 11);
 
@@ -94,7 +94,7 @@ pub fn patch(req: &mut Request) -> EspErr {
     let Ok(body) = crate::http::server::read_body(req) else {
         return ESP_FAIL;
     };
-    let Ok(doc) = crate::ajson::deserialize(&body) else {
+    let Ok(doc) = crate::util::ajson::deserialize(&body) else {
         log!(Error, c"can_swarm", "JSON parsing failed");
         send_err(req, err::E400_BAD_REQUEST, c"Invalid JSON");
         return ESP_FAIL;

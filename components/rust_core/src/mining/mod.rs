@@ -134,7 +134,7 @@ mod tests {
 
     fn unhex<const N: usize>(s: &str) -> [u8; N] {
         let mut out = [0u8; N];
-        crate::cutil::hex2bin(s.as_bytes(), &mut out);
+        crate::util::cutil::hex2bin(s.as_bytes(), &mut out);
         out
     }
 
@@ -144,7 +144,7 @@ mod tests {
     #[test]
     fn genesis_block() {
         let mut tx = vec![0u8; GENESIS_COINBASE.len() / 2];
-        crate::cutil::hex2bin(GENESIS_COINBASE.as_bytes(), &mut tx);
+        crate::util::cutil::hex2bin(GENESIS_COINBASE.as_bytes(), &mut tx);
         let root = merkle_root(&tx, &[]);
         // txid 4a5e1e4b...a33b is displayed byte-reversed
         assert_eq!(

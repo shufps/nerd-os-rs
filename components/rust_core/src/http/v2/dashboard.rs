@@ -4,7 +4,6 @@
 use core::ffi::c_int;
 use std::ffi::CString;
 
-use crate::ajson::Json;
 use crate::config::cfg;
 use crate::http::json::{cstr, float, floats, history, int, manager_info, ManagerInfo, Obj};
 use crate::http::reply::{send_doc, set_json};
@@ -16,6 +15,7 @@ use crate::idf::httpd::Request;
 use crate::idf::EspErr;
 use crate::mining::history::api::{history_current, history_current_timestamp};
 use crate::power::mgmt;
+use crate::util::ajson::Json;
 
 /// One pool's coinbase data of the dashboard.
 #[derive(Clone, Debug, Default)]

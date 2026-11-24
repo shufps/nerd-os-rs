@@ -9,7 +9,7 @@
 /// case) in `name=value&...`; `None` if missing or if it needs more than
 /// `cap` bytes with the NUL (the C callers ignored truncated values).
 pub fn query_value<'a>(query: &'a [u8], key: &[u8], cap: usize) -> Option<&'a [u8]> {
-    let query = crate::cutil::until_nul(query);
+    let query = crate::util::cutil::until_nul(query);
     let mut rest = query;
     while !rest.is_empty() {
         let eq = rest.iter().position(|&c| c == b'=')?;
@@ -174,7 +174,7 @@ fn node_id(text: &[u8]) -> NodeId {
 
 /// `/api/v2/can/nodes/{id}`: the number after the last `/`.
 pub fn can_node_id(uri: &[u8]) -> NodeId {
-    let uri = crate::cutil::until_nul(uri);
+    let uri = crate::util::cutil::until_nul(uri);
     match uri.iter().rposition(|&c| c == b'/') {
         Some(slash) if slash + 1 < uri.len() => node_id(&uri[slash + 1..]),
         _ => NodeId::Missing,
@@ -191,7 +191,7 @@ pub enum NodeAction {
 /// `/api/v2/can/nodes/{id}/{action}`: the ID (`Invalid` if there is none),
 /// then the action (`None`: unknown).
 pub fn can_node_action(uri: &[u8]) -> (NodeId, Option<NodeAction>) {
-    let uri = crate::cutil::until_nul(uri);
+    let uri = crate::util::cutil::until_nul(uri);
     let Some(last) = uri.iter().rposition(|&c| c == b'/').filter(|&l| l > 0) else {
         return (NodeId::Invalid, None);
     };

@@ -4,13 +4,13 @@
 use core::ffi::c_int;
 use std::ffi::CString;
 
-use crate::ajson::Json;
 use crate::config::sdkconfig as k;
 use crate::http::json::Obj;
 use crate::http::reply::{cfg_flag, cfg_str, send_doc, set_json};
 use crate::http::sources::{CAP_INTERNAL, CAP_SPIRAM};
 use crate::idf::httpd::Request;
 use crate::idf::EspErr;
+use crate::util::ajson::Json;
 
 /// `v2_system_t`: the values of `GET /api/v2/system`.
 #[derive(Clone, Debug, Default)]
@@ -108,7 +108,7 @@ pub(crate) fn system(req: &mut Request) -> EspErr {
         device_model: Some(b.device_model.into()),
         asic_model: Some(b.asic_model.into()),
         version: Some(version),
-        uptime_seconds: (crate::cutil::now_us() - crate::system::start_us()) / 1_000_000,
+        uptime_seconds: (crate::util::cutil::now_us() - crate::system::start_us()) / 1_000_000,
         last_reset_reason: Some(crate::system::reset_reason().into()),
         hostname: Some(hostname),
         ssid: Some(ssid),

@@ -6,10 +6,10 @@
 use core::ffi::c_int;
 use std::ffi::CString;
 
-use crate::ajson::Json;
 use crate::http::json::{
     float, floats, history, manager_info, pid_obj, u32_list, FanInfo, ManagerInfo, Obj,
 };
+use crate::util::ajson::Json;
 
 /// `system_info_t`: the values of `GET /api/system/info`.
 #[derive(Clone, Debug, Default)]

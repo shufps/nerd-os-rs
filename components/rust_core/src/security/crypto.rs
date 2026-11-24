@@ -157,7 +157,7 @@ mod tests {
 
     fn unhex(s: &str) -> Vec<u8> {
         let mut out = vec![0u8; s.len() / 2];
-        crate::cutil::hex2bin(s.as_bytes(), &mut out);
+        crate::util::cutil::hex2bin(s.as_bytes(), &mut out);
         out
     }
 

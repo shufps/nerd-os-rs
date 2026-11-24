@@ -305,7 +305,7 @@ impl Env for Board {
         crate::services::influx::api::influx_set_fan(v[0], v[1], v[2], v[3]);
     }
     fn now_us(&mut self) -> u64 {
-        crate::cutil::now_us() as u64
+        crate::util::cutil::now_us() as u64
     }
 }
 

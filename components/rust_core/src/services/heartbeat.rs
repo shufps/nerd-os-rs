@@ -47,7 +47,7 @@ fn uptime(s: u64) -> String {
 
 /// The message.
 pub fn message(v: &Values) -> String {
-    let diff = |d| crate::suffix::suffix_string(d, 0);
+    let diff = |d| crate::util::suffix::suffix_string(d, 0);
     let efficiency = if v.hashrate > 0.0 {
         format!("{:.1} J/TH", v.power as f64 / (v.hashrate / 1000.0))
     } else {

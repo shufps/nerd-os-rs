@@ -11,14 +11,14 @@
 use core::ffi::CStr;
 use std::sync::Mutex;
 
-use crate::ajson::{Json, Num};
 use crate::config;
-use crate::cutil::url_encode;
 use crate::http::auth::{
     base32_decode, base32_encode, mint_session_token, verify_session_token, verify_totp_code,
     ReplayState,
 };
 use crate::log::log;
+use crate::util::ajson::{Json, Num};
+use crate::util::cutil::url_encode;
 
 const TAG: &CStr = c"OTP";
 

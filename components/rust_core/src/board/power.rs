@@ -16,8 +16,8 @@
 use core::ffi::{c_int, CStr};
 
 use crate::board::board_core::{validate_voltage, Limits};
-use crate::cutil::fixed;
 use crate::log::log;
+use crate::util::cutil::fixed;
 
 /// The two sequences.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

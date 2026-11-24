@@ -13,14 +13,12 @@
 // symbols C calls must use the C ABI
 #![deny(clippy::no_mangle_with_rust_abi)]
 
-pub mod ajson;
 #[cfg(target_os = "espidf")]
 mod alloc;
 pub mod board;
 pub mod can;
 pub mod clock;
 pub mod config;
-pub mod cutil;
 pub mod display;
 pub mod drivers;
 pub mod http;
@@ -34,6 +32,6 @@ pub mod power;
 pub mod security;
 pub mod services;
 pub mod stack_monitor;
-pub mod suffix;
 pub mod system;
 pub mod tasks;
+pub mod util;

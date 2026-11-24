@@ -13,9 +13,9 @@
 use core::ffi::CStr;
 use std::ffi::CString;
 
-use crate::ajson;
 use crate::idf::idf_const;
 use crate::log::log;
+use crate::util::ajson;
 
 const TAG: &CStr = c"http_ota";
 

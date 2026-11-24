@@ -376,7 +376,7 @@ fn run(case: &Case) -> (i32, CoinbaseResult) {
 
 /// The result as recorded in the golden file.
 fn result_text(r: &CoinbaseResult) -> String {
-    let scriptsig = rust_core::cutil::to_hex(r.scriptsig_bytes());
+    let scriptsig = rust_core::util::cutil::to_hex(r.scriptsig_bytes());
     format!(
         "{:#x} {} {scriptsig} {} {} {} {}",
         r.network_difficulty.to_bits(),

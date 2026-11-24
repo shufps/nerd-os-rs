@@ -17,8 +17,8 @@ use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::Mutex;
 use std::time::{Duration, Instant};
 
-use crate::cutil::fixed;
 use crate::log::log;
+use crate::util::cutil::fixed;
 
 const TAG: &CStr = c"power_management";
 pub const POLL_MS: u64 = 2000;

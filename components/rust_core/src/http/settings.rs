@@ -2,7 +2,7 @@
 //! (`config/settings_apply.rs` applies them to the config) and the field readers
 //! shared by the parsers next to the handlers in `v1/` and `v2/`.
 //!
-//! The JSON is read with ArduinoJson's rules ([`crate::ajson`]), and
+//! The JSON is read with ArduinoJson's rules ([`crate::util::ajson`]), and
 //! `is<T>()` only accepts values of that type (integers in range for integer
 //! types, any number for `float`), as before.
 //!
@@ -10,7 +10,7 @@
 //! * PID factors and the coinbase fee are converted to the register value
 //!   with saturation (out of range: 0 or 65535, NaN: 0),
 
-use crate::ajson::Json;
+use crate::util::ajson::Json;
 
 /// `setting_t`: one config setter each; `index` is the fan channel or pool.
 #[repr(u16)]

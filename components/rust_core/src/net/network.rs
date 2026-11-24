@@ -300,7 +300,7 @@ mod sys {
             records
                 .iter()
                 .map(|r| ScanResult {
-                    ssid: CString::new(crate::cutil::until_nul(&r.ssid)).unwrap_or_default(),
+                    ssid: CString::new(crate::util::cutil::until_nul(&r.ssid)).unwrap_or_default(),
                     rssi: r.rssi,
                     authmode: r.authmode as c_int,
                 })

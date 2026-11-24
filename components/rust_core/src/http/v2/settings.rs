@@ -5,7 +5,6 @@
 use core::ffi::c_int;
 use std::ffi::CString;
 
-use crate::ajson::Json;
 use crate::config::cfg;
 use crate::http::json::*;
 use crate::http::reply::{send_doc, set_json};
@@ -17,6 +16,7 @@ use crate::http::settings::{
 use crate::http::sources::{board, fan_settings, reload_settings};
 use crate::idf::httpd::Request;
 use crate::idf::{EspErr, ESP_FAIL, ESP_OK};
+use crate::util::ajson::Json;
 
 /// One pool of `GET /api/v2/settings`.
 #[derive(Clone, Debug, Default)]
@@ -238,7 +238,7 @@ pub(crate) fn get(req: &mut Request) -> EspErr {
 /// The document of `GET /api/v2/settings` (also the source of the first
 /// settings profile).
 #[allow(clippy::field_reassign_with_default)]
-pub(crate) fn v2_settings_doc() -> crate::ajson::Json {
+pub(crate) fn v2_settings_doc() -> crate::util::ajson::Json {
     let b = board();
     let version = CString::new(crate::net::mdns::fw_version()).unwrap_or_default();
     let urls = [cfg::stratum_url(0), cfg::stratum_url(1)];
@@ -355,7 +355,7 @@ mod tests {
     #[test]
     fn auto_screen_off_timeout_range() {
         let get = |body: &str| {
-            let doc = crate::ajson::deserialize(body.as_bytes()).unwrap();
+            let doc = crate::util::ajson::deserialize(body.as_bytes()).unwrap();
             settings_v2(&doc)
                 .into_iter()
                 .find(|w| w.setting == S::AutoScreenOffTimeout)

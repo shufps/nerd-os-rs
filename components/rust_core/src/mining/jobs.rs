@@ -13,12 +13,12 @@ use core::ffi::{c_char, c_int, CStr};
 use std::ffi::CString;
 use std::sync::Mutex;
 
-use crate::cutil::until_nul;
 use crate::log::log;
 use crate::mining::JobHashes;
 use crate::pool::stratum_v1::job::build_parts;
 use crate::pool::stratum_v1::MiningNotify;
 use crate::pool::stratum_v2::jobs::{hashes, ExtendedJob};
+use crate::util::cutil::until_nul;
 
 const TAG: &CStr = c"create_jobs_task";
 
@@ -387,7 +387,7 @@ impl Extended {
             pool_diff: self.difficulty,
             job_id: self.job_id.to_string().into_bytes(),
             // sent with the share
-            extranonce2: crate::cutil::to_hex(&en2).into_bytes(),
+            extranonce2: crate::util::cutil::to_hex(&en2).into_bytes(),
         })
     }
 }

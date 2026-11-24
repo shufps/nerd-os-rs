@@ -134,7 +134,7 @@ fn with<T: Default>(f: impl FnOnce(&mut Driver) -> T) -> T {
 }
 
 fn now_us() -> i64 {
-    crate::cutil::now_us()
+    crate::util::cutil::now_us()
 }
 
 fn gpio_level(pin: i32, level: bool) {

@@ -138,7 +138,7 @@ fn state() -> MutexGuard<'static, State> {
 
 /// At most `max` bytes, cut at a NUL (as the C++ buffers did).
 fn text(s: &[u8], max: usize) -> Vec<u8> {
-    let s = crate::cutil::until_nul(s);
+    let s = crate::util::cutil::until_nul(s);
     s[..s.len().min(max)].to_vec()
 }
 
@@ -150,7 +150,7 @@ fn cstring(v: &[u8]) -> CString {
 /// Start time, host name, the history for `asic_count` ASICs.
 pub fn init(asic_count: c_int) {
     let hostname = crate::config::get_str(b"hostname")
-        .map(|h| crate::cutil::until_nul(&h).to_vec())
+        .map(|h| crate::util::cutil::until_nul(&h).to_vec())
         .unwrap_or_else(|| {
             crate::config::sdkconfig::LWIP_LOCAL_HOSTNAME
                 .as_bytes()
@@ -159,7 +159,7 @@ pub fn init(asic_count: c_int) {
     let _ = HOSTNAME.set(CString::new(hostname).unwrap_or_default());
     {
         let mut s = state();
-        s.start_us = crate::cutil::now_us();
+        s.start_us = crate::util::cutil::now_us();
         s.ip = b"0.0.0.0".to_vec();
     }
     if !crate::mining::history::api::history_init(asic_count) {
@@ -344,7 +344,7 @@ impl Overlay {
 pub fn run() -> ! {
     // ticks every 5 s from now; a tick missed while the loop body ran is
     // dropped, as the FreeRTOS timer's signal was
-    let start = crate::cutil::now_us();
+    let start = crate::util::cutil::now_us();
     let mut next = start + PERIOD_US;
     log!(Info, TAG, "SYSTEM_task started");
 
@@ -378,7 +378,7 @@ pub fn run() -> ! {
     let mut overlay = Overlay::default();
 
     loop {
-        let now = crate::cutil::now_us();
+        let now = crate::util::cutil::now_us();
         while next <= now {
             next += PERIOD_US;
         }
@@ -388,8 +388,8 @@ pub fn run() -> ! {
             log!(Warn, TAG, "suspended");
             crate::idf::task::suspend_self();
         }
-        crate::stack_monitor::tick(crate::cutil::now_us());
-        crate::services::heartbeat::tick(crate::cutil::now_us());
+        crate::stack_monitor::tick(crate::util::cutil::now_us());
+        crate::services::heartbeat::tick(crate::util::cutil::now_us());
 
         if can_slave {
             // the CAN ID in the IP label, every tick (the negotiation may
@@ -434,7 +434,7 @@ pub fn run() -> ! {
         crate::display::update(toggle);
 
         // a history sample with the filtered temperatures
-        let timestamp_ms = (crate::cutil::now_us() / 1000) as u64;
+        let timestamp_ms = (crate::util::cutil::now_us() / 1000) as u64;
         let (vreg, asic) = filters.push(crate::power::mgmt::get(4), crate::power::mgmt::get(3));
         crate::mining::history::api::history_push(
             crate::mining::hashrate::api::hashrate_monitor_total(),

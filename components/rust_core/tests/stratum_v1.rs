@@ -357,7 +357,7 @@ fn shown(b: &[u8]) -> String {
     if b.len() <= 200 {
         format!("{:?}", String::from_utf8_lossy(b))
     } else {
-        let d = rust_core::cutil::to_hex(&Sha256::digest(b)[..8]);
+        let d = rust_core::util::cutil::to_hex(&Sha256::digest(b)[..8]);
         format!("<{} bytes, sha256 {d}..>", b.len())
     }
 }
@@ -682,7 +682,7 @@ fn lenient(v: &Value, rng: &Rng) -> String {
 }
 
 /// ArduinoJson read pool lines before step 1 and reads them again since the
-/// switch to rust_core::ajson; serde_json (steps 1 to H2) rejected these.
+/// switch to rust_core::util::ajson; serde_json (steps 1 to H2) rejected these.
 #[test]
 fn lenient_syntax_matches_reference() {
     let (n, seed) = iterations();

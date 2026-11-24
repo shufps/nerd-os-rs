@@ -14,8 +14,8 @@
 use core::ffi::CStr;
 use std::sync::Mutex;
 
-use crate::cutil::fixed;
 use crate::log::log;
+use crate::util::cutil::fixed;
 
 const TAG: &CStr = c"can_master";
 

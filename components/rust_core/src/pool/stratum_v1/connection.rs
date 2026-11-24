@@ -71,7 +71,7 @@ pub trait Hooks {
 /// (the log can be read over the web socket without OTP).
 fn loggable(data: &[u8]) -> Vec<u8> {
     let shown = data.strip_suffix(b"\n").unwrap_or(data);
-    let Ok(doc) = crate::ajson::deserialize(shown) else {
+    let Ok(doc) = crate::util::ajson::deserialize(shown) else {
         return shown.to_vec();
     };
     if doc.get("method").as_cstr() != Some(b"mining.authorize") {

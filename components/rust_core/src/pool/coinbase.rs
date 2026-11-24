@@ -14,7 +14,7 @@
 
 use core::ffi::{c_char, c_int, CStr};
 
-use crate::cutil::hex2bin;
+use crate::util::cutil::hex2bin;
 
 pub const MAX_SCRIPTSIG_LEN: usize = 256;
 

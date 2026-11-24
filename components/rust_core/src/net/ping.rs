@@ -12,7 +12,7 @@ use core::ffi::c_int;
 use std::sync::Mutex;
 use std::time::Duration;
 
-use crate::cutil::fixed;
+use crate::util::cutil::fixed;
 
 /// Pings per round.
 pub const COUNT: u16 = 7;

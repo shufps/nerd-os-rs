@@ -301,7 +301,7 @@ impl Driver {
                 Error,
                 TAG,
                 "Serial RX invalid {n}: {}",
-                crate::cutil::to_hex(&buf[..n as usize])
+                crate::util::cutil::to_hex(&buf[..n as usize])
             );
             uart.clear();
         }

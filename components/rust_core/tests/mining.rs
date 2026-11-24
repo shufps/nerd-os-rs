@@ -56,7 +56,7 @@ fn iterations() -> (usize, u64) {
 }
 
 fn hex(b: &[u8]) -> String {
-    rust_core::cutil::to_hex(b)
+    rust_core::util::cutil::to_hex(b)
 }
 
 fn hashes_text(h: &JobHashes) -> String {

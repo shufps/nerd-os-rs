@@ -999,7 +999,7 @@ impl Ui {
             .vinput
             .set_text_str(l, &format!("{}mV", mgmt::get(1) as i32));
 
-        let up = (crate::cutil::now_us() - crate::system::start_us()) / 1_000_000;
+        let up = (crate::util::cutil::now_us() - crate::system::start_us()) / 1_000_000;
         self.mining.time.set_text_str(l, &text::uptime(up));
 
         let m = crate::pool::manager::get();
@@ -1014,7 +1014,7 @@ impl Ui {
             self.settings
                 .shares
                 .set_text_str(l, &text::fit20(format!("{acc}/{rej}")));
-            let best = crate::suffix::suffix_string(m.summary().total_best, 0);
+            let best = crate::util::suffix::suffix_string(m.summary().total_best, 0);
             self.mining.best_diff.set_text_str(l, &best);
             self.settings.best_diff.set_text_str(l, &best);
         }

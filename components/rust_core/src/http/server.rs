@@ -196,7 +196,7 @@ pub fn read_body(req: &mut Request) -> Result<Vec<u8>, EspErr> {
         }
         cur += n as usize;
     }
-    let n = crate::cutil::until_nul(&buf).len();
+    let n = crate::util::cutil::until_nul(&buf).len();
     buf.truncate(n);
     Ok(buf)
 }

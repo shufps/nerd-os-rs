@@ -10,9 +10,9 @@
 
 use core::ffi::{c_int, CStr};
 
-use crate::cutil::fixed;
 use crate::drivers::i2c::RegBus;
 use crate::log::log;
+use crate::util::cutil::fixed;
 
 const TAG: &CStr = c"emc2302";
 pub const ADDR: u8 = 0x2e;

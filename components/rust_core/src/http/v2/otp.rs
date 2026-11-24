@@ -4,13 +4,13 @@
 use crate::idf::idf_const;
 use core::ffi::c_int;
 
-use crate::ajson::Json;
 use crate::http::json::Obj;
 use crate::http::reply::{end_chunks, send_doc, send_err, set_json};
 use crate::http::server::read_body;
 use crate::idf::httpd::{err, Request};
 use crate::idf::{EspErr, ESP_FAIL, ESP_OK};
 use crate::log::log;
+use crate::util::ajson::Json;
 
 /// `GET /api/otp/status`
 pub fn otp_status(enabled: bool) -> Json {
@@ -36,7 +36,7 @@ pub enum OtpBody {
 }
 
 pub fn otp_body(body: &[u8]) -> OtpBody {
-    match crate::ajson::deserialize(body) {
+    match crate::util::ajson::deserialize(body) {
         Err(_) => OtpBody::Invalid,
         Ok(doc) => doc
             .get("enabled")

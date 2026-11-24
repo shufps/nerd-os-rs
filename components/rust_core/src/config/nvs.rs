@@ -9,11 +9,11 @@
 use core::ffi::{c_void, CStr};
 use std::sync::{Condvar, Mutex};
 
-use crate::ajson::{Json, Num};
 use crate::config;
 use crate::idf::nvs::{err_name, Nvs, READWRITE};
 use crate::idf::{task, ESP_OK};
 use crate::log::log;
+use crate::util::ajson::{Json, Num};
 
 const TAG: &CStr = c"nvs_config";
 const NAMESPACE: &CStr = c"main";

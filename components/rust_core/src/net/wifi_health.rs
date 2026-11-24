@@ -90,8 +90,13 @@ mod sys {
     pub fn ap_info() -> Option<(i8, Vec<u8>, u8)> {
         let mut r = raw::wifi_ap_record_t::default();
         // SAFETY: `r` is a live local the call fills
-        (unsafe { raw::esp_wifi_sta_get_ap_info(&mut r) } == 0)
-            .then(|| (r.rssi, crate::cutil::until_nul(&r.ssid).to_vec(), r.primary))
+        (unsafe { raw::esp_wifi_sta_get_ap_info(&mut r) } == 0).then(|| {
+            (
+                r.rssi,
+                crate::util::cutil::until_nul(&r.ssid).to_vec(),
+                r.primary,
+            )
+        })
     }
 }
 

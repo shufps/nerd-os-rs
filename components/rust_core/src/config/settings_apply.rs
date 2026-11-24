@@ -3,9 +3,9 @@
 //! goes to its NVS key, per pool or fan channel where it has an index. The
 //! config is reached through [`Store`] (a recording one in the tests).
 
-use crate::ajson::{Json, Num};
 use crate::config;
 use crate::http::settings::{Setting, Write};
+use crate::util::ajson::{Json, Num};
 
 /// What applying a body changed beyond the config.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -154,7 +154,7 @@ pub fn apply_body(
     applied: &mut Applied,
     s: &mut impl Store,
 ) -> bool {
-    let Ok(doc) = crate::ajson::deserialize(body) else {
+    let Ok(doc) = crate::util::ajson::deserialize(body) else {
         return false;
     };
     let pid_use_max = pid_use_max_board();

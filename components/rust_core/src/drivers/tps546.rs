@@ -19,8 +19,8 @@
 use core::ffi::{c_int, CStr};
 use std::sync::Mutex;
 
-use crate::cutil::fixed;
 use crate::log::log;
+use crate::util::cutil::fixed;
 
 const TAG: &CStr = c"TPS546";
 pub const ADDR: u8 = 0x24;

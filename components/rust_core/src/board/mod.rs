@@ -481,7 +481,7 @@ impl State {
         if !config::has(b"autofanspeed") {
             config::set(
                 b"autofanspeed",
-                crate::ajson::Json::Num(crate::ajson::Num::U(2)),
+                crate::util::ajson::Json::Num(crate::util::ajson::Num::U(2)),
             );
         }
     }
@@ -1050,8 +1050,8 @@ impl Board {
                 Error,
                 c"board",
                 "Validation error. ASIC Frequency {} is higher than absolute maximum value {}",
-                crate::cutil::fixed(mhz as f64, 3),
-                crate::cutil::fixed(l.abs_max_frequency as f64, 3)
+                crate::util::cutil::fixed(mhz as f64, 3),
+                crate::util::cutil::fixed(l.abs_max_frequency as f64, 3)
             );
             return false;
         }
@@ -1127,7 +1127,7 @@ impl Board {
                     Info,
                     tag(id),
                     "Read ASIC temp = {}ºC",
-                    crate::cutil::fixed(t as f64, 3)
+                    crate::util::cutil::fixed(t as f64, 3)
                 );
                 t
             }
@@ -1164,7 +1164,7 @@ impl Board {
                     Info,
                     tag(id),
                     "Read vr temp = {}ºC",
-                    crate::cutil::fixed(t as f64, 3)
+                    crate::util::cutil::fixed(t as f64, 3)
                 );
                 t
             }
@@ -1279,7 +1279,7 @@ impl Board {
         let mut hw = self.hw();
         match id {
             NerdQAxePlus | NerdOctaxePlus => {
-                let now = crate::cutil::now_us();
+                let now = crate::util::cutil::now_us();
                 if hw.asic_temp_due_us == 0 {
                     hw.asic_temp_due_us = now + ASIC_TEMP_PERIOD_US;
                 }

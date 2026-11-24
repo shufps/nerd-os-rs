@@ -41,7 +41,7 @@ const NULL: Json = Json::Null;
 
 /// `deserializeJson(doc, input)`: the input ends at the first NUL.
 pub fn deserialize(input: &[u8]) -> Result<Json, Error> {
-    let input = crate::cutil::until_nul(input);
+    let input = crate::util::cutil::until_nul(input);
     let mut p = Parser {
         s: input,
         pos: 0,
@@ -552,7 +552,7 @@ impl Json {
     /// it (up to the first NUL).
     pub fn as_cstr(&self) -> Option<&[u8]> {
         match self {
-            Json::Str(s) => Some(crate::cutil::until_nul(s)),
+            Json::Str(s) => Some(crate::util::cutil::until_nul(s)),
             _ => None,
         }
     }
@@ -574,7 +574,7 @@ fn number_of(v: &Json) -> Option<Num> {
     match v {
         Json::Num(n) => Some(stored(*n)),
         Json::Bool(b) => Some(Num::U(*b as u64)),
-        Json::Str(s) => parse_number(crate::cutil::until_nul(s)).map(stored),
+        Json::Str(s) => parse_number(crate::util::cutil::until_nul(s)).map(stored),
         _ => None,
     }
 }

@@ -15,8 +15,8 @@ pub mod settings_apply;
 use core::ffi::CStr;
 use std::sync::Mutex;
 
-use crate::ajson::{self, Json, Num};
 use crate::log::log;
+use crate::util::ajson::{self, Json, Num};
 
 const TAG: &CStr = c"nvs_config";
 

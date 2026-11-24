@@ -9,7 +9,7 @@ use std::io::Write;
 /// `"s"` with `"`, `\` and control characters escaped; other bytes unchanged.
 fn quoted(out: &mut Vec<u8>, s: &[u8]) {
     out.push(b'"');
-    for &b in crate::cutil::until_nul(s) {
+    for &b in crate::util::cutil::until_nul(s) {
         match b {
             b'"' => out.extend(b"\\\""),
             b'\\' => out.extend(b"\\\\"),

@@ -15,8 +15,8 @@ use core::ffi::{c_int, CStr};
 use std::sync::Mutex;
 use std::time::{Duration, Instant};
 
-use crate::cutil::{fixed, now_us};
 use crate::log::log;
+use crate::util::cutil::{fixed, now_us};
 
 const TAG: &CStr = c"hashrate_monitor";
 const PERIOD: Duration = Duration::from_millis(5000);

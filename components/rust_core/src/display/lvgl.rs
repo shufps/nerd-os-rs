@@ -260,7 +260,7 @@ impl Obj {
 
     /// The label text from a Rust string (cut at a NUL byte).
     pub fn set_text_str(&self, l: &Lvgl, t: &str) -> &Self {
-        let t = crate::cutil::until_nul(t.as_bytes());
+        let t = crate::util::cutil::until_nul(t.as_bytes());
         let c = std::ffi::CString::new(t).unwrap_or_default();
         self.set_text(l, &c)
     }

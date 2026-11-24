@@ -116,7 +116,7 @@ impl ResultEnv for Results {
     }
     fn best_session_diff(&mut self) -> String {
         let best = crate::pool::manager::get().map_or(0, |m| m.best_session());
-        crate::suffix::suffix_string(best, 3)
+        crate::util::suffix::suffix_string(best, 3)
     }
     fn push_share(&mut self, asic_nr: c_int) {
         crate::mining::history::api::history_push_share(asic_nr);

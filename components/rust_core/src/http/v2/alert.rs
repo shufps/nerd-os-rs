@@ -1,7 +1,6 @@
 //! `GET`/`PATCH /api/v2/alert` and `POST /api/v2/alert/test` (port of
 //! `handler_alert.cpp`).
 
-use crate::ajson::Json;
 use crate::config;
 use crate::config::sdkconfig as k;
 use crate::config::settings_apply::Applied;
@@ -12,6 +11,7 @@ use crate::http::reply::{
 use crate::http::settings::{boolean, field, string, uint, Out, Setting as S, Write};
 use crate::idf::httpd::{err, Request};
 use crate::idf::{EspErr, ESP_FAIL, ESP_OK};
+use crate::util::ajson::Json;
 
 /// `alert_info_t`: `GET /api/alert/info`.
 #[derive(Clone, Debug, Default)]
@@ -109,7 +109,8 @@ mod tests {
 
     #[test]
     fn heartbeat_hours() {
-        let parse = |b: &str| settings_alert(&crate::ajson::deserialize(b.as_bytes()).unwrap());
+        let parse =
+            |b: &str| settings_alert(&crate::util::ajson::deserialize(b.as_bytes()).unwrap());
         let w = parse(r#"{"heartbeatHours":6}"#);
         assert_eq!((w.len(), w[0].setting, w[0].num), (1, S::HeartbeatHours, 6));
         assert_eq!(parse(r#"{"heartbeatHours":0}"#)[0].num, 0);

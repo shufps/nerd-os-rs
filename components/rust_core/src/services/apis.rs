@@ -1,13 +1,13 @@
 //! Responses of the mempool API (port of the parsing in `apis_task.cpp`):
 //! Bitcoin price, block height, network hashrate and difficulty, fees. The
 //! responses come from the internet (a custom mempool URL may be plain
-//! HTTP), read with ArduinoJson's rules ([`crate::ajson`]); the HTTP client
+//! HTTP), read with ArduinoJson's rules ([`crate::util::ajson`]); the HTTP client
 //! is `services/apis_fetcher.rs`.
 //!
 //! Hashrate and difficulty are converted with saturation (negative and NaN:
 //! 0, out of range: `u64::MAX`).
 
-use crate::ajson;
+use crate::util::ajson;
 
 /// What the fetcher shows.
 #[repr(C)]

@@ -17,11 +17,11 @@ use core::ffi::{c_int, CStr};
 use std::sync::{Condvar, Mutex};
 use std::time::{Duration, Instant};
 
-use crate::cutil::fixed;
 use crate::log::log;
 use crate::mining::hashrate;
 use crate::mining::jobs::{self, BmJob, CAN_SLAVE_MAX, JOB_TABLES};
 use crate::mining::nonce_difficulty;
+use crate::util::cutil::fixed;
 
 // ---------------------------------------------------------------------------
 // Job creation

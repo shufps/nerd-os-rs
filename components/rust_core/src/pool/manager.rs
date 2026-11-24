@@ -29,7 +29,6 @@ use std::ffi::CString;
 use std::sync::atomic::{AtomicBool, AtomicI32, AtomicU32, Ordering::*};
 use std::sync::{Arc, Mutex, MutexGuard, OnceLock};
 
-use crate::ajson::{Json, Num};
 use crate::config;
 use crate::config::sdkconfig as k;
 use crate::http::json::{ManagerInfo, ManagerPool};
@@ -51,6 +50,7 @@ use crate::pool::stratum_v2::protocol::FrameHeader;
 use crate::pool::stratum_v2::session::{ExtendedJob, Session as V2Session};
 use crate::pool::{self as policy, Event as PolicyEvent};
 use crate::pool::{Actions, PoolState};
+use crate::util::ajson::{Json, Num};
 
 const TAG: &CStr = c"stratum-manager";
 const RECONNECT_PERIOD_US: u64 = 30_000_000;
@@ -184,7 +184,7 @@ use crate::idf::task::delay_ms;
 use crate::idf::task::suspend_self;
 
 fn now_us() -> u64 {
-    crate::cutil::now_us().max(1) as u64
+    crate::util::cutil::now_us().max(1) as u64
 }
 
 fn set_u64(key: &[u8], v: u64) {
@@ -388,7 +388,7 @@ impl Task {
         } else {
             b"fbsv2_authpk"
         })
-        .map(|k| String::from_utf8_lossy(crate::cutil::until_nul(&k)).into_owned())
+        .map(|k| String::from_utf8_lossy(crate::util::cutil::until_nul(&k)).into_owned())
         .unwrap_or_default();
         let key = if key.is_empty() {
             None
@@ -717,7 +717,7 @@ impl v1::Hooks for V1Loop<'_> {
     }
     fn dispatch(&mut self, line: &[u8]) {
         // cut at a NUL byte, as the C string it once was
-        let line = crate::cutil::until_nul(line);
+        let line = crate::util::cutil::until_nul(line);
         self.m.dispatch(self.t.pool, line, self.session);
         self.t.log_stack_low();
     }
@@ -806,9 +806,9 @@ impl V2Hooks for V2Loop<'_> {
         // suffix) starts with the nSequence
         if !job.coinbase_prefix.is_empty() && !job.coinbase_suffix.is_empty() {
             let en_len = job.extranonce_prefix.len().min(32);
-            let mut c1 = crate::cutil::to_hex(&job.coinbase_prefix);
-            c1 += &crate::cutil::to_hex(&job.extranonce_prefix[..en_len]);
-            let c2 = crate::cutil::to_hex(&job.coinbase_suffix);
+            let mut c1 = crate::util::cutil::to_hex(&job.coinbase_prefix);
+            c1 += &crate::util::cutil::to_hex(&job.extranonce_prefix[..en_len]);
+            let c2 = crate::util::cutil::to_hex(&job.coinbase_suffix);
             if let (Ok(c1), Ok(c2)) = (CString::new(c1), CString::new(c2)) {
                 c.m.process_coinbase_v2(
                     c.t.pool,
@@ -1379,8 +1379,8 @@ impl Manager {
             Info,
             TAG,
             "FOUND BLOCK!!! {} > {}",
-            crate::cutil::fixed(diff, 6),
-            crate::cutil::fixed(ev.network_difficulty, 6)
+            crate::util::cutil::fixed(diff, 6),
+            crate::util::cutil::fixed(ev.network_difficulty, 6)
         );
         set_u64(b"totalblocks", ev.total_found_blocks as u64);
         crate::services::discord::api::discord_send_block_found(diff, ev.network_difficulty);

@@ -9,7 +9,7 @@
 use core::ffi::{c_int, CStr};
 use std::ffi::CString;
 
-use crate::ajson::{Json, Num};
+use crate::util::ajson::{Json, Num};
 
 /// An object under construction (members in insertion order).
 #[derive(Default)]

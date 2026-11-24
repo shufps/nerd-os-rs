@@ -381,7 +381,7 @@ fn handle_nonce(slave_id: u8, nonce: u32, rolled_version: u32, job_id: u8) {
         Info,
         TAG_MASTER,
         "({pool_str}) slave={slave_id} job={job_id:02X} nonce={nonce:08X} diff={}/pool={}/asic={max}",
-        crate::cutil::fixed(diff, 1),
+        crate::util::cutil::fixed(diff, 1),
         j.pool_diff
     );
 
@@ -420,7 +420,7 @@ fn master_loop() -> ! {
             // about 1 s
             if timeouts >= 10 {
                 timeouts = 0;
-                master_api::can_master_tick(crate::cutil::now_us());
+                master_api::can_master_tick(crate::util::cutil::now_us());
                 status_line(TAG_MASTER);
             }
             continue;
@@ -434,7 +434,7 @@ fn master_loop() -> ! {
             msg.identifier,
             msg.data_length_code,
             &msg.data,
-            crate::cutil::now_us(),
+            crate::util::cutil::now_us(),
         );
         match ev.kind {
             master::EVENT_ASSIGN => {
@@ -534,7 +534,10 @@ fn send_slave_config(slave_id: u8) {
 }
 
 fn set_u16(key: &[u8], v: u16) {
-    crate::config::set(key, crate::ajson::Json::Num(crate::ajson::Num::U(v as u64)));
+    crate::config::set(
+        key,
+        crate::util::ajson::Json::Num(crate::util::ajson::Num::U(v as u64)),
+    );
 }
 
 /// A settings command of the master.
@@ -616,7 +619,7 @@ fn handle_settings_cmd(p: &[u8]) {
 }
 
 fn now_ms() -> u64 {
-    (crate::cutil::now_us() / 1000) as u64
+    (crate::util::cutil::now_us() / 1000) as u64
 }
 
 fn slave_loop() -> ! {

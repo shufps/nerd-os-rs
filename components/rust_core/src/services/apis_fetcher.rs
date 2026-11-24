@@ -189,7 +189,7 @@ fn fetch(url: &str, api: Api) -> bool {
 fn base_url() -> String {
     if config::get_u16(b"mempool_cust", 0) != 0 {
         config::get_str(b"mempool_url")
-            .map(|v| String::from_utf8_lossy(crate::cutil::until_nul(&v)).into_owned())
+            .map(|v| String::from_utf8_lossy(crate::util::cutil::until_nul(&v)).into_owned())
             .unwrap_or_else(|| sdkconfig::MEMPOOL_URL.to_string())
     } else {
         sdkconfig::MEMPOOL_URL.to_string()

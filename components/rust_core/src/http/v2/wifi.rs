@@ -3,12 +3,12 @@
 use core::ffi::c_int;
 use std::ffi::CString;
 
-use crate::ajson::Json;
 use crate::http::json::Obj;
 use crate::http::reply::{send_doc, send_err, set_json};
 use crate::idf::httpd::{err, Request};
 use crate::idf::{EspErr, ESP_FAIL};
 use crate::log::log;
+use crate::util::ajson::Json;
 
 /// `wifi_network_t`: one scanned access point.
 #[derive(Clone, Debug, Default)]

@@ -2,7 +2,6 @@
 
 use std::ffi::CString;
 
-use crate::ajson::Json;
 use crate::config;
 use crate::config::sdkconfig as k;
 use crate::config::settings_apply::Applied;
@@ -11,6 +10,7 @@ use crate::http::reply::{apply_settings, cfg_flag, cfg_str, end_chunks, send_doc
 use crate::http::settings::{boolean, field, string, uint, Out, Setting as S, Write};
 use crate::idf::httpd::Request;
 use crate::idf::{EspErr, ESP_FAIL, ESP_OK};
+use crate::util::ajson::Json;
 
 /// `influx_info_t`: `GET /api/influx/info`.
 #[derive(Clone, Debug, Default)]

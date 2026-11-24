@@ -293,7 +293,7 @@ impl Tps536x7 {
                 Info,
                 c"TPS53647.c",
                 "{what}: {} V",
-                crate::cutil::fixed(v as f64, 6)
+                crate::util::cutil::fixed(v as f64, 6)
             );
         }
     }
@@ -350,7 +350,7 @@ impl Tps536x7 {
                 Error,
                 c"TPS53647.c",
                 "ERR- Voltage requested ({} V) is out of range",
-                crate::cutil::fixed(volts as f64, 6)
+                crate::util::cutil::fixed(volts as f64, 6)
             );
             return false;
         }
@@ -363,7 +363,7 @@ impl Tps536x7 {
             Info,
             c"TPS53647.c",
             "Vout changed to {} V",
-            crate::cutil::fixed(volts as f64, 2)
+            crate::util::cutil::fixed(volts as f64, 2)
         );
         true
     }

@@ -299,7 +299,7 @@ struct Outcome {
 }
 
 fn hex(b: &[u8]) -> String {
-    rust_core::cutil::to_hex(b)
+    rust_core::util::cutil::to_hex(b)
 }
 
 /// The outcome as recorded in the golden file.

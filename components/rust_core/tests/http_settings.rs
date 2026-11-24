@@ -294,11 +294,11 @@ impl Store for Log<'_> {
 /// NerdAxe (fanPidUseMax applies). The result and the config writes.
 fn run(
     body: &[u8],
-    parse: impl Fn(&rust_core::ajson::Json) -> Vec<Write>,
+    parse: impl Fn(&rust_core::util::ajson::Json) -> Vec<Write>,
 ) -> ((bool, Applied), String) {
     let log = RefCell::new(String::new());
     let mut a = Applied::default();
-    let Ok(doc) = rust_core::ajson::deserialize(body) else {
+    let Ok(doc) = rust_core::util::ajson::deserialize(body) else {
         return ((false, a), log.into_inner());
     };
     for w in parse(&doc) {

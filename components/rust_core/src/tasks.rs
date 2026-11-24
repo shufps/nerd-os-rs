@@ -1,7 +1,7 @@
 //! The mining tasks' and the telemetry tasks' entries (port of
 //! `main/tasks/create_jobs_task.cpp`, `asic_result_task.cpp`,
 //! `influx_task.cpp` and `hashrate_monitor_task.cpp`): the loops were
-//! Rust already (`mining/tasks.rs`, `influx.rs`, `mining/hashrate.rs`); what they
+//! Rust already (`mining/tasks.rs`, `services/influx.rs`, `mining/hashrate.rs`); what they
 //! reach (the ASIC chain, the board, the pool manager, the CAN slaves, the
 //! HTTP client) is now reached directly instead of through C++ hook
 //! tables.
@@ -10,15 +10,15 @@ use core::ffi::{c_int, c_void, CStr};
 use std::ffi::CString;
 use std::time::Duration;
 
-use crate::influx::{Inputs, Method, Response};
 use crate::log::log;
 use crate::mining::asic::driver::api as asic;
 use crate::mining::jobs::BmJob;
 use crate::mining::tasks::TaskResult;
 use crate::mining::tasks::{JobEnv, ResultEnv};
 use crate::pool::manager::api as mgr;
+use crate::services::influx::{Inputs, Method, Response};
 
-/// the influx client's answer limit (`influx.rs`)
+/// the influx client's answer limit (`services/influx.rs`)
 const RESPONSE_MAX: usize = 32768;
 
 fn suspend_if_shutdown(tag: &CStr) {
@@ -155,7 +155,7 @@ impl ResultEnv for Results {
 struct Influx;
 const INFLUX_TAG: &CStr = c"influx_task";
 
-impl crate::influx::Env for Influx {
+impl crate::services::influx::Env for Influx {
     fn request(
         &mut self,
         method: Method,
@@ -222,7 +222,7 @@ impl crate::influx::Env for Influx {
     }
 }
 
-impl crate::influx::TaskEnv for Influx {
+impl crate::services::influx::TaskEnv for Influx {
     fn suspend_if_shutdown(&mut self) {
         suspend_if_shutdown(INFLUX_TAG);
     }
@@ -308,7 +308,7 @@ pub(crate) mod api {
     /// # Safety
     /// A FreeRTOS task entry.
     pub unsafe extern "C" fn influx_task(_: *mut c_void) {
-        let settings = crate::influx::Settings {
+        let settings = crate::services::influx::Settings {
             enabled: crate::config::cfg::influx_enabled(),
             url: crate::config::cfg::influx_url()
                 .to_string_lossy()
@@ -327,7 +327,7 @@ pub(crate) mod api {
                 .to_string_lossy()
                 .into_owned(),
         };
-        crate::influx::run(settings, &mut Influx)
+        crate::services::influx::run(settings, &mut Influx)
     }
 
     /// Starts the hashrate monitor (the counters read every 5 s); false

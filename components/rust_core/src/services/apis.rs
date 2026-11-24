@@ -2,7 +2,7 @@
 //! Bitcoin price, block height, network hashrate and difficulty, fees. The
 //! responses come from the internet (a custom mempool URL may be plain
 //! HTTP), read with ArduinoJson's rules ([`crate::ajson`]); the HTTP client
-//! is `apis_fetcher.rs`.
+//! is `services/apis_fetcher.rs`.
 //!
 //! Hashrate and difficulty are converted with saturation (negative and NaN:
 //! 0, out of range: `u64::MAX`).

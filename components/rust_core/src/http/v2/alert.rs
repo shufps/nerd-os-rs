@@ -54,7 +54,10 @@ pub fn settings_alert(doc: &Json) -> Vec<Write> {
     out.num(
         S::HeartbeatHours,
         0,
-        uint(f("heartbeatHours"), crate::heartbeat::MAX_HOURS as u64),
+        uint(
+            f("heartbeatHours"),
+            crate::services::heartbeat::MAX_HOURS as u64,
+        ),
     );
     out.0
 }
@@ -72,7 +75,8 @@ pub(crate) fn get(req: &mut Request) -> EspErr {
         best_diff: cfg_flag(b"alrt_disc_bd_en", k::ALERT_DISCORD_BEST_DIFF_ENABLE_VALUE),
         coinbase_verify: cfg_flag(b"alrt_disc_cb_en", 0),
         show_block_found_screen: cfg_flag(b"block_found_en", k::SHOW_BLOCK_FOUND_ENABLE_VALUE),
-        heartbeat_hours: config::get_u16(b"alrt_hb_intv", 0).min(crate::heartbeat::MAX_HOURS),
+        heartbeat_hours: config::get_u16(b"alrt_hb_intv", 0)
+            .min(crate::services::heartbeat::MAX_HOURS),
     };
     send_doc(req, alert_info(&a))
 }
@@ -85,13 +89,13 @@ pub(crate) fn patch(req: &mut Request) -> EspErr {
     crate::config::nvs::request_flush();
     end_chunks(req);
     // the alerter's and the display's settings
-    crate::discord::load_config();
+    crate::services::discord::load_config();
     crate::display::load_settings();
     ESP_OK
 }
 
 pub(crate) fn test(req: &mut Request) -> EspErr {
-    if crate::discord::api::discord_send_test() {
+    if crate::services::discord::api::discord_send_test() {
         send_str(req, c"ok");
     } else {
         send_err(req, err::E500_INTERNAL_SERVER_ERROR, c"Send failed");

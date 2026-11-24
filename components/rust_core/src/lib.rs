@@ -14,11 +14,8 @@
 #![deny(clippy::no_mangle_with_rust_abi)]
 
 pub mod ajson;
-pub mod alerts;
 #[cfg(target_os = "espidf")]
 mod alloc;
-pub mod apis;
-pub mod apis_fetcher;
 pub mod board;
 pub mod can;
 pub mod can_master;
@@ -28,14 +25,11 @@ pub mod config;
 pub mod crt_bundle;
 pub mod crypto;
 pub mod cutil;
-pub mod discord;
 pub mod display;
 pub mod drivers;
 pub mod fan_control;
-pub mod heartbeat;
 pub mod http;
 pub mod idf;
-pub mod influx;
 mod log;
 pub mod mining;
 pub mod net;
@@ -46,6 +40,7 @@ pub mod pool;
 pub mod power_mgmt;
 pub mod power_task;
 pub mod secp;
+pub mod services;
 pub mod stack_monitor;
 pub mod suffix;
 pub mod system;

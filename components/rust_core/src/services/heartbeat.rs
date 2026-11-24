@@ -120,7 +120,7 @@ static SCHEDULE: Mutex<Schedule> = Mutex::new(Schedule {
 
 /// Every tick of the system task: queues the message when it is due.
 pub fn tick(now_us: i64) {
-    let c = crate::alerts::config();
+    let c = crate::services::alerts::config();
     let hours = if c.webhook.is_empty() {
         0
     } else {
@@ -133,7 +133,7 @@ pub fn tick(now_us: i64) {
     {
         return;
     }
-    if !crate::alerts::enqueue_plain(&message(&values(now_us))) {
+    if !crate::services::alerts::enqueue_plain(&message(&values(now_us))) {
         log!(Warn, TAG, "alert queue full, metrics message dropped");
     }
 }

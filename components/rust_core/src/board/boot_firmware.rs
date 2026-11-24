@@ -463,7 +463,7 @@ impl Hooks for Firmware {
     }
 
     fn discord_start(&mut self) {
-        crate::discord::start()
+        crate::services::discord::start()
     }
 
     fn otp_init(&mut self) {
@@ -480,7 +480,7 @@ impl Hooks for Firmware {
     }
 
     fn discord_watchdog_alert(&mut self) {
-        crate::discord::api::discord_send_watchdog();
+        crate::services::discord::api::discord_send_watchdog();
     }
 
     fn start_mining_tasks(&mut self) {
@@ -488,7 +488,12 @@ impl Hooks for Firmware {
         task(t::create_jobs_task, c"stratum miner", 8192, 10);
         task(t::ASIC_result_task, c"asic result", 8192, 15);
         task(t::influx_task, c"influx", 8192, 1);
-        task(crate::apis_fetcher::api::apis_task, c"apis ticker", 8192, 5);
+        task(
+            crate::services::apis_fetcher::api::apis_task,
+            c"apis ticker",
+            8192,
+            5,
+        );
         task(
             crate::net::wifi_health::api::wifi_monitor_task,
             c"wifi monitor",

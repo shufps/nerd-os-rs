@@ -416,14 +416,14 @@ impl Driver {
             State::Portal => {}
             State::Mining => {
                 if !self.led_control(b1, b2) && b1 {
-                    crate::apis_fetcher::enable_fetching();
+                    crate::services::apis_fetcher::enable_fetching();
                     self.enter(State::Settings, now);
                 }
             }
             State::Settings => {
                 if !self.led_control(b1, b2) && b1 {
                     self.enter(State::Btc, now);
-                    crate::apis_fetcher::enable_fetching();
+                    crate::services::apis_fetcher::enable_fetching();
                 }
             }
             State::Btc => {

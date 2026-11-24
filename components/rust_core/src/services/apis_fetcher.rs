@@ -3,7 +3,7 @@
 //! display, from the configured mempool instance (default
 //! `CONFIG_MEMPOOL_URL`). One fetch at start; while the display shows the
 //! page (fetching enabled), every 60 s. The responses are parsed by
-//! `apis.rs`.
+//! `services/apis.rs`.
 //!
 //! Behaviour notes: chunked response bodies are read too (custom mempool
 //! instances behind a proxy that chunks); enabling while a fetch runs is not
@@ -13,12 +13,12 @@
 use core::ffi::{c_int, c_void, CStr};
 use std::sync::{Condvar, Mutex};
 
-use crate::apis::{parse, Api, Values};
 use crate::config;
 use crate::config::sdkconfig;
 use crate::idf::http_client::{Client, Event, EVENT_DISCONNECTED, EVENT_ERROR, EVENT_ON_DATA};
 use crate::idf::{nvs::err_name, ESP_OK};
 use crate::log::log;
+use crate::services::apis::{parse, Api, Values};
 
 const TAG: &CStr = c"APIsFetcher";
 const BUFFER_SIZE: usize = 1024;

@@ -2,16 +2,16 @@
 //! the alert settings with their Kconfig defaults, the device's address,
 //! the sender task (8 KB stack in PSRAM, priority 5) and the HTTPS POST
 //! (5 s timeout, the certificate bundle). Texts, queue and sender loop are
-//! in `alerts.rs`.
+//! in `services/alerts.rs`.
 
 use core::ffi::{c_int, c_void, CStr};
 
-use crate::alerts;
 use crate::config;
 use crate::config::sdkconfig;
 use crate::idf::http_client::{Client, METHOD_POST};
 use crate::idf::{nvs::err_name, task, ESP_OK};
 use crate::log::log;
+use crate::services::alerts;
 use crate::suffix::suffix_string;
 
 const TAG: &CStr = c"discord";
@@ -40,7 +40,8 @@ pub fn load_config() {
             sdkconfig::ALERT_DISCORD_BEST_DIFF_ENABLE_VALUE,
         ),
         coinbase_verify: on(b"alrt_disc_cb_en", 0),
-        heartbeat_hours: config::get_u16(b"alrt_hb_intv", 0).min(crate::heartbeat::MAX_HOURS),
+        heartbeat_hours: config::get_u16(b"alrt_hb_intv", 0)
+            .min(crate::services::heartbeat::MAX_HOURS),
     });
 }
 
@@ -109,7 +110,7 @@ fn diff_text(d: f64) -> String {
 
 pub(crate) mod api {
     use super::*;
-    use crate::alerts::kind;
+    use crate::services::alerts::kind;
 
     pub fn discord_send_test() -> bool {
         send(kind::TEST, "", "", 0, 0, 0, 0)

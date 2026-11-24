@@ -1094,7 +1094,7 @@ impl Manager {
         }
         if o.alert {
             let info = self.coinbase_info(pool);
-            crate::discord::api::discord_send_coinbase_verify_failed(
+            crate::services::discord::api::discord_send_coinbase_verify_failed(
                 pool,
                 info.result.user_value_satoshis,
                 info.result.total_value_satoshis,
@@ -1367,7 +1367,7 @@ impl Manager {
             return;
         }
         set_u64(b"bestdiff", ev.total_best);
-        crate::discord::api::discord_send_best_diff(diff, ev.network_difficulty);
+        crate::services::discord::api::discord_send_best_diff(diff, ev.network_difficulty);
     }
 
     pub fn check_found_block(&self, diff: f64, nbits: u32) {
@@ -1383,7 +1383,7 @@ impl Manager {
             crate::cutil::fixed(ev.network_difficulty, 6)
         );
         set_u64(b"totalblocks", ev.total_found_blocks as u64);
-        crate::discord::api::discord_send_block_found(diff, ev.network_difficulty);
+        crate::services::discord::api::discord_send_block_found(diff, ev.network_difficulty);
     }
 
     pub fn pool_host(&self, pool: c_int) -> CString {

@@ -1038,7 +1038,7 @@ impl Ui {
             .set_text_str(l, &text::efficiency(power, ghs));
         self.mining.power.set_text_str(l, &text::watts(power));
 
-        use crate::apis_fetcher as api;
+        use crate::services::apis_fetcher as api;
         let v = api::values();
         if btc_shown || self.btc_price == 0 {
             self.btc_price = v.price_usd;

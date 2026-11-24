@@ -389,7 +389,7 @@ pub fn run() -> ! {
             crate::idf::task::suspend_self();
         }
         crate::stack_monitor::tick(crate::cutil::now_us());
-        crate::heartbeat::tick(crate::cutil::now_us());
+        crate::services::heartbeat::tick(crate::cutil::now_us());
 
         if can_slave {
             // the CAN ID in the IP label, every tick (the negotiation may

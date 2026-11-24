@@ -235,23 +235,26 @@ impl Session {
         }
     }
 
-    fn emit_standard(&mut self, job: StandardJob) {
+    /// `clean`: the job starts a new block (activated by SetNewPrevHash), so
+    /// the older jobs are dropped; a job for the current block keeps them,
+    /// the pool still accepts their shares.
+    fn emit_standard(&mut self, job: StandardJob, clean: bool) {
         let pool_difficulty = self.pool_difficulty();
         self.events.push_back(Event::StandardJob {
             job,
             pool_difficulty,
-            clean: true,
+            clean,
         });
     }
 
-    fn emit_extended(&mut self, job: ExtendedJob) {
+    fn emit_extended(&mut self, job: ExtendedJob, clean: bool) {
         let pool_difficulty = self.pool_difficulty();
         let extranonce_size = self.extranonce_size;
         self.events.push_back(Event::ExtendedJob {
             job,
             extranonce_size,
             pool_difficulty,
-            clean: true,
+            clean,
         });
     }
 
@@ -278,7 +281,7 @@ impl Session {
                     ntime,
                     nbits: prev.nbits,
                 };
-                self.emit_standard(job);
+                self.emit_standard(job, false);
             }
             _ => {
                 self.pending_standard[j.job_id as usize % PENDING_JOBS] =
@@ -330,7 +333,7 @@ impl Session {
             (Some(prev), true) => {
                 job.prev_hash = prev.hash;
                 job.nbits = prev.nbits;
-                self.emit_extended(job);
+                self.emit_extended(job, false);
             }
             _ => {
                 let slot = job.job_id as usize % PENDING_JOBS;
@@ -373,6 +376,8 @@ impl Session {
         let first = self.prev.is_none();
         self.prev = Some(PrevHash { hash, ntime, nbits });
         let slot = job_id as usize % PENDING_JOBS;
+        // the first job emitted for the new block drops the old block's jobs
+        let mut clean = true;
 
         // Standard channel: the job this prevhash is for, and on the first
         // prevhash all others that were waiting.
@@ -386,13 +391,15 @@ impl Session {
         };
         if let Some(pending) = self.pending_standard[slot].filter(|&(id, _, _)| id == job_id) {
             self.pending_standard[slot] = None;
-            self.emit_standard(standard(pending));
+            self.emit_standard(standard(pending), clean);
+            clean = false;
         }
         if first {
             for i in 0..PENDING_JOBS {
                 if let Some(pending) = self.pending_standard[i].filter(|&(id, _, _)| id != job_id) {
                     self.pending_standard[i] = None;
-                    self.emit_standard(standard(pending));
+                    self.emit_standard(standard(pending), clean);
+                    clean = false;
                 }
             }
         }
@@ -409,7 +416,8 @@ impl Session {
             .is_some_and(|j| j.job_id == job_id)
         {
             let job = self.pending_extended[slot].take().unwrap();
-            self.emit_extended(activate(job));
+            self.emit_extended(activate(job), clean);
+            clean = false;
         }
         if first {
             for i in 0..PENDING_JOBS {
@@ -418,7 +426,8 @@ impl Session {
                     .is_some_and(|j| j.job_id != job_id)
                 {
                     let job = self.pending_extended[i].take().unwrap();
-                    self.emit_extended(activate(job));
+                    self.emit_extended(activate(job), clean);
+                    clean = false;
                 }
             }
         }
@@ -634,55 +643,100 @@ mod tests {
         s.handle(MSG_NEW_EXTENDED_MINING_JOB, &ext_job(2, None, true));
         assert!(events(&mut s).is_empty());
 
-        // The first prevhash activates the job it names and all others.
+        // The first prevhash activates the job it names and all others; only
+        // the first of them drops the older jobs.
         s.handle(MSG_SET_NEW_PREV_HASH, &prev_hash(2, 1000));
         let ev = events(&mut s);
-        let ids: Vec<u32> = ev
+        let ids: Vec<(u32, bool)> = ev
             .iter()
             .filter_map(|e| match e {
                 Event::ExtendedJob {
                     job,
                     extranonce_size: 8,
-                    clean: true,
+                    clean,
                     ..
                 } => {
                     assert_eq!(
                         (job.ntime, job.nbits, job.prev_hash),
                         (1000, 0x1703_4219, [0xcd; 32])
                     );
-                    Some(job.job_id)
+                    Some((job.job_id, *clean))
                 }
                 _ => None,
             })
             .collect();
-        assert_eq!(ids, [2, 1]);
+        assert_eq!(ids, [(2, true), (1, false)]);
         assert!(matches!(
             ev.first(),
             Some(Event::NetworkDifficulty(0x1703_4219))
         ));
         assert!(matches!(ev.last(), Some(Event::ValidNotify)));
 
-        // A current job after that is delivered right away.
+        // A current job after that is delivered right away and keeps the
+        // jobs of the same block (the pool still accepts their shares).
         s.handle(MSG_NEW_EXTENDED_MINING_JOB, &ext_job(3, Some(1001), true));
-        assert!(
-            matches!(&events(&mut s)[..], [Event::ExtendedJob { job, .. }] if job.ntime == 1001)
-        );
+        assert!(matches!(
+            &events(&mut s)[..],
+            [Event::ExtendedJob { job, clean: false, .. }] if job.ntime == 1001
+        ));
 
         // A later prevhash only activates its own job.
         s.handle(MSG_NEW_EXTENDED_MINING_JOB, &ext_job(4, None, true));
         s.handle(MSG_NEW_EXTENDED_MINING_JOB, &ext_job(5, None, true));
         s.handle(MSG_SET_NEW_PREV_HASH, &prev_hash(5, 1002));
-        let ids: Vec<u32> = events(&mut s)
+        let ids: Vec<(u32, bool)> = events(&mut s)
             .iter()
             .filter_map(|e| {
-                if let Event::ExtendedJob { job, .. } = e {
-                    Some(job.job_id)
+                if let Event::ExtendedJob { job, clean, .. } = e {
+                    Some((job.job_id, *clean))
                 } else {
                     None
                 }
             })
             .collect();
-        assert_eq!(ids, [5]);
+        // a new block: the old block's jobs are dropped
+        assert_eq!(ids, [(5, true)]);
+    }
+
+    fn std_job(job_id: u32, min_ntime: Option<u32>) -> Vec<u8> {
+        let mut m = Vec::new();
+        m.extend(7u32.to_le_bytes());
+        m.extend(job_id.to_le_bytes());
+        match min_ntime {
+            Some(t) => {
+                m.push(1);
+                m.extend(t.to_le_bytes());
+            }
+            None => m.push(0),
+        }
+        m.extend(0x2000_0000u32.to_le_bytes());
+        m.extend([0x11; 32]);
+        m
+    }
+
+    #[test]
+    fn standard_jobs_clean_only_on_a_new_block() {
+        let mut s = Session::new(false);
+        let jobs = |s: &mut Session| -> Vec<(u32, bool)> {
+            events(s)
+                .iter()
+                .filter_map(|e| match e {
+                    Event::StandardJob { job, clean, .. } => Some((job.job_id, *clean)),
+                    _ => None,
+                })
+                .collect()
+        };
+        s.handle(MSG_NEW_MINING_JOB, &std_job(1, None));
+        assert!(jobs(&mut s).is_empty());
+        s.handle(MSG_SET_NEW_PREV_HASH, &prev_hash(1, 1000));
+        assert_eq!(jobs(&mut s), [(1, true)]);
+        // the same block: the older jobs stay
+        s.handle(MSG_NEW_MINING_JOB, &std_job(2, Some(1001)));
+        assert_eq!(jobs(&mut s), [(2, false)]);
+        // a new block
+        s.handle(MSG_NEW_MINING_JOB, &std_job(3, None));
+        s.handle(MSG_SET_NEW_PREV_HASH, &prev_hash(3, 1002));
+        assert_eq!(jobs(&mut s), [(3, true)]);
     }
 
     #[test]

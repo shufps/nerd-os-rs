@@ -351,7 +351,7 @@ impl Hooks for Firmware {
     fn start_system_tasks(&mut self) {
         task(crate::system::api::system_task, c"SYSTEM_task", 6144, 3);
         task(
-            crate::power_mgmt::api::pm_task,
+            crate::power::mgmt::api::pm_task,
             c"power mangement",
             8192,
             10,
@@ -367,12 +367,12 @@ impl Hooks for Firmware {
     }
 
     fn init_asics(&mut self) {
-        crate::power_mgmt::lock();
+        crate::power::mgmt::lock();
         if !crate::board::api::board_init_asics() {
             let model = info_text(board_info().device_model);
             log!(Error, TAG, "error initializing board {model}");
         }
-        crate::power_mgmt::unlock();
+        crate::power::mgmt::unlock();
     }
 
     fn start_can_slave_tasks(&mut self) {
@@ -527,7 +527,7 @@ impl Hooks for Firmware {
     }
 
     fn is_shutdown(&mut self) -> bool {
-        crate::power_mgmt::is_shutdown()
+        crate::power::mgmt::is_shutdown()
     }
 
     fn suspend(&mut self) {

@@ -983,21 +983,21 @@ impl Ui {
     /// the global stats only while their screen is shown (and once at the
     /// start).
     pub(crate) fn update(&mut self, l: &Lvgl, pool: c_int, btc_shown: bool, global_shown: bool) {
-        use crate::power_mgmt;
-        let temp = text::degrees(power_mgmt::get(3));
+        use crate::power::mgmt;
+        let temp = text::degrees(mgmt::get(3));
         self.mining.temp.set_text_str(l, &temp);
         self.btc.temp.set_text_str(l, &temp);
         self.mining
             .rpm
-            .set_text_str(l, &power_mgmt::fan_get(0, 0).to_string());
-        let power = power_mgmt::get(0);
+            .set_text_str(l, &mgmt::fan_get(0, 0).to_string());
+        let power = mgmt::get(0);
         self.mining.power.set_text_str(l, &text::watts(power));
         self.mining
             .current
-            .set_text_str(l, &format!("{}mA", power_mgmt::get(2) as i32));
+            .set_text_str(l, &format!("{}mA", mgmt::get(2) as i32));
         self.mining
             .vinput
-            .set_text_str(l, &format!("{}mV", power_mgmt::get(1) as i32));
+            .set_text_str(l, &format!("{}mV", mgmt::get(1) as i32));
 
         let up = (crate::cutil::now_us() - crate::system::start_us()) / 1_000_000;
         self.mining.time.set_text_str(l, &text::uptime(up));

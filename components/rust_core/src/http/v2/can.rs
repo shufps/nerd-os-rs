@@ -15,7 +15,7 @@ use crate::http::settings::{field, uint, Out, Setting, Setting as S, Write, NULL
 use crate::idf::httpd::{self, err, Request};
 use crate::idf::{EspErr, ESP_FAIL, ESP_OK};
 use crate::log::log;
-use crate::power_mgmt;
+use crate::power::mgmt;
 
 idf_const!(CAP_INTERNAL: u32 = MALLOC_CAP_INTERNAL, 1 << 11);
 
@@ -50,8 +50,8 @@ pub fn nodes(req: &mut Request) -> EspErr {
 
     let mut fans: [FanInfo; 2] = Default::default();
     for (ch, f) in fans.iter_mut().enumerate() {
-        f.rpm = power_mgmt::fan_get(ch as c_int, 0);
-        f.speed_perc = power_mgmt::fan_get(ch as c_int, 1);
+        f.rpm = mgmt::fan_get(ch as c_int, 0);
+        f.speed_perc = mgmt::fan_get(ch as c_int, 1);
         if (ch as c_int) < b.num_fans {
             f.mode = b.fan_mode[ch];
             f.manual_speed = crate::config::cfg::fan_manual_speed(ch);
@@ -63,12 +63,12 @@ pub fn nodes(req: &mut Request) -> EspErr {
         mac: Some(crate::net::network::mac_addr().into()),
         device_model: Some(b.device_model.into()),
         version: Some(version),
-        shutdown: power_mgmt::is_shutdown(),
+        shutdown: mgmt::is_shutdown(),
         hashrate: crate::system::current_hashrate(),
-        power: power_mgmt::get(0),
-        temp: power_mgmt::get(3),
-        vr_temp: power_mgmt::get(4),
-        current: power_mgmt::get(2),
+        power: mgmt::get(0),
+        temp: mgmt::get(3),
+        vr_temp: mgmt::get(4),
+        current: mgmt::get(2),
         vout: crate::board::api::board_power_value(3),
         board_error: crate::system::error().0,
         free_heap_int: crate::idf::task::free_heap(CAP_INTERNAL) as c_int,

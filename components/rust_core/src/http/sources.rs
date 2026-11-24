@@ -66,7 +66,7 @@ pub(crate) fn fan_settings(b: &BoardInfo, ch: usize) -> FanInfo {
 /// Reloads what a settings change touches: board, fans, display, pools.
 pub(crate) fn reload_settings() {
     crate::board::api::board_load_settings();
-    crate::power_mgmt::fan_load_settings();
+    crate::power::mgmt::fan_load_settings();
     crate::display::load_settings();
     crate::pool::manager::api::pool_mgr_load_settings();
 }

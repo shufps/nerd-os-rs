@@ -535,7 +535,7 @@ struct Ctx {
 
 impl crate::pool::stratum_task::Hooks for Ctx {
     fn suspend_if_shutdown(&mut self) {
-        if crate::power_mgmt::is_shutdown() {
+        if crate::power::mgmt::is_shutdown() {
             log!(Warn, self.t.tag, "suspended");
             suspend_self();
         }
@@ -703,7 +703,7 @@ struct V1Loop<'a> {
 
 impl v1::Hooks for V1Loop<'_> {
     fn stop_requested(&mut self) -> bool {
-        self.t.stop.load(Acquire) || crate::power_mgmt::is_shutdown()
+        self.t.stop.load(Acquire) || crate::power::mgmt::is_shutdown()
     }
     fn reconnect_requested(&mut self) -> bool {
         self.t.reconnect.load(Acquire)
@@ -750,7 +750,7 @@ struct V2Loop<'a> {
 impl v2::Hooks for V2Loop<'_> {
     fn exit_requested(&mut self) -> bool {
         let t = self.c.t;
-        t.stop.load(Acquire) || t.reconnect.load(Acquire) || crate::power_mgmt::is_shutdown()
+        t.stop.load(Acquire) || t.reconnect.load(Acquire) || crate::power::mgmt::is_shutdown()
     }
     fn connected(&mut self) {
         let c = self.c;
@@ -1508,7 +1508,7 @@ impl Manager {
 
         let mut seconds = 0u32;
         loop {
-            if crate::power_mgmt::is_shutdown() {
+            if crate::power::mgmt::is_shutdown() {
                 // SAFETY: a null handle unsubscribes the calling task
                 if unsafe { sys::esp_task_wdt_delete(core::ptr::null_mut()) } != 0 {
                     log!(Error, TAG, "Couldn't remove watchdog");
@@ -1562,7 +1562,7 @@ struct PingEnv {
 
 impl crate::net::ping::Env for PingEnv {
     fn shutdown(&mut self) -> bool {
-        crate::power_mgmt::is_shutdown()
+        crate::power::mgmt::is_shutdown()
     }
     fn suspend(&mut self) {
         log!(Warn, self.tag, "suspended");

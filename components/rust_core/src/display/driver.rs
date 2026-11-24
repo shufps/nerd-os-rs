@@ -813,15 +813,15 @@ unsafe extern "C" fn task(_: *mut c_void) {
         let sleep = with(Driver::tick);
         crate::idf::task::delay_ms(sleep);
 
-        if crate::power_mgmt::is_shutdown() {
+        if crate::power::mgmt::is_shutdown() {
             if with(|d| d.enter(State::PowerOff, now)) {
-                crate::power_mgmt::shutdown();
+                crate::power::mgmt::shutdown();
             }
             crate::idf::task::delay_ms(sleep);
             continue;
         }
         if with(|d| d.step(now)) {
-            crate::power_mgmt::shutdown();
+            crate::power::mgmt::shutdown();
         }
     }
 }

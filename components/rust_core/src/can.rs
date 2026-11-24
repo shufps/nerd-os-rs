@@ -457,7 +457,7 @@ fn master_loop() -> ! {
 /// The live telemetry (`can_slave_telemetry_t`, 49 bytes, offsets as read
 /// by `can_master.rs`).
 fn telemetry() -> [u8; can_master::TELEMETRY_LEN] {
-    use crate::power_mgmt::{fan_get, get as pm};
+    use crate::power::mgmt::{fan_get, get as pm};
     let mut t = [0u8; can_master::TELEMETRY_LEN];
     let mut put = |at: usize, b: &[u8]| t[at..at + b.len()].copy_from_slice(b);
     put(0, &[TELEMETRY_VERSION]);
@@ -481,7 +481,7 @@ fn telemetry() -> [u8; can_master::TELEMETRY_LEN] {
     put(
         43,
         &[
-            crate::power_mgmt::is_shutdown() as u8,
+            crate::power::mgmt::is_shutdown() as u8,
             crate::system::error().0 as u8,
         ],
     );
@@ -564,7 +564,7 @@ fn handle_settings_cmd(p: &[u8]) {
             set_u16(k(b"fanspeed", b"fan1speed"), speed as u16);
             set_u16(k(b"pid_temp", b"fan1_pid_temp"), target as u16);
             set_u16(k(b"overheat_temp", b"fan1_overheat"), overheat as u16);
-            crate::power_mgmt::fan_load_settings();
+            crate::power::mgmt::fan_load_settings();
             log!(
                 Info,
                 TAG_SLAVE,
@@ -589,7 +589,7 @@ fn handle_settings_cmd(p: &[u8]) {
         CMD_GET_CONFIG => send_config = true,
         CMD_SHUTDOWN => {
             log!(Warn, TAG_SLAVE, "CMD SHUTDOWN → shutting down");
-            crate::power_mgmt::shutdown();
+            crate::power::mgmt::shutdown();
         }
         CMD_IDENTIFY => {
             log!(Info, TAG_SLAVE, "CMD IDENTIFY → blink display 60s");

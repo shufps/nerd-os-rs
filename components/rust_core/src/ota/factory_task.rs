@@ -21,7 +21,7 @@ use crate::idf::httpd::{self, err, Request};
 use crate::idf::{EspErr, ESP_FAIL, ESP_OK};
 use crate::log::log;
 use crate::ota::factory::{redirect, updater, Redirect, Step, FW_LEN, MAX_REDIRECTS, WWW_LEN};
-use crate::power_mgmt;
+use crate::power::mgmt;
 
 const TAG: &CStr = c"http_ota";
 const FW_START: usize = 0x10000;
@@ -361,14 +361,14 @@ struct PmLock;
 
 impl PmLock {
     fn new() -> PmLock {
-        power_mgmt::lock();
+        mgmt::lock();
         PmLock
     }
 }
 
 impl Drop for PmLock {
     fn drop(&mut self) {
-        power_mgmt::unlock();
+        mgmt::unlock();
     }
 }
 
@@ -439,7 +439,7 @@ fn update(start_url: &[u8], keep_config: bool) -> EspErr {
         let _g = PmLock::new();
         // the regulator off: the PID cannot run during the flash writes
         // (I2C), and the device restarts afterwards anyway
-        power_mgmt::shutdown();
+        mgmt::shutdown();
         log!(Info, TAG, "performing firmware update ...");
         set_step(Step::UpdatingFw, "OTA: updating firmware");
         let e = firmware_update(&c);
@@ -449,7 +449,7 @@ fn update(start_url: &[u8], keep_config: bool) -> EspErr {
             // the boot partition is unchanged: restart into the running
             // firmware
             delay_ms(3000);
-            power_mgmt::restart();
+            mgmt::restart();
         }
         log!(Info, TAG, "firmware update successful!");
 
@@ -458,7 +458,7 @@ fn update(start_url: &[u8], keep_config: bool) -> EspErr {
         for chunk in www.chunks_mut(CHUNK) {
             if read_exact(&c, chunk) != ESP_OK {
                 log!(Error, TAG, "error reading www binary");
-                power_mgmt::restart();
+                mgmt::restart();
             }
             updater().add(2, CHUNK as u32);
         }
@@ -468,7 +468,7 @@ fn update(start_url: &[u8], keep_config: bool) -> EspErr {
         if www_update(&www) != ESP_OK {
             log!(Error, TAG, "www update failed");
             // the new firmware is active already: restart
-            power_mgmt::restart();
+            mgmt::restart();
         }
         log!(Info, TAG, "www update successful!");
 
@@ -492,7 +492,7 @@ fn update(start_url: &[u8], keep_config: bool) -> EspErr {
     set_step(Step::Rebooting, "OTA: done, rebooting");
     // the web UI sees this state
     delay_ms(3000);
-    power_mgmt::restart()
+    mgmt::restart()
 }
 
 unsafe extern "C" fn task(_: *mut c_void) {

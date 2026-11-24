@@ -19,7 +19,7 @@ use crate::idf::httpd::Request;
 use crate::idf::{EspErr, ESP_FAIL, ESP_OK};
 use crate::log::log;
 use crate::mining::history::api::{history_current, history_current_timestamp};
-use crate::power_mgmt;
+use crate::power::mgmt;
 
 pub(crate) fn restart(req: &mut Request) -> EspErr {
     log!(
@@ -30,7 +30,7 @@ pub(crate) fn restart(req: &mut Request) -> EspErr {
     send_str(req, c"System will restart shortly.");
     // let the response go out
     crate::idf::task::delay_ms(1000);
-    crate::power_mgmt::restart()
+    crate::power::mgmt::restart()
 }
 
 pub(crate) fn shutdown(req: &mut Request) -> EspErr {
@@ -41,7 +41,7 @@ pub(crate) fn shutdown(req: &mut Request) -> EspErr {
     );
     send_str(req, c"System will shutdown shortly.");
     crate::idf::task::delay_ms(1000);
-    crate::power_mgmt::shutdown();
+    crate::power::mgmt::shutdown();
     ESP_OK
 }
 
@@ -87,19 +87,19 @@ pub(crate) fn info(req: &mut Request) -> EspErr {
     s.mac_addr = Some(crate::net::network::mac_addr().into());
     s.wifi_rssi = crate::net::network::wifi_rssi();
 
-    s.power = power_mgmt::get(0);
+    s.power = mgmt::get(0);
     s.max_power = b.max_pin;
     s.min_power = b.min_pin;
     s.max_voltage = b.max_vin;
     s.min_voltage = b.min_vin;
-    s.current = power_mgmt::get(2);
+    s.current = mgmt::get(2);
     s.min_current_a = b.min_current_a;
     s.max_current_a = b.max_current_a;
-    s.temp = power_mgmt::get(3);
-    s.vr_temp = power_mgmt::get(4);
-    s.vr_temp_int = power_mgmt::get(5);
+    s.temp = mgmt::get(3);
+    s.vr_temp = mgmt::get(4);
+    s.vr_temp_int = mgmt::get(5);
     s.hashrate_timestamp = history_current_timestamp();
-    s.shutdown = power_mgmt::is_shutdown();
+    s.shutdown = mgmt::is_shutdown();
     s.hashrate = crate::system::current_hashrate();
     s.hashrate_1m = history_current(0);
     s.hashrate_10m = history_current(1);
@@ -115,8 +115,8 @@ pub(crate) fn info(req: &mut Request) -> EspErr {
         if (ch as c_int) < s.fan_count {
             f = fan_settings(&b, ch);
         }
-        f.rpm = power_mgmt::fan_get(ch as c_int, 0);
-        f.speed_perc = power_mgmt::fan_get(ch as c_int, 1);
+        f.rpm = mgmt::fan_get(ch as c_int, 0);
+        f.speed_perc = mgmt::fan_get(ch as c_int, 1);
         s.fans[ch] = f;
     }
     s.fans[0].mode = b.fan_mode[0];
@@ -172,7 +172,7 @@ pub(crate) fn info(req: &mut Request) -> EspErr {
     s.fallback_sv2_authority_pubkey = Some(fallback_sv2);
     s.sv2_channel_type = cfg::sv2_channel_type(0);
     s.fallback_sv2_channel_type = cfg::sv2_channel_type(1);
-    s.voltage = power_mgmt::get(1);
+    s.voltage = mgmt::get(1);
     s.frequency = b.asic_frequency;
     s.default_frequency = b.default_frequency;
     s.job_interval = b.job_interval_ms;

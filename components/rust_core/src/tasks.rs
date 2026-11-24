@@ -22,7 +22,7 @@ use crate::services::influx::{Inputs, Method, Response};
 const RESPONSE_MAX: usize = 32768;
 
 fn suspend_if_shutdown(tag: &CStr) {
-    if crate::power_mgmt::is_shutdown() {
+    if crate::power::mgmt::is_shutdown() {
         log!(Warn, tag, "suspended");
         crate::idf::task::suspend_self();
     }

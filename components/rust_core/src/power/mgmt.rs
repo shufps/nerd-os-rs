@@ -1,8 +1,8 @@
 //! The power management (port of `main/tasks/power_management_task.cpp` and
 //! `main/fan_controller.cpp`): the hardware lock (a FreeRTOS recursive
 //! mutex shared by everything that touches the ASICs and the I2C devices),
-//! shutdown and restart, the task that runs the power loop (`power_task.rs`)
-//! with the fan control (`fan_control.rs`) on the board (`board/board_api.rs`), and
+//! shutdown and restart, the task that runs the power loop (`power/task.rs`)
+//! with the fan control (`power/fan_control.rs`) on the board (`board/board_api.rs`), and
 //! the values the other tasks read.
 
 use core::ffi::{c_int, c_void, CStr};
@@ -11,9 +11,9 @@ use std::sync::OnceLock;
 
 use crate::config;
 use crate::config::sdkconfig;
-use crate::fan_control::{ChannelConfig, FanController, Fans, MAX_FANS};
 use crate::log::log;
-use crate::power_task::{Env, PowerTask, POLL_MS};
+use crate::power::fan_control::{ChannelConfig, FanController, Fans, MAX_FANS};
+use crate::power::task::{Env, PowerTask, POLL_MS};
 
 const TAG: &CStr = c"power_management";
 

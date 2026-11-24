@@ -154,7 +154,7 @@ pub(crate) mod api {
         std::thread::sleep(PERIOD);
         reset_stats();
         loop {
-            if crate::power_mgmt::is_shutdown() {
+            if crate::power::mgmt::is_shutdown() {
                 log!(Warn, TAG, "suspended");
                 crate::idf::task::suspend_self();
             }

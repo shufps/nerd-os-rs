@@ -14,7 +14,7 @@ use crate::http::ota::{receive_upload, UploadError, UploadIo};
 use crate::idf::httpd::{self, err, Request};
 use crate::idf::{EspErr, ESP_FAIL, ESP_OK};
 use crate::log::log;
-use crate::power_mgmt;
+use crate::power::mgmt;
 
 const TAG: &CStr = c"http_ota";
 /// the receive buffer (internal RAM: flash writes)
@@ -116,14 +116,14 @@ struct PmLock;
 
 impl PmLock {
     fn new() -> PmLock {
-        power_mgmt::lock();
+        mgmt::lock();
         PmLock
     }
 }
 
 impl Drop for PmLock {
     fn drop(&mut self) {
-        power_mgmt::unlock();
+        mgmt::unlock();
     }
 }
 
@@ -188,7 +188,7 @@ fn upload_error(req: &mut Request, e: UploadError) -> EspErr {
 /// The restart after a firmware upload (with or without success).
 fn restart_soon() -> ! {
     crate::idf::task::delay_ms(1000);
-    power_mgmt::restart()
+    mgmt::restart()
 }
 
 /// `POST /api/system/OTAWWW`
@@ -275,7 +275,7 @@ pub fn firmware_update(req: &mut Request) -> EspErr {
     let _g = PmLock::new();
     // the regulator off: the PID cannot run during the flash writes (I2C),
     // and the device restarts afterwards anyway
-    power_mgmt::shutdown();
+    mgmt::shutdown();
 
     let mut handle = 0u32;
     // SAFETY: a partition entry; `handle` writable

@@ -1,10 +1,10 @@
-//! Golden tests of the fan control (rust_core::fan_control): the fan
+//! Golden tests of the fan control (rust_core::power::fan_control): the fan
 //! accesses (bit-exact duty fractions), speeds, RPMs and overheat flags
 //! over long random temperature sequences, with settings reloads in
 //! between, against the outputs of the former FanController and PID library
 //! (tests/golden/fan_control.txt, recorded by the differential tests).
 
-use rust_core::fan_control::{ChannelConfig, FanController, Fans};
+use rust_core::power::fan_control::{ChannelConfig, FanController, Fans};
 
 mod golden;
 use golden::Rec;

@@ -140,7 +140,7 @@ pub fn tick(now_us: i64) {
 
 #[cfg(target_os = "espidf")]
 fn values(now_us: i64) -> Values {
-    use crate::power_mgmt::get;
+    use crate::power::mgmt::get;
     let s = crate::pool::manager::get()
         .map(|m| m.summary())
         .unwrap_or_default();

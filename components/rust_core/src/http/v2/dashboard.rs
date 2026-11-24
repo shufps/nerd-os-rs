@@ -15,7 +15,7 @@ use crate::http::sources::{
 use crate::idf::httpd::Request;
 use crate::idf::EspErr;
 use crate::mining::history::api::{history_current, history_current_timestamp};
-use crate::power_mgmt;
+use crate::power::mgmt;
 
 /// One pool's coinbase data of the dashboard.
 #[derive(Clone, Debug, Default)]
@@ -252,7 +252,7 @@ pub(crate) fn get(req: &mut Request) -> EspErr {
 
     let mut d = Dashboard::default();
     d.uptime_seconds = uptime_seconds();
-    d.shutdown = power_mgmt::is_shutdown();
+    d.shutdown = mgmt::is_shutdown();
     d.board_error = crate::system::error().0;
     d.overheat_temp = cfg::overheat_temp();
     d.vr_overheat_temp = cfg::fan_overheat_temp(1);
@@ -283,24 +283,24 @@ pub(crate) fn get(req: &mut Request) -> EspErr {
             .push(crate::board::board_core::CHIP_TEMPS.get(i));
     }
 
-    d.watts = power_mgmt::get(0);
+    d.watts = mgmt::get(0);
     d.min_power = b.min_pin;
     d.max_power = b.max_pin;
-    d.voltage = power_mgmt::get(1);
+    d.voltage = mgmt::get(1);
     d.min_voltage = b.min_vin;
     d.max_voltage = b.max_vin;
-    d.current = power_mgmt::get(2);
+    d.current = mgmt::get(2);
     d.min_current_a = b.min_current_a;
     d.max_current_a = b.max_current_a;
     d.vout = crate::board::api::board_power_value(3);
 
-    d.asic_temp = power_mgmt::get(3);
-    d.vr_temp = power_mgmt::get(4);
-    d.vr_temp_int = power_mgmt::get(5);
+    d.asic_temp = mgmt::get(3);
+    d.vr_temp = mgmt::get(4);
+    d.vr_temp_int = mgmt::get(5);
     d.fan_count = b.num_fans;
     for ch in 0..2.min(d.fan_count.max(0) as usize) {
-        d.fan_speed[ch] = power_mgmt::fan_get(ch as c_int, 1);
-        d.fan_rpm[ch] = power_mgmt::fan_get(ch as c_int, 0);
+        d.fan_speed[ch] = mgmt::fan_get(ch as c_int, 1);
+        d.fan_rpm[ch] = mgmt::fan_get(ch as c_int, 0);
     }
 
     d.manager = pool_manager_info();

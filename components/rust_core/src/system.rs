@@ -384,7 +384,7 @@ pub fn run() -> ! {
         }
         std::thread::sleep(Duration::from_micros((next - now) as u64));
 
-        if crate::power_mgmt::is_shutdown() {
+        if crate::power::mgmt::is_shutdown() {
             log!(Warn, TAG, "suspended");
             crate::idf::task::suspend_self();
         }
@@ -435,7 +435,7 @@ pub fn run() -> ! {
 
         // a history sample with the filtered temperatures
         let timestamp_ms = (crate::cutil::now_us() / 1000) as u64;
-        let (vreg, asic) = filters.push(crate::power_mgmt::get(4), crate::power_mgmt::get(3));
+        let (vreg, asic) = filters.push(crate::power::mgmt::get(4), crate::power::mgmt::get(3));
         crate::mining::history::api::history_push(
             crate::mining::hashrate::api::hashrate_monitor_total(),
             vreg,

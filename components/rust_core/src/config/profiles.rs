@@ -287,7 +287,7 @@ pub fn ensure_default(current: impl FnOnce() -> Json) {
                 if nvs::write(&serialize(&list)) {
                     log!(Info, TAG, "profile \"default\" created");
                     config::set(ACTIVE_KEY, Json::Num(Num::U(0)));
-                    crate::config_nvs::request_flush();
+                    crate::config::nvs::request_flush();
                 }
                 list
             }
@@ -371,7 +371,7 @@ pub fn store(new: Vec<Profile>) -> bool {
         if config::has(ACTIVE_KEY) {
             let v = active.map_or(NONE, |i| i as u16);
             config::set(ACTIVE_KEY, Json::Num(Num::U(v as u64)));
-            crate::config_nvs::request_flush();
+            crate::config::nvs::request_flush();
         }
         *l = new;
         true
@@ -380,12 +380,12 @@ pub fn store(new: Vec<Profile>) -> bool {
 
 /// Applies profile `id` to the config (the caller persists and reloads);
 /// its name, or None if there is no such profile.
-pub fn apply(id: usize, s: &mut impl crate::settings_apply::Store) -> Option<Vec<u8>> {
+pub fn apply(id: usize, s: &mut impl crate::config::settings_apply::Store) -> Option<Vec<u8>> {
     let p = with(|l| l.get(id).cloned())?;
-    let mut applied = crate::settings_apply::Applied::default();
-    let pid_use_max = crate::settings_apply::pid_use_max_board();
+    let mut applied = crate::config::settings_apply::Applied::default();
+    let pid_use_max = crate::config::settings_apply::pid_use_max_board();
     for w in crate::http::v2::settings::settings_v2(&p.settings) {
-        crate::settings_apply::apply(&w, &mut applied, pid_use_max, s);
+        crate::config::settings_apply::apply(&w, &mut applied, pid_use_max, s);
     }
     s.set_u16(ACTIVE_KEY, id as u16);
     log!(
@@ -457,10 +457,10 @@ pub mod http {
         let Some(id) = parse_apply(&b, count) else {
             return send_err(req, err::E400_BAD_REQUEST, c"Unknown profile id");
         };
-        let Some(name) = super::apply(id, &mut crate::settings_apply::Config) else {
+        let Some(name) = super::apply(id, &mut crate::config::settings_apply::Config) else {
             return send_err(req, err::E400_BAD_REQUEST, c"Unknown profile id");
         };
-        crate::config_nvs::request_flush();
+        crate::config::nvs::request_flush();
         let r = send_doc(
             req,
             Json::Obj(vec![
@@ -628,7 +628,7 @@ mod tests {
     #[derive(Default)]
     struct Rec(Vec<String>);
 
-    impl crate::settings_apply::Store for Rec {
+    impl crate::config::settings_apply::Store for Rec {
         fn set_u16(&mut self, key: &[u8], v: u16) {
             self.0.push(format!("{}={v}", String::from_utf8_lossy(key)));
         }

@@ -1,5 +1,5 @@
 //! Settings request bodies of the HTTP API: the typed writes
-//! (`settings_apply.rs` applies them to the config) and the field readers
+//! (`config/settings_apply.rs` applies them to the config) and the field readers
 //! shared by the parsers next to the handlers in `v1/` and `v2/`.
 //!
 //! The JSON is read with ArduinoJson's rules ([`crate::ajson`]), and
@@ -112,8 +112,9 @@ pub(crate) fn uint(v: &Json, max: u64) -> Option<u32> {
 
 /// The auto screen off time: 5 s to 1 h, else ignored.
 pub(crate) fn screen_off_secs(v: &Json) -> Option<u32> {
-    uint(v, 0xffff)
-        .filter(|s| (crate::cfg::SCREEN_OFF_MIN_S..=crate::cfg::SCREEN_OFF_MAX_S).contains(s))
+    uint(v, 0xffff).filter(|s| {
+        (crate::config::cfg::SCREEN_OFF_MIN_S..=crate::config::cfg::SCREEN_OFF_MAX_S).contains(s)
+    })
 }
 
 pub(crate) fn boolean(v: &Json) -> Option<bool> {

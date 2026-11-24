@@ -6,7 +6,7 @@ use core::ffi::c_int;
 use std::ffi::CString;
 
 use crate::ajson::Json;
-use crate::cfg;
+use crate::config::cfg;
 use crate::http::json::*;
 use crate::http::reply::{send_doc, set_json};
 use crate::http::settings::num_f32;
@@ -299,7 +299,7 @@ pub(crate) fn v2_settings_doc() -> crate::ajson::Json {
         v.fans[ch] = fan_settings(&b, ch);
     }
     v.invert_fan_polarity = b.fan_invert;
-    if crate::settings_apply::pid_use_max_board() {
+    if crate::config::settings_apply::pid_use_max_board() {
         v.has_pid_use_max = true;
         v.pid_use_max = cfg::fan_pid_use_max();
     }
@@ -342,7 +342,7 @@ pub(crate) fn patch(req: &mut Request) -> EspErr {
         }
     }
 
-    crate::config_nvs::request_flush();
+    crate::config::nvs::request_flush();
     req.end_chunks();
     reload_settings();
     ESP_OK

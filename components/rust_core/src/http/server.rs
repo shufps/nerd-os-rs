@@ -48,7 +48,7 @@ fn server() -> httpd::Handle {
 }
 
 /// core dumps in flash: the download route exists
-const COREDUMP: bool = crate::sdkconfig::ESP_COREDUMP_ENABLE_TO_FLASH;
+const COREDUMP: bool = crate::config::sdkconfig::ESP_COREDUMP_ENABLE_TO_FLASH;
 
 /// A route as registered: its entry, the handler, the handler's
 /// `user_ctx` (the server context or NULL).
@@ -331,9 +331,15 @@ unsafe fn register_routes() {
                 Handler::Screenshot => Some(crate::display::shot::handler as httpd::HandlerFn),
                 #[cfg(feature = "screenshot")]
                 Handler::Press => Some(crate::display::shot::press as httpd::HandlerFn),
-                Handler::ProfilesGet => Some(crate::profiles::http::get as httpd::HandlerFn),
-                Handler::ProfilesPatch => Some(crate::profiles::http::patch as httpd::HandlerFn),
-                Handler::ProfileApply => Some(crate::profiles::http::apply as httpd::HandlerFn),
+                Handler::ProfilesGet => {
+                    Some(crate::config::profiles::http::get as httpd::HandlerFn)
+                }
+                Handler::ProfilesPatch => {
+                    Some(crate::config::profiles::http::patch as httpd::HandlerFn)
+                }
+                Handler::ProfileApply => {
+                    Some(crate::config::profiles::http::apply as httpd::HandlerFn)
+                }
                 Handler::OtaGithubPost => {
                     Some(crate::ota_factory_task::post_handler as httpd::HandlerFn)
                 }

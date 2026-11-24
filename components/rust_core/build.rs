@@ -1,4 +1,4 @@
-//! The Kconfig values as Rust constants (`src/sdkconfig.rs`): from the
+//! The Kconfig values as Rust constants (`config/sdkconfig.rs`): from the
 //! project's sdkconfig in the firmware build (RUST_CORE_SDKCONFIG, set by
 //! CMakeLists.txt), from sdkconfig.defaults on the host.
 //!

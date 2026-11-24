@@ -1090,7 +1090,7 @@ impl Ui {
         s.vcore.set_text_str(l, &b.asic_voltage_mv.to_string());
         s.fan.set_text_str(
             l,
-            &text::fan_setting(b.fan_mode[0], crate::cfg::fan_speed()),
+            &text::fan_setting(b.fan_mode[0], crate::config::cfg::fan_speed()),
         );
     }
 

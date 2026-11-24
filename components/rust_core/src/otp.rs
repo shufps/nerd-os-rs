@@ -78,7 +78,7 @@ fn fill_random(buf: &mut [u8]) {
 /// Asks the configuration to be written (`Config::flush()`).
 fn flush() {
     #[cfg(target_os = "espidf")]
-    crate::config_nvs::request_flush();
+    crate::config::nvs::request_flush();
 }
 
 impl Otp {

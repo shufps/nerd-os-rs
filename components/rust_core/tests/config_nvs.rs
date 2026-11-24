@@ -1,11 +1,11 @@
 //! Golden tests of the keys the configuration migration copies from the old
-//! individual NVS entries (rust_core::config_nvs): against the lists of the
+//! individual NVS entries (rust_core::config::nvs): against the lists of the
 //! former migrate_from_legacy() with nvs_config.h's names
 //! (tests/golden/config_nvs.txt, recorded by the differential tests).
 
 use std::ffi::CStr;
 
-use rust_core::config_nvs::{LEGACY_STR_KEYS, LEGACY_U16_KEYS, LEGACY_U64_KEYS};
+use rust_core::config::nvs::{LEGACY_STR_KEYS, LEGACY_U16_KEYS, LEGACY_U64_KEYS};
 
 mod golden;
 use golden::Rec;

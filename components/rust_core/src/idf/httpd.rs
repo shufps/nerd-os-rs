@@ -11,7 +11,7 @@ use super::EspErr;
 pub type Handle = *mut c_void;
 
 /// `CONFIG_HTTPD_MAX_URI_LEN`
-pub const MAX_URI_LEN: usize = crate::sdkconfig::HTTPD_MAX_URI_LEN as usize;
+pub const MAX_URI_LEN: usize = crate::config::sdkconfig::HTTPD_MAX_URI_LEN as usize;
 
 /// `http_method`, `httpd_err_code_t` (enums: `u32` in the bindings)
 pub type Method = u32;

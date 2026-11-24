@@ -7,7 +7,7 @@ use core::ffi::{c_int, CStr};
 use std::ffi::CString;
 
 use super::json::{self, AsicInfo, SystemInfo};
-use crate::cfg;
+use crate::config::cfg;
 use crate::http::json::FanInfo;
 use crate::http::ota::running_partition;
 use crate::http::reply::{send_doc, send_str, set_json};
@@ -253,7 +253,7 @@ pub(crate) fn patch(req: &mut Request) -> EspErr {
     if crate::http::reply::apply_pool_settings(req, true, dual, c"system").is_err() {
         return ESP_FAIL;
     }
-    crate::config_nvs::request_flush();
+    crate::config::nvs::request_flush();
     req.end_chunks();
     reload_settings();
     ESP_OK

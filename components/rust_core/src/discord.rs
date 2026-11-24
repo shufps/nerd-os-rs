@@ -8,10 +8,10 @@ use core::ffi::{c_int, c_void, CStr};
 
 use crate::alerts;
 use crate::config;
+use crate::config::sdkconfig;
 use crate::idf::http_client::{Client, METHOD_POST};
 use crate::idf::{nvs::err_name, task, ESP_OK};
 use crate::log::log;
-use crate::sdkconfig;
 use crate::suffix::suffix_string;
 
 const TAG: &CStr = c"discord";

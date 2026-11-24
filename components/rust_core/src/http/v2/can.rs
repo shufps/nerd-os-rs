@@ -54,8 +54,8 @@ pub fn nodes(req: &mut Request) -> EspErr {
         f.speed_perc = power_mgmt::fan_get(ch as c_int, 1);
         if (ch as c_int) < b.num_fans {
             f.mode = b.fan_mode[ch];
-            f.manual_speed = crate::cfg::fan_manual_speed(ch);
-            f.overheat_temp = crate::cfg::fan_overheat_temp(ch);
+            f.manual_speed = crate::config::cfg::fan_manual_speed(ch);
+            f.overheat_temp = crate::config::cfg::fan_overheat_temp(ch);
             f.target_temp = b.pid[ch].target_temp;
         }
     }
@@ -75,7 +75,7 @@ pub fn nodes(req: &mut Request) -> EspErr {
         frequency: b.asic_frequency,
         core_voltage: b.asic_voltage_mv,
         flip_screen: b.flip_screen,
-        auto_screen_off: crate::cfg::auto_screen_off(),
+        auto_screen_off: crate::config::cfg::auto_screen_off(),
         asic_temps: temps,
         fan_count: b.num_fans,
         fans,

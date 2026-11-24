@@ -20,11 +20,11 @@ use std::sync::atomic::{AtomicBool, AtomicI32, Ordering};
 use std::sync::{Mutex, RwLock};
 
 use crate::config;
+use crate::config::sdkconfig;
 use crate::log::log;
 use crate::pool::stratum_v2::connection::Readiness;
 use crate::pool::stratum_v2::noise::{self, EspWire, Receiver, Sender};
 use crate::pool::stratum_v2::protocol::{parse_frame_header, FrameHeader};
-use crate::sdkconfig;
 
 const TAG: &CStr = c"stratum_transport";
 const NOISE_TAG: &CStr = c"noise_transport";

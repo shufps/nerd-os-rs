@@ -44,7 +44,7 @@ impl Store for Config {
 /// Whether the board takes `fanPidUseMax` (the NerdAxe and NerdAxeGamma
 /// builds).
 pub fn pid_use_max_board() -> bool {
-    matches!(crate::sdkconfig::BOARD, "NERDAXE" | "NERDAXEGAMMA")
+    matches!(crate::config::sdkconfig::BOARD, "NERDAXE" | "NERDAXEGAMMA")
 }
 
 /// Applies one write; `pid_use_max`: the board takes `fanPidUseMax`.

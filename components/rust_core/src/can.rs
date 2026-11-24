@@ -513,12 +513,12 @@ fn slave_config() -> [u8; can_master::CONFIG_LEN] {
         };
         let at = 36 + 4 * ch;
         c[at] = b.fan_mode[ch] as u8;
-        c[at + 1] = crate::cfg::fan_manual_speed(ch) as u8;
+        c[at + 1] = crate::config::cfg::fan_manual_speed(ch) as u8;
         c[at + 2] = get_u16(target_key, b.pid[ch].target_temp) as u8;
-        c[at + 3] = crate::cfg::fan_overheat_temp(ch) as u8;
+        c[at + 3] = crate::config::cfg::fan_overheat_temp(ch) as u8;
     }
     c[44] = (get_u16(b"flipscreen", 0) != 0) as u8;
-    c[45] = crate::cfg::auto_screen_off() as u8;
+    c[45] = crate::config::cfg::auto_screen_off() as u8;
     c
 }
 
@@ -604,7 +604,7 @@ fn handle_settings_cmd(p: &[u8]) {
         _ => log!(Warn, TAG_SLAVE, "Unknown settings cmd 0x{cmd:02X}"),
     }
     if send_config {
-        crate::config_nvs::request_flush();
+        crate::config::nvs::request_flush();
         let id = slave::can_slave_id();
         if id != can_slave::UNASSIGNED {
             send_slave_config(id);

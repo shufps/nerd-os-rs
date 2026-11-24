@@ -10,10 +10,10 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::OnceLock;
 
 use crate::config;
+use crate::config::sdkconfig;
 use crate::fan_control::{ChannelConfig, FanController, Fans, MAX_FANS};
 use crate::log::log;
 use crate::power_task::{Env, PowerTask, POLL_MS};
-use crate::sdkconfig;
 
 const TAG: &CStr = c"power_management";
 

@@ -5,12 +5,12 @@ use core::ffi::c_int;
 use std::ffi::CString;
 
 use crate::ajson::Json;
+use crate::config::sdkconfig as k;
 use crate::http::json::Obj;
 use crate::http::reply::{cfg_flag, cfg_str, send_doc, set_json};
 use crate::http::sources::{CAP_INTERNAL, CAP_SPIRAM};
 use crate::idf::httpd::Request;
 use crate::idf::EspErr;
-use crate::sdkconfig as k;
 
 /// `v2_system_t`: the values of `GET /api/v2/system`.
 #[derive(Clone, Debug, Default)]

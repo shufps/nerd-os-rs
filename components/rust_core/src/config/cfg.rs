@@ -6,7 +6,7 @@
 use std::ffi::CString;
 
 use crate::config;
-use crate::sdkconfig as k;
+use crate::config::sdkconfig as k;
 
 fn s(key: &[u8], def: &str) -> CString {
     let v = config::get_str(key)

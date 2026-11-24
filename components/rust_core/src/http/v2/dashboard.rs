@@ -5,7 +5,7 @@ use core::ffi::c_int;
 use std::ffi::CString;
 
 use crate::ajson::Json;
-use crate::cfg;
+use crate::config::cfg;
 use crate::http::json::{cstr, float, floats, history, int, manager_info, ManagerInfo, Obj};
 use crate::http::reply::{send_doc, set_json};
 use crate::http::sources::{

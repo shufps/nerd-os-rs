@@ -151,7 +151,11 @@ fn cstring(v: &[u8]) -> CString {
 pub fn init(asic_count: c_int) {
     let hostname = crate::config::get_str(b"hostname")
         .map(|h| crate::cutil::until_nul(&h).to_vec())
-        .unwrap_or_else(|| crate::sdkconfig::LWIP_LOCAL_HOSTNAME.as_bytes().to_vec());
+        .unwrap_or_else(|| {
+            crate::config::sdkconfig::LWIP_LOCAL_HOSTNAME
+                .as_bytes()
+                .to_vec()
+        });
     let _ = HOSTNAME.set(CString::new(hostname).unwrap_or_default());
     {
         let mut s = state();

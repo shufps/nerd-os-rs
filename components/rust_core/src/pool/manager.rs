@@ -31,6 +31,7 @@ use std::sync::{Arc, Mutex, MutexGuard, OnceLock};
 
 use crate::ajson::{Json, Num};
 use crate::config;
+use crate::config::sdkconfig as k;
 use crate::http::json::{ManagerInfo, ManagerPool};
 use crate::log::log;
 use crate::pool::block;
@@ -50,7 +51,6 @@ use crate::pool::stratum_v2::protocol::FrameHeader;
 use crate::pool::stratum_v2::session::{ExtendedJob, Session as V2Session};
 use crate::pool::{self as policy, Event as PolicyEvent};
 use crate::pool::{Actions, PoolState};
-use crate::sdkconfig as k;
 
 const TAG: &CStr = c"stratum-manager";
 const RECONNECT_PERIOD_US: u64 = 30_000_000;
@@ -189,7 +189,7 @@ fn now_us() -> u64 {
 
 fn set_u64(key: &[u8], v: u64) {
     config::set(key, Json::Num(Num::U(v)));
-    crate::config_nvs::request_flush();
+    crate::config::nvs::request_flush();
 }
 
 fn lock<T>(m: &Mutex<T>) -> MutexGuard<'_, T> {
@@ -1248,7 +1248,7 @@ impl Manager {
     pub fn load_settings(&self) {
         let mut cfg = self.lock();
         let mut reconnect = false;
-        let (mode, _) = crate::board::boot::pool_mode(crate::cfg::pool_mode() as c_int);
+        let (mode, _) = crate::board::boot::pool_mode(crate::config::cfg::pool_mode() as c_int);
         self.set_mode(mode == crate::board::boot::PoolMode::Dual);
         if self.is_dual() {
             // a changed balance resets the dithering and reconnects

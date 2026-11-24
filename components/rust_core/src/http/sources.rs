@@ -5,7 +5,7 @@ use crate::idf::idf_const;
 use core::ffi::{c_int, CStr};
 
 use crate::board::api::Info as BoardInfo;
-use crate::cfg;
+use crate::config::cfg;
 use crate::http::json::{self, FanInfo};
 use crate::idf::httpd::Request;
 

@@ -9,7 +9,7 @@ use core::ffi::c_int;
 use std::ffi::CString;
 
 use crate::config;
-use crate::sdkconfig as k;
+use crate::config::sdkconfig as k;
 
 /// `StratumProtocol` `STRATUM_V2`
 pub const PROTOCOL_V2: u16 = 1;

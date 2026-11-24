@@ -5,10 +5,10 @@
 
 use std::cell::{Cell, RefCell};
 
+use rust_core::config::settings_apply::{apply, Applied, Store};
 use rust_core::http::settings::Write;
 use rust_core::http::v1::settings as v1;
 use rust_core::http::v2::settings as v2;
-use rust_core::settings_apply::{apply, Applied, Store};
 
 mod golden;
 use golden::Rec;

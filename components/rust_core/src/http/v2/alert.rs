@@ -3,6 +3,8 @@
 
 use crate::ajson::Json;
 use crate::config;
+use crate::config::sdkconfig as k;
+use crate::config::settings_apply::Applied;
 use crate::http::json::Obj;
 use crate::http::reply::{
     apply_settings, cfg_flag, cfg_str, end_chunks, send_doc, send_err, send_str, set_json,
@@ -10,8 +12,6 @@ use crate::http::reply::{
 use crate::http::settings::{boolean, field, string, uint, Out, Setting as S, Write};
 use crate::idf::httpd::{err, Request};
 use crate::idf::{EspErr, ESP_FAIL, ESP_OK};
-use crate::sdkconfig as k;
-use crate::settings_apply::Applied;
 
 /// `alert_info_t`: `GET /api/alert/info`.
 #[derive(Clone, Debug, Default)]
@@ -82,7 +82,7 @@ pub(crate) fn patch(req: &mut Request) -> EspErr {
     if apply_settings(req, c"http_utils", settings_alert, &mut a) != ESP_OK {
         return ESP_FAIL;
     }
-    crate::config_nvs::request_flush();
+    crate::config::nvs::request_flush();
     end_chunks(req);
     // the alerter's and the display's settings
     crate::discord::load_config();

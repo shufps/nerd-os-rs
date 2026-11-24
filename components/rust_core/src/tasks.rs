@@ -309,13 +309,23 @@ pub(crate) mod api {
     /// A FreeRTOS task entry.
     pub unsafe extern "C" fn influx_task(_: *mut c_void) {
         let settings = crate::influx::Settings {
-            enabled: crate::cfg::influx_enabled(),
-            url: crate::cfg::influx_url().to_string_lossy().into_owned(),
-            port: crate::cfg::influx_port(),
-            token: crate::cfg::influx_token().to_string_lossy().into_owned(),
-            bucket: crate::cfg::influx_bucket().to_string_lossy().into_owned(),
-            org: crate::cfg::influx_org().to_string_lossy().into_owned(),
-            prefix: crate::cfg::influx_prefix().to_string_lossy().into_owned(),
+            enabled: crate::config::cfg::influx_enabled(),
+            url: crate::config::cfg::influx_url()
+                .to_string_lossy()
+                .into_owned(),
+            port: crate::config::cfg::influx_port(),
+            token: crate::config::cfg::influx_token()
+                .to_string_lossy()
+                .into_owned(),
+            bucket: crate::config::cfg::influx_bucket()
+                .to_string_lossy()
+                .into_owned(),
+            org: crate::config::cfg::influx_org()
+                .to_string_lossy()
+                .into_owned(),
+            prefix: crate::config::cfg::influx_prefix()
+                .to_string_lossy()
+                .into_owned(),
         };
         crate::influx::run(settings, &mut Influx)
     }

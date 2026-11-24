@@ -6,13 +6,13 @@
 
 use std::cell::{Cell, RefCell};
 
+use rust_core::config::settings_apply::{apply, Applied, Store};
 use rust_core::http::query::{self, NodeId};
 use rust_core::http::settings::{Setting, Write};
 use rust_core::http::v2::alert::settings_alert;
 use rust_core::http::v2::can::can_node;
 use rust_core::http::v2::influx::settings_influx;
 use rust_core::http::v2::otp::{otp_body, OtpBody};
-use rust_core::settings_apply::{apply, Applied, Store};
 
 mod golden;
 use golden::Rec;

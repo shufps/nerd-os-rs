@@ -15,10 +15,10 @@ use std::sync::{Condvar, Mutex};
 
 use crate::apis::{parse, Api, Values};
 use crate::config;
+use crate::config::sdkconfig;
 use crate::idf::http_client::{Client, Event, EVENT_DISCONNECTED, EVENT_ERROR, EVENT_ON_DATA};
 use crate::idf::{nvs::err_name, ESP_OK};
 use crate::log::log;
-use crate::sdkconfig;
 
 const TAG: &CStr = c"APIsFetcher";
 const BUFFER_SIZE: usize = 1024;

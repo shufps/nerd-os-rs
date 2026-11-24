@@ -17,7 +17,7 @@ const TAG: &CStr = c"nerd*axe";
 
 #[cfg(target_os = "espidf")]
 const _: () = assert!(
-    crate::sdkconfig::SPIRAM,
+    crate::config::sdkconfig::SPIRAM,
     "firmware will not work without psram"
 );
 
@@ -115,7 +115,7 @@ unsafe extern "C" fn psram_free(p: *mut c_void) {
 /// The board the firmware is built for (`BOARD`, build.rs).
 fn board_id() -> Option<crate::board::profile::BoardId> {
     use crate::board::profile::BoardId::*;
-    Some(match crate::sdkconfig::BOARD {
+    Some(match crate::config::sdkconfig::BOARD {
         "NERDAXE" => NerdAxe,
         "NERDAXEGAMMA" => NerdAxeGamma,
         "NERDAXEGAIA" => NerdAxeGaia,
@@ -190,8 +190,8 @@ impl Hooks for Firmware {
         // shows and saves the last reset reason
         let reason = crate::system::read_reset_reason();
         // loads (or migrates) the config; the NerdAxe and NerdAxe-γ have one fan
-        let single_fan = matches!(crate::sdkconfig::BOARD, "NERDAXE" | "NERDAXEGAMMA");
-        crate::config_nvs::init(single_fan, crate::sdkconfig::OVERHEAT_TEMP as u16);
+        let single_fan = matches!(crate::config::sdkconfig::BOARD, "NERDAXE" | "NERDAXEGAMMA");
+        crate::config::nvs::init(single_fan, crate::config::sdkconfig::OVERHEAT_TEMP as u16);
 
         // SAFETY: plain ESP-IDF call with no pointer arguments; an already installed service is
         // tolerated below
@@ -218,7 +218,12 @@ impl Hooks for Firmware {
     fn board_create(&mut self) {
         let id = board_id();
         if !id.is_some_and(|id| crate::board::api::board_create(id as c_int)) {
-            log!(Error, c"board", "no board {}", crate::sdkconfig::BOARD);
+            log!(
+                Error,
+                c"board",
+                "no board {}",
+                crate::config::sdkconfig::BOARD
+            );
             std::process::abort();
         }
     }
@@ -322,7 +327,7 @@ impl Hooks for Firmware {
                 b"selftest",
                 crate::ajson::Json::Num(crate::ajson::Num::U(0)),
             );
-            crate::config_nvs::request_flush();
+            crate::config::nvs::request_flush();
         }
     }
 
@@ -386,7 +391,7 @@ impl Hooks for Firmware {
     }
 
     fn pool_mode(&mut self) -> c_int {
-        crate::cfg::pool_mode() as c_int
+        crate::config::cfg::pool_mode() as c_int
     }
 
     fn log_invalid_pool_mode(&mut self, v: c_int) {
@@ -404,9 +409,9 @@ impl Hooks for Firmware {
     /// WiFi (and Ethernet), the HTTP server, then waiting for an IP;
     /// mDNS once there is one.
     fn setup_network(&mut self) {
-        let ssid = cfg_str(b"wifissid", crate::sdkconfig::ESP_WIFI_SSID);
-        let pass = cfg_str(b"wifipass", crate::sdkconfig::ESP_WIFI_PASSWORD);
-        let hostname = crate::cfg::hostname();
+        let ssid = cfg_str(b"wifissid", crate::config::sdkconfig::ESP_WIFI_SSID);
+        let pass = cfg_str(b"wifipass", crate::config::sdkconfig::ESP_WIFI_PASSWORD);
+        let hostname = crate::config::cfg::hostname();
         crate::system::set_ssid(&ssid);
 
         crate::net::network::api::network_set_hook_preferred_changed(Some(on_preferred_changed));
@@ -493,7 +498,7 @@ impl Hooks for Firmware {
     }
 
     fn can_master_wanted(&mut self) -> bool {
-        crate::cfg::can_enabled() && crate::board::api::board_has_can_extension()
+        crate::config::cfg::can_enabled() && crate::board::api::board_has_can_extension()
     }
 
     fn start_can_master(&mut self) {

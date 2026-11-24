@@ -373,7 +373,7 @@ fn is_plus2_family(id: BoardId) -> bool {
 
 /// The default fan mode of channel 0 (`CONFIG_AUTO_FAN_SPEED_VALUE`).
 fn kconfig_fan_mode() -> c_int {
-    use crate::sdkconfig as k;
+    use crate::config::sdkconfig as k;
     if k::FAN_MODE_MANUAL {
         0
     } else if k::FAN_MODE_PID {
@@ -427,7 +427,7 @@ impl State {
     /// `Board::loadSettings()`
     fn load_settings(&mut self) {
         const TAG: &CStr = c"board";
-        self.fan_perc = cfg_u16(b"fanspeed", crate::sdkconfig::FAN_SPEED as c_int) as f32;
+        self.fan_perc = cfg_u16(b"fanspeed", crate::config::sdkconfig::FAN_SPEED as c_int) as f32;
         let l = self.limits();
         let (f, v) = board_core::clamp_settings(
             cfg_u16(b"asicfrequency", self.asic_frequency) as u16,

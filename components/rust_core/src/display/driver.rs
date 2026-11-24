@@ -171,9 +171,9 @@ impl Driver {
     }
 
     fn load_settings(&mut self) {
-        self.auto_off = crate::cfg::auto_screen_off();
-        self.auto_off_us = crate::cfg::screen_off_secs() as i64 * 1_000_000;
-        self.show_found_block = crate::cfg::show_block_found();
+        self.auto_off = crate::config::cfg::auto_screen_off();
+        self.auto_off_us = crate::config::cfg::screen_off_secs() as i64 * 1_000_000;
+        self.show_found_block = crate::config::cfg::show_block_found();
         // the setting was switched off: the screen comes on
         if !self.auto_off {
             self.turn_on();
@@ -864,7 +864,7 @@ pub mod api {
             found_block: false,
             identify_ms: 60_000,
             auto_off: false,
-            auto_off_us: crate::cfg::SCREEN_OFF_DEFAULT_S as i64 * 1_000_000,
+            auto_off_us: crate::config::cfg::SCREEN_OFF_DEFAULT_S as i64 * 1_000_000,
             show_found_block: true,
             countdown: None,
             shutdown: None,

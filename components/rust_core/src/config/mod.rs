@@ -6,6 +6,12 @@
 //! older firmware reads it back. The NVS access and the migration from
 //! the old per-setting keys stay in C++.
 
+pub mod cfg;
+pub mod nvs;
+pub mod profiles;
+pub mod sdkconfig;
+pub mod settings_apply;
+
 use core::ffi::CStr;
 use std::sync::Mutex;
 

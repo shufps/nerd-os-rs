@@ -4,13 +4,13 @@ use std::ffi::CString;
 
 use crate::ajson::Json;
 use crate::config;
+use crate::config::sdkconfig as k;
+use crate::config::settings_apply::Applied;
 use crate::http::json::Obj;
 use crate::http::reply::{apply_settings, cfg_flag, cfg_str, end_chunks, send_doc, set_json};
 use crate::http::settings::{boolean, field, string, uint, Out, Setting as S, Write};
 use crate::idf::httpd::Request;
 use crate::idf::{EspErr, ESP_FAIL, ESP_OK};
-use crate::sdkconfig as k;
-use crate::settings_apply::Applied;
 
 /// `influx_info_t`: `GET /api/influx/info`.
 #[derive(Clone, Debug, Default)]
@@ -70,7 +70,7 @@ pub(crate) fn patch(req: &mut Request) -> EspErr {
     if apply_settings(req, c"http_utils", settings_influx, &mut a) != ESP_OK {
         return ESP_FAIL;
     }
-    crate::config_nvs::request_flush();
+    crate::config::nvs::request_flush();
     end_chunks(req);
     ESP_OK
 }

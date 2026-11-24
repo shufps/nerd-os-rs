@@ -7,7 +7,7 @@
 use std::cell::Cell;
 use std::ffi::CString;
 
-use rust_core::stratum_v2::protocol::*;
+use rust_core::pool::stratum_v2::protocol::*;
 
 mod golden;
 use golden::Rec;

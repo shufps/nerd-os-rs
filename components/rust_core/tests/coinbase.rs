@@ -7,7 +7,7 @@
 use std::cell::Cell;
 use std::ffi::CString;
 
-use rust_core::coinbase::{coinbase_process, CoinbaseResult, ESP_ERR_INVALID_ARG, ESP_OK};
+use rust_core::pool::coinbase::{coinbase_process, CoinbaseResult, ESP_ERR_INVALID_ARG, ESP_OK};
 
 mod golden;
 use golden::Rec;

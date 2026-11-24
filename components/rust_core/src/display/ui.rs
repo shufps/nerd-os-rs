@@ -1002,7 +1002,7 @@ impl Ui {
         let up = (crate::cutil::now_us() - crate::system::start_us()) / 1_000_000;
         self.mining.time.set_text_str(l, &text::uptime(up));
 
-        let m = crate::pool_manager::get();
+        let m = crate::pool::manager::get();
         if let Some(m) = m {
             let (acc, rej) = if m.is_dual() {
                 let p = m.pool_stats(pool);
@@ -1068,7 +1068,7 @@ impl Ui {
 
     /// `updateCurrentSettings()`: pool, frequency, voltage and fan setting.
     pub(crate) fn update_settings(&mut self, l: &Lvgl, pool: c_int) {
-        let Some(m) = crate::pool_manager::get() else {
+        let Some(m) = crate::pool::manager::get() else {
             return;
         };
         let s = &self.settings;

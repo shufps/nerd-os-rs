@@ -12,12 +12,12 @@ use std::sync::Mutex;
 
 use crate::jobs;
 use crate::log::log;
-use crate::pool_coinbase::Handle as Coinbase;
-use crate::pool_stats::Handle as Stats;
-use crate::stratum_v1::method::*;
-use crate::stratum_v1::session::Session as V1Session;
-use crate::stratum_v1::{Message, MiningNotify};
-use crate::stratum_v2::session::{Event, ExtendedJob, Session as V2Session};
+use crate::pool::coinbase_verify::Handle as Coinbase;
+use crate::pool::stats::Handle as Stats;
+use crate::pool::stratum_v1::method::*;
+use crate::pool::stratum_v1::session::Session as V1Session;
+use crate::pool::stratum_v1::{Message, MiningNotify};
+use crate::pool::stratum_v2::session::{Event, ExtendedJob, Session as V2Session};
 
 /// The manager's side of a Stratum v1 message. `pool` is the pool the
 /// message came from.
@@ -220,7 +220,7 @@ pub fn dispatch_v1(
         .lock()
         .unwrap_or_else(|e| e.into_inner())
         .parse(line, &mut m);
-    crate::stratum_v1::session::log_parsed(ok, &m);
+    crate::pool::stratum_v1::session::log_parsed(ok, &m);
     handle_v1(h, stats, coinbase, pool, tag, &m, ok, now_us);
 }
 
@@ -251,7 +251,7 @@ pub fn drain_v2(
 mod tests {
     use super::*;
     use crate::jobs::test_support::{fresh, take};
-    use crate::pool_stats::PoolSummary;
+    use crate::pool::stats::PoolSummary;
 
     /// What the hooks saw, in order.
     #[derive(Default)]
@@ -369,8 +369,8 @@ mod tests {
         );
     }
 
-    fn old_job() -> crate::stratum_v2::session::StandardJob {
-        crate::stratum_v2::session::StandardJob {
+    fn old_job() -> crate::pool::stratum_v2::session::StandardJob {
+        crate::pool::stratum_v2::session::StandardJob {
             job_id: 1,
             version: 0,
             merkle_root: [0; 32],
@@ -481,7 +481,7 @@ mod tests {
         t.drain(vec![
             Event::PoolDifficulty(512),
             Event::StandardJob {
-                job: crate::stratum_v2::session::StandardJob {
+                job: crate::pool::stratum_v2::session::StandardJob {
                     job_id: 5,
                     version: 0x2000_0000,
                     merkle_root: [1; 32],

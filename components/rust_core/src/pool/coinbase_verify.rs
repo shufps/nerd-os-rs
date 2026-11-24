@@ -2,7 +2,7 @@
 //! `storeExtranonce()`, `runVerification()` and the verification members of
 //! `StratumManager`): per pool the extranonce from the subscribe, the last
 //! decoded coinbase, the verification counters and the block reason. The
-//! decoding is [`crate::coinbase`], the decision [`crate::pool::verify`];
+//! decoding is [`crate::pool::coinbase`], the decision [`crate::pool::verify`];
 //! the alert, the reconnect and the board fault flag are done by the caller
 //! from the returned [`Outcome`].
 //!
@@ -11,7 +11,7 @@
 
 use std::sync::Mutex;
 
-use crate::coinbase::{self, CoinbaseResult};
+use crate::pool::coinbase::{self, CoinbaseResult};
 use crate::pool::{self, block, VerifyInput};
 
 /// The verification settings of a pool (from the config).

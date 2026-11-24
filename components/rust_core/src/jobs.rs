@@ -16,9 +16,9 @@ use std::sync::Mutex;
 use crate::cutil::until_nul;
 use crate::log::log;
 use crate::mining::JobHashes;
-use crate::stratum_v1::job::build_parts;
-use crate::stratum_v1::MiningNotify;
-use crate::stratum_v2::jobs::{hashes, ExtendedJob};
+use crate::pool::stratum_v1::job::build_parts;
+use crate::pool::stratum_v1::MiningNotify;
+use crate::pool::stratum_v2::jobs::{hashes, ExtendedJob};
 
 const TAG: &CStr = c"create_jobs_task";
 
@@ -571,7 +571,7 @@ pub fn v1_set_next_extranonce(pool: c_int, extranonce: Option<&[u8]>, extranonce
 /// A standard channel job (merkle root and prevhash from the pool).
 pub fn sv2_standard(
     pool: c_int,
-    job: &crate::stratum_v2::session::StandardJob,
+    job: &crate::pool::stratum_v2::session::StandardJob,
     clean: bool,
     version_mask: u32,
     difficulty: u32,
@@ -610,14 +610,14 @@ pub fn sv2_standard(
 /// An extended channel job.
 pub fn sv2_extended(
     pool: c_int,
-    mut job: crate::stratum_v2::session::ExtendedJob,
+    mut job: crate::pool::stratum_v2::session::ExtendedJob,
     clean: bool,
     extranonce_size: u8,
     version_mask: u32,
     difficulty: u32,
 ) {
     job.merkle_path
-        .truncate(crate::stratum_v2::protocol::MAX_MERKLE_BRANCHES);
+        .truncate(crate::pool::stratum_v2::protocol::MAX_MERKLE_BRANCHES);
     job.extranonce_prefix.truncate(32);
     let job_id = job.job_id;
     let ok = with_pool(pool, |w| {
@@ -755,7 +755,7 @@ pub(crate) mod test_support {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::stratum_v2::session::{ExtendedJob, StandardJob};
+    use crate::pool::stratum_v2::session::{ExtendedJob, StandardJob};
 
     use super::test_support::{fresh as serial, take};
 

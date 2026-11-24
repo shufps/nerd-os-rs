@@ -152,7 +152,7 @@ fn on_preferred_changed() {
         TAG,
         "Network preferred route changed -> request stratum reconnect"
     );
-    crate::pool_manager::api::pool_mgr_reconnect_all();
+    crate::pool::manager::api::pool_mgr_reconnect_all();
 }
 
 /// The firmware's boot steps.
@@ -394,11 +394,11 @@ impl Hooks for Firmware {
     }
 
     fn create_stratum_manager(&mut self, mode: PoolMode) {
-        crate::pool_manager::api::pool_mgr_create(mode == PoolMode::Dual);
+        crate::pool::manager::api::pool_mgr_create(mode == PoolMode::Dual);
     }
 
     fn stratum_load_settings(&mut self) {
-        crate::pool_manager::api::pool_mgr_load_settings();
+        crate::pool::manager::api::pool_mgr_load_settings();
     }
 
     /// WiFi (and Ethernet), the HTTP server, then waiting for an IP;
@@ -507,7 +507,7 @@ impl Hooks for Firmware {
 
     fn start_stratum_task(&mut self) {
         task(
-            crate::pool_manager::api::pool_mgr_task,
+            crate::pool::manager::api::pool_mgr_task,
             c"stratum manager",
             8192,
             5,

@@ -384,7 +384,7 @@ fn handle_nonce(slave_id: u8, nonce: u32, rolled_version: u32, job_id: u8) {
 
     // the share history needs the slave's chip number, which is not sent
     if diff >= j.pool_diff as f64 {
-        if let Some(m) = crate::pool_manager::get() {
+        if let Some(m) = crate::pool::manager::get() {
             m.submit_share(
                 (j.pool_id & 1) as usize,
                 j.job_id(),
@@ -396,8 +396,8 @@ fn handle_nonce(slave_id: u8, nonce: u32, rolled_version: u32, job_id: u8) {
             );
         }
     }
-    crate::pool_manager::api::pool_mgr_check_best_diff(j.pool_id, diff, j.target);
-    crate::pool_manager::api::pool_mgr_check_found_block(j.pool_id, diff, j.target);
+    crate::pool::manager::api::pool_mgr_check_best_diff(j.pool_id, diff, j.target);
+    crate::pool::manager::api::pool_mgr_check_found_block(j.pool_id, diff, j.target);
 }
 
 fn master_loop() -> ! {

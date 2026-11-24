@@ -1,11 +1,11 @@
 //! The pool manager and the stratum tasks (port of
 //! `main/stratum/stratum_manager.cpp`, `stratum_task.cpp` and
 //! `stratum_task_v2.cpp`): one task per pool runs the connection loop
-//! (`stratum_task.rs`) with the Stratum v1 (`stratum_v1::connection`) or
+//! (`pool/stratum_task.rs`) with the Stratum v1 (`stratum_v1::connection`) or
 //! v2 (`stratum_v2::connection`) protocol loop; the manager decides through
 //! the pool policy (`pool.rs`) which pools are connected, hands the pool
-//! messages to `pool_dispatch.rs`, submits shares, keeps the statistics
-//! (`pool_stats.rs`) and the coinbase verification (`pool_coinbase.rs`), and
+//! messages to `pool/dispatch.rs`, submits shares, keeps the statistics
+//! (`pool/stats.rs`) and the coinbase verification (`pool/coinbase_verify.rs`), and
 //! starts the ping tasks (`ping.rs`, `ping_session.rs`).
 //!
 //! The manager lock (`m_mutex`, not recursive) is the mutex around the pool
@@ -34,23 +34,23 @@ use crate::config;
 use crate::http::json::{ManagerInfo, ManagerPool};
 use crate::log::log;
 use crate::pool::block;
+use crate::pool::coinbase_verify as cb;
+use crate::pool::coinbase_verify::{Outcome, VerifyConfig};
+use crate::pool::dispatch::{self as dispatch, V1Hooks, V2Hooks};
+use crate::pool::stats;
+use crate::pool::stratum_config::PoolConfig;
+use crate::pool::stratum_task::Family;
+use crate::pool::stratum_transport::{Kind, Transport};
+use crate::pool::stratum_v1::connection::{self as v1, Io, Transfer};
+use crate::pool::stratum_v1::lines::LineBuffer;
+use crate::pool::stratum_v1::session::Session as V1Session;
+use crate::pool::stratum_v1::MiningNotify;
+use crate::pool::stratum_v2::connection::{self as v2, FrameIo, Readiness};
+use crate::pool::stratum_v2::protocol::FrameHeader;
+use crate::pool::stratum_v2::session::{ExtendedJob, Session as V2Session};
 use crate::pool::{self as policy, Event as PolicyEvent};
 use crate::pool::{Actions, PoolState};
-use crate::pool_coinbase as cb;
-use crate::pool_coinbase::{Outcome, VerifyConfig};
-use crate::pool_dispatch::{self as dispatch, V1Hooks, V2Hooks};
-use crate::pool_stats as stats;
 use crate::sdkconfig as k;
-use crate::stratum_config::PoolConfig;
-use crate::stratum_task::Family;
-use crate::stratum_transport::{Kind, Transport};
-use crate::stratum_v1::connection::{self as v1, Io, Transfer};
-use crate::stratum_v1::lines::LineBuffer;
-use crate::stratum_v1::session::Session as V1Session;
-use crate::stratum_v1::MiningNotify;
-use crate::stratum_v2::connection::{self as v2, FrameIo, Readiness};
-use crate::stratum_v2::protocol::FrameHeader;
-use crate::stratum_v2::session::{ExtendedJob, Session as V2Session};
 
 const TAG: &CStr = c"stratum-manager";
 const RECONNECT_PERIOD_US: u64 = 30_000_000;
@@ -393,7 +393,7 @@ impl Task {
         let key = if key.is_empty() {
             None
         } else {
-            use crate::stratum_v2::authority::{authority_key, KeyError};
+            use crate::pool::stratum_v2::authority::{authority_key, KeyError};
             const T: &CStr = c"stratum_v2";
             match authority_key(&key) {
                 Ok(k) => {
@@ -533,7 +533,7 @@ struct Ctx {
     proto: Arc<Proto>,
 }
 
-impl crate::stratum_task::Hooks for Ctx {
+impl crate::pool::stratum_task::Hooks for Ctx {
     fn suspend_if_shutdown(&mut self) {
         if crate::power_mgmt::is_shutdown() {
             log!(Warn, self.t.tag, "suspended");
@@ -1035,7 +1035,7 @@ impl Manager {
         self.apply(&a);
     }
 
-    /// Hands a Stratum v1 line to `pool_dispatch.rs`.
+    /// Hands a Stratum v1 line to `pool/dispatch.rs`.
     fn dispatch(&self, pool: usize, line: &[u8], session: &Mutex<V1Session>) {
         let cfg = self.lock();
         if !self.policy.accepts_notify_from(pool as i32) {
@@ -1547,9 +1547,9 @@ unsafe extern "C" fn stratum_task_entry(arg: *mut c_void) {
         t,
         proto: t.proto(),
     };
-    let mut skip = crate::stratum_task::Ipv6Skip::default();
+    let mut skip = crate::pool::stratum_task::Ipv6Skip::default();
     loop {
-        crate::stratum_task::round(&mut c, &mut skip, t.tag);
+        crate::pool::stratum_task::round(&mut c, &mut skip, t.tag);
     }
 }
 

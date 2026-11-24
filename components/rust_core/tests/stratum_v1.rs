@@ -8,10 +8,10 @@ use std::cell::Cell;
 use std::collections::VecDeque;
 use std::sync::Mutex;
 
-use rust_core::stratum_v1::connection::{receive_line, send_tracked, Io, Transfer};
-use rust_core::stratum_v1::lines::LineBuffer;
-use rust_core::stratum_v1::session::Session;
-use rust_core::stratum_v1::{method, Message};
+use rust_core::pool::stratum_v1::connection::{receive_line, send_tracked, Io, Transfer};
+use rust_core::pool::stratum_v1::lines::LineBuffer;
+use rust_core::pool::stratum_v1::session::Session;
+use rust_core::pool::stratum_v1::{method, Message};
 use serde_json::{json, Value};
 
 mod golden;

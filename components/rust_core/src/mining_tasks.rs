@@ -339,7 +339,7 @@ pub(crate) mod api {
 mod tests {
     use super::*;
     use crate::jobs::test_support::fresh;
-    use crate::stratum_v2::session::{ExtendedJob, StandardJob};
+    use crate::pool::stratum_v2::session::{ExtendedJob, StandardJob};
 
     #[derive(Default)]
     struct Fake {

@@ -9,8 +9,8 @@ use std::cell::Cell;
 use std::ffi::CString;
 
 use rust_core::mining::{nonce_difficulty, JobHashes};
-use rust_core::stratum_v1::job::build;
-use rust_core::stratum_v1::MiningNotify;
+use rust_core::pool::stratum_v1::job::build;
+use rust_core::pool::stratum_v1::MiningNotify;
 
 mod golden;
 use golden::Rec;

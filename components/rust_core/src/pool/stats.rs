@@ -14,7 +14,7 @@
 
 use std::sync::Mutex;
 
-use crate::coinbase::network_difficulty;
+use crate::pool::coinbase::network_difficulty;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Mode {

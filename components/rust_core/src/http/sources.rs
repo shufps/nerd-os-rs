@@ -20,16 +20,16 @@ pub(crate) fn small_core_count() -> c_int {
     crate::board::get().map_or(0, |b| b.small_core_count() as c_int)
 }
 
-pub(crate) fn stats() -> crate::pool_stats::Summary {
-    crate::pool_manager::get().map_or_else(Default::default, |m| m.summary())
+pub(crate) fn stats() -> crate::pool::stats::Summary {
+    crate::pool::manager::get().map_or_else(Default::default, |m| m.summary())
 }
 
 pub(crate) fn pool_manager_info() -> json::ManagerInfo {
-    crate::pool_manager::get().map_or_else(Default::default, |m| m.info())
+    crate::pool::manager::get().map_or_else(Default::default, |m| m.info())
 }
 
-pub(crate) fn coinbase_info(pool: c_int) -> Option<crate::pool_coinbase::Info> {
-    crate::pool_manager::get().map(|m| m.coinbase_info(pool))
+pub(crate) fn coinbase_info(pool: c_int) -> Option<crate::pool::coinbase_verify::Info> {
+    crate::pool::manager::get().map(|m| m.coinbase_info(pool))
 }
 
 pub(crate) fn uptime_seconds() -> i64 {
@@ -68,5 +68,5 @@ pub(crate) fn reload_settings() {
     crate::board::api::board_load_settings();
     crate::power_mgmt::fan_load_settings();
     crate::display::load_settings();
-    crate::pool_manager::api::pool_mgr_load_settings();
+    crate::pool::manager::api::pool_mgr_load_settings();
 }

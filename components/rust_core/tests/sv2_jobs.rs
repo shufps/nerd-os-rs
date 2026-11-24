@@ -8,7 +8,7 @@ use std::cell::Cell;
 
 use rust_core::cutil::to_hex;
 use rust_core::mining::JobHashes;
-use rust_core::stratum_v2::jobs::{hashes, ExtendedJob};
+use rust_core::pool::stratum_v2::jobs::{hashes, ExtendedJob};
 
 mod golden;
 use golden::Rec;

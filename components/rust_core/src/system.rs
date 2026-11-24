@@ -412,7 +412,7 @@ pub fn run() -> ! {
                 last_label = ip;
             }
 
-            let found = crate::pool_manager::get().map_or(0, |m| m.found_blocks());
+            let found = crate::pool::manager::get().map_or(0, |m| m.found_blocks());
             if found > last_found {
                 crate::display::show_found_block();
             }

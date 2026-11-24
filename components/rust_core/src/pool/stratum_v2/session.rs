@@ -3,7 +3,7 @@
 //! waiting for their prevhash, the extranonce prefix in force per job, the
 //! target, share submission. The connection loop (`connection.rs`) feeds
 //! received frames in; the pool manager turns the resulting [`Event`]s into
-//! calls to the statistics and the job pipeline (`pool_dispatch.rs`).
+//! calls to the statistics and the job pipeline (`pool/dispatch.rs`).
 //!
 //! Behaviour notes:
 //! * an extended channel's `extranonce_size` (a u16 from the pool) must be

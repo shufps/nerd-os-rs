@@ -7,6 +7,17 @@
 //! `tests/pool_policy.rs`. In dual-pool mode a disconnected
 //! pool's difficulty is forgotten, so it does not lower the ASIC difficulty.
 
+pub mod coinbase;
+pub mod coinbase_verify;
+pub mod dispatch;
+pub mod manager;
+pub mod stats;
+pub mod stratum_config;
+pub mod stratum_task;
+pub mod stratum_transport;
+pub mod stratum_v1;
+pub mod stratum_v2;
+
 pub const PRIMARY: usize = 0;
 pub const SECONDARY: usize = 1;
 

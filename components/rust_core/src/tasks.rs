@@ -16,7 +16,7 @@ use crate::jobs::BmJob;
 use crate::log::log;
 use crate::mining_tasks::TaskResult;
 use crate::mining_tasks::{JobEnv, ResultEnv};
-use crate::pool_manager::api as mgr;
+use crate::pool::manager::api as mgr;
 
 /// the influx client's answer limit (`influx.rs`)
 const RESPONSE_MAX: usize = 32768;
@@ -115,7 +115,7 @@ impl ResultEnv for Results {
         board_info().max_difficulty
     }
     fn best_session_diff(&mut self) -> String {
-        let best = crate::pool_manager::get().map_or(0, |m| m.best_session());
+        let best = crate::pool::manager::get().map_or(0, |m| m.best_session());
         crate::suffix::suffix_string(best, 3)
     }
     fn push_share(&mut self, asic_nr: c_int) {
@@ -131,7 +131,7 @@ impl ResultEnv for Results {
         version_rolled: u32,
         version: u32,
     ) {
-        if let Some(m) = crate::pool_manager::get() {
+        if let Some(m) = crate::pool::manager::get() {
             m.submit_share(
                 (pool & 1) as usize,
                 job_id,
@@ -235,7 +235,7 @@ impl crate::influx::TaskEnv for Influx {
             duplicates: crate::mining_tasks::api::asic_result_duplicates(),
             ..Inputs::default()
         };
-        if let Some(m) = crate::pool_manager::get() {
+        if let Some(m) = crate::pool::manager::get() {
             let s = m.summary();
             i.best_session_diff = s.best_session;
             i.best_diff = s.total_best;

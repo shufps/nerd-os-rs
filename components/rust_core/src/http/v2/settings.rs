@@ -328,7 +328,7 @@ pub(crate) fn patch(req: &mut Request) -> EspErr {
 
     // re-run the verification (unblocked and counted afresh if its settings
     // changed)
-    if let Some(m) = crate::pool_manager::get() {
+    if let Some(m) = crate::pool::manager::get() {
         let cb = m.coinbase();
         for (i, &changed) in verify_changed.iter().enumerate() {
             if changed {

@@ -10,9 +10,13 @@ use std::collections::VecDeque;
 
 use rust_core::crypto::{encrypt, hkdf2};
 use rust_core::mining::sha256;
+use rust_core::pool::stratum_v2::noise::{
+    self_test, Cipher, Handshake, Wire, ACT2_LEN, PROTOCOL_NAME,
+};
+use rust_core::pool::stratum_v2::protocol::{
+    encode_frame_header, parse_frame_header, FRAME_HEADER_SIZE,
+};
 use rust_core::secp::{self, Context, Keypair, Opaque64};
-use rust_core::stratum_v2::noise::{self_test, Cipher, Handshake, Wire, ACT2_LEN, PROTOCOL_NAME};
-use rust_core::stratum_v2::protocol::{encode_frame_header, parse_frame_header, FRAME_HEADER_SIZE};
 
 mod golden;
 use golden::Rec;
@@ -487,7 +491,7 @@ fn certificate_validity_period_is_checked() {
             -1
         }
     };
-    let skew = rust_core::stratum_v2::noise::CLOCK_SKEW_S;
+    let skew = rust_core::pool::stratum_v2::noise::CLOCK_SKEW_S;
     let mut rec = Rec::new("sv2_noise", "certificate_validity_period_is_checked");
     for (now, ok) in [
         (from, true),

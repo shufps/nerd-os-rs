@@ -121,8 +121,8 @@ pub(crate) fn info(req: &mut Request) -> EspErr {
     }
     s.fans[0].mode = b.fan_mode[0];
 
-    s.last_ping_rtt = crate::pool_manager::api::pool_mgr_ping_rtt();
-    s.recent_ping_loss = crate::pool_manager::api::pool_mgr_ping_loss();
+    s.last_ping_rtt = crate::pool::manager::api::pool_mgr_ping_rtt();
+    s.recent_ping_loss = crate::pool::manager::api::pool_mgr_ping_loss();
     s.duplicate_hw_nonces = crate::mining_tasks::api::asic_result_duplicates();
 
     s.pool_difficulty = st.pool_difficulty;
@@ -230,9 +230,9 @@ pub(crate) fn reset_stats(req: &mut Request) -> EspErr {
     if all_time && crate::http::server::validate_otp(req, false) != ESP_OK {
         return ESP_FAIL;
     }
-    crate::pool_manager::api::pool_mgr_reset_session_stats();
+    crate::pool::manager::api::pool_mgr_reset_session_stats();
     if all_time {
-        crate::pool_manager::api::pool_mgr_reset_all_time_stats();
+        crate::pool::manager::api::pool_mgr_reset_all_time_stats();
     }
     log!(
         Info,
@@ -249,7 +249,7 @@ pub(crate) fn reset_stats(req: &mut Request) -> EspErr {
 }
 
 pub(crate) fn patch(req: &mut Request) -> EspErr {
-    let dual = crate::pool_manager::api::pool_mgr_is_dual();
+    let dual = crate::pool::manager::api::pool_mgr_is_dual();
     if crate::http::reply::apply_pool_settings(req, true, dual, c"system").is_err() {
         return ESP_FAIL;
     }

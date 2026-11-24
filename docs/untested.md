@@ -114,11 +114,10 @@ The display driver (formerly `main/displays/displayDriver.cpp`, buttons, UI mess
 
 Tested on a Q1373: panel init, splash sequence, screen cycle with button 1, OTP QR screen with cancel by button, auto screen off (countdown, off, on by button), the real buttons (short presses, button 2 toggling the screen) and the shutdown countdown with both held; the found-block image and its close by a button (a real block replayed by a test stratum server).
 
-Tested with the user on the NerdAxe: the self test (`selftest` set, best difficulty 0): ASICs found, the result on the display, the flag cleared.
+Tested with the user on the NerdAxe: the rotated panel (`flip_screen`; the NerdAxe looks normal, the other boards rotate by 180°), and the self test (`selftest` set, best difficulty 0): ASICs found, the result on the display, the flag cleared.
 
 Still to test:
-- identify (CAN command);
-- a board with `flip_screen` (mirrored panel).
+- identify (CAN command).
 
 ## IPv6 (pool connections and web access)
 

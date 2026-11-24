@@ -65,7 +65,7 @@ pub(crate) fn info(req: &mut Request) -> EspErr {
     let sv2 = [cfg::sv2_authority_pubkey(0), cfg::sv2_authority_pubkey(1)];
     let hostip = crate::system::ip();
     let wifi_status = crate::system::wifi_status();
-    let version = CString::new(crate::mdns::fw_version()).unwrap_or_default();
+    let version = CString::new(crate::net::mdns::fw_version()).unwrap_or_default();
     let partition = running_partition();
 
     // at least one entry, as the former calloc()
@@ -84,8 +84,8 @@ pub(crate) fn info(req: &mut Request) -> EspErr {
     s.small_core_count = small_core_count();
     s.device_model = Some(b.device_model.into());
     s.hostip = Some(hostip);
-    s.mac_addr = Some(crate::network::mac_addr().into());
-    s.wifi_rssi = crate::network::wifi_rssi();
+    s.mac_addr = Some(crate::net::network::mac_addr().into());
+    s.wifi_rssi = crate::net::network::wifi_rssi();
 
     s.power = power_mgmt::get(0);
     s.max_power = b.max_pin;

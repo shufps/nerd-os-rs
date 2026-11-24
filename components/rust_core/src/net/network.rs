@@ -1,7 +1,7 @@
 //! The network (port of `main/network/connect.cpp` and
 //! `network_manager.cpp`): the WiFi station and access point, the WiFi
 //! scan, and the choice between WiFi and the W5500 Ethernet. The decisions
-//! were Rust already (`wifi.rs` for the station, `netmgr.rs` for the
+//! were Rust already (`net/wifi.rs` for the station, `net/netmgr.rs` for the
 //! interfaces); this module carries out their actions on the IDF. The
 //! WiFi structs come from the generated bindings; `wifi_init_config_t` is
 //! `WIFI_INIT_CONFIG_DEFAULT()` built from the header's constants.
@@ -21,8 +21,8 @@ use std::time::Duration;
 use crate::idf::nvs::err_name;
 use crate::idf::{EspErr, ESP_OK};
 use crate::log::log;
-use crate::netmgr::{act as nact, api as netmgr};
-use crate::wifi::{act, api as wifi_state};
+use crate::net::netmgr::{act as nact, api as netmgr};
+use crate::net::wifi::{act, api as wifi_state};
 
 /// The event bases the network code registers for.
 #[derive(Clone, Copy)]
@@ -548,7 +548,7 @@ fn set_wifi_status(text: &str) {
     crate::system::set_wifi_status(text.as_bytes());
 }
 
-/// Carries out the actions of a `wifi.rs` call, in bit order.
+/// Carries out the actions of a `net/wifi.rs` call, in bit order.
 fn run_actions(a: u32) {
     // the connected/fail bits had no waiters left
     if a & act::HOOK_DISCONNECTED != 0 {
@@ -876,7 +876,7 @@ pub fn shutdown_ap_once() {
     }
 }
 
-/// An interface event: the decisions in `netmgr.rs`, the actions here.
+/// An interface event: the decisions in `net/netmgr.rs`, the actions here.
 fn on_event(ev: Event) {
     let eth = crate::drivers::w5500::netif();
     let sta = NETIF_STA.get();

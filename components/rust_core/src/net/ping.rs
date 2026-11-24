@@ -1,7 +1,7 @@
 //! Pool ping statistics (port of `PingTask` in `ping_task.cpp`): every
 //! 60 s a round of 7 pings to the pool's resolved address, the average
 //! round trip time and the packet loss over the last 15 minutes. The ICMP
-//! session is `ping_session.rs`, the loop is run by the pool manager.
+//! session is `net/ping_session.rs`, the loop is run by the pool manager.
 //!
 //! The statistics lock is only held to read or update the numbers, never
 //! across a ping round (about 9 s) and never together with the manager

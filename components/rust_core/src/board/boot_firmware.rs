@@ -242,7 +242,7 @@ impl Hooks for Firmware {
                 crate::drivers::w5500::GPIO_NC,
             );
         }
-        crate::network::api::network_early_eth_init();
+        crate::net::network::api::network_early_eth_init();
     }
 
     fn board_load_settings(&mut self) {
@@ -409,10 +409,10 @@ impl Hooks for Firmware {
         let hostname = crate::cfg::hostname();
         crate::system::set_ssid(&ssid);
 
-        crate::network::api::network_set_hook_preferred_changed(Some(on_preferred_changed));
+        crate::net::network::api::network_set_hook_preferred_changed(Some(on_preferred_changed));
         let has_eth = crate::board::api::board_has_ethernet();
         check(
-            crate::network::start(&ssid, &pass, &hostname, has_eth),
+            crate::net::network::start(&ssid, &pass, &hostname, has_eth),
             "network start",
         );
 
@@ -421,8 +421,8 @@ impl Hooks for Firmware {
         crate::http::server::api::start_rest_server(core::ptr::null_mut());
 
         loop {
-            if crate::network::wait_any_ip(Duration::from_secs(30)) != 0 {
-                if crate::netmgr::api::netmgr_eth_has_ip() {
+            if crate::net::network::wait_any_ip(Duration::from_secs(30)) != 0 {
+                if crate::net::netmgr::api::netmgr_eth_has_ip() {
                     log!(Info, TAG, "Network up via ETH (preferred)");
                     crate::system::set_wifi_status(b"LAN Connected!");
                 } else {
@@ -431,7 +431,7 @@ impl Hooks for Firmware {
                 }
                 let b = board_info();
                 let s = |p: &CStr| p.to_string_lossy().into_owned();
-                crate::mdns::start(
+                crate::net::mdns::start(
                     &hostname.to_string_lossy(),
                     b.version,
                     b.asic_count,
@@ -454,7 +454,7 @@ impl Hooks for Firmware {
     }
 
     fn ap_off_once(&mut self) {
-        crate::network::shutdown_ap_once()
+        crate::net::network::shutdown_ap_once()
     }
 
     fn discord_start(&mut self) {
@@ -464,7 +464,9 @@ impl Hooks for Firmware {
     fn otp_init(&mut self) {
         let model = info_text(board_info().device_model);
         let hostname = crate::system::hostname().to_string_lossy().into_owned();
-        let mac = crate::network::mac_addr().to_string_lossy().into_owned();
+        let mac = crate::net::network::mac_addr()
+            .to_string_lossy()
+            .into_owned();
         crate::otp_device::init(&hostname, &mac, &model);
     }
 
@@ -483,7 +485,7 @@ impl Hooks for Firmware {
         task(t::influx_task, c"influx", 8192, 1);
         task(crate::apis_fetcher::api::apis_task, c"apis ticker", 8192, 5);
         task(
-            crate::wifi_health::api::wifi_monitor_task,
+            crate::net::wifi_health::api::wifi_monitor_task,
             c"wifi monitor",
             4096,
             1,

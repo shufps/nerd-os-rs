@@ -43,7 +43,7 @@ use crate::board::api::info as board_info;
 pub fn nodes(req: &mut Request) -> EspErr {
     req.set_type(c"application/json");
     let b = board_info();
-    let version = CString::new(crate::mdns::fw_version()).unwrap_or_default();
+    let version = CString::new(crate::net::mdns::fw_version()).unwrap_or_default();
     let temps: Vec<f32> = (0..b.asic_count.max(0))
         .map(|j| crate::board::board_core::CHIP_TEMPS.get(j))
         .collect();
@@ -60,7 +60,7 @@ pub fn nodes(req: &mut Request) -> EspErr {
         }
     }
     let m = CanMasterNode {
-        mac: Some(crate::network::mac_addr().into()),
+        mac: Some(crate::net::network::mac_addr().into()),
         device_model: Some(b.device_model.into()),
         version: Some(version),
         shutdown: power_mgmt::is_shutdown(),

@@ -146,7 +146,7 @@ fn values(now_us: i64) -> Values {
         .unwrap_or_default();
     Values {
         hostname: crate::system::hostname().to_string_lossy().into_owned(),
-        ip: crate::network::preferred_ip().map_or_else(|| "0.0.0.0".into(), |(ip, _)| ip),
+        ip: crate::net::network::preferred_ip().map_or_else(|| "0.0.0.0".into(), |(ip, _)| ip),
         hashrate: crate::system::current_hashrate() as f64,
         hashrate_1h: crate::mining::history::api::history_current(2),
         temp: get(3),

@@ -240,7 +240,7 @@ pub(crate) fn get(req: &mut Request) -> EspErr {
 #[allow(clippy::field_reassign_with_default)]
 pub(crate) fn v2_settings_doc() -> crate::ajson::Json {
     let b = board();
-    let version = CString::new(crate::mdns::fw_version()).unwrap_or_default();
+    let version = CString::new(crate::net::mdns::fw_version()).unwrap_or_default();
     let urls = [cfg::stratum_url(0), cfg::stratum_url(1)];
     let users = [cfg::stratum_user(0), cfg::stratum_user(1)];
     let sv2 = [cfg::sv2_authority_pubkey(0), cfg::sv2_authority_pubkey(1)];
@@ -253,7 +253,7 @@ pub(crate) fn v2_settings_doc() -> crate::ajson::Json {
     v.device_model = Some(b.device_model.into());
     v.version = Some(version);
     v.otp = cfg::otp_enabled();
-    v.ap_active = crate::netmgr::ap_active();
+    v.ap_active = crate::net::netmgr::ap_active();
 
     v.has_can_extension = crate::board::api::board_has_can_extension();
     v.can_enabled = cfg::can_enabled();

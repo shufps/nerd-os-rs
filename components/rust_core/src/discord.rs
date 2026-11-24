@@ -77,8 +77,10 @@ pub fn start() {
 /// The device's address ("0.0.0.0" without one) and MAC for a message
 /// (only looked up for enabled alerts).
 fn device() -> (String, String) {
-    let ip = crate::network::preferred_ip().map_or_else(|| "0.0.0.0".into(), |(ip, _)| ip);
-    let mac = crate::network::mac_addr().to_string_lossy().into_owned();
+    let ip = crate::net::network::preferred_ip().map_or_else(|| "0.0.0.0".into(), |(ip, _)| ip);
+    let mac = crate::net::network::mac_addr()
+        .to_string_lossy()
+        .into_owned();
     (ip, mac)
 }
 

@@ -39,7 +39,7 @@ pub fn wifi_scan(nets: &[WifiNetwork]) -> Json {
 /// station is disconnected for the scan); the CORS headers after that
 /// check.
 pub fn scan(req: &mut Request) -> EspErr {
-    if !crate::netmgr::ap_active() {
+    if !crate::net::netmgr::ap_active() {
         return send_err(
             req,
             err::E403_FORBIDDEN,
@@ -52,7 +52,7 @@ pub fn scan(req: &mut Request) -> EspErr {
         req.send_err(err::E500_INTERNAL_SERVER_ERROR, None);
         return ESP_FAIL;
     }
-    let nets = match crate::network::scan() {
+    let nets = match crate::net::network::scan() {
         Ok(n) => n,
         Err(e) => {
             log!(

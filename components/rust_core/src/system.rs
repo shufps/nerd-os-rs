@@ -273,7 +273,7 @@ pub fn current_hashrate() -> f32 {
 /// The preferred interface's address ("0.0.0.0" without one) and whether
 /// it is Ethernet.
 fn preferred_ip() -> (bool, CString, bool) {
-    match crate::network::preferred_ip() {
+    match crate::net::network::preferred_ip() {
         Some((ip, eth)) if !ip.is_empty() => (true, CString::new(ip).unwrap_or_default(), eth),
         p => (p.is_some(), c"0.0.0.0".into(), p.is_some_and(|(_, e)| e)),
     }
@@ -355,7 +355,7 @@ pub fn run() -> ! {
                 break;
             }
             // not connected yet: show the access point
-            let ssid = CString::new(crate::network::ap_ssid()).unwrap_or_default();
+            let ssid = CString::new(crate::net::network::ap_ssid()).unwrap_or_default();
             crate::display::portal_screen(&ssid);
             std::thread::sleep(Duration::from_secs(5));
         }

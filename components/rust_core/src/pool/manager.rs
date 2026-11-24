@@ -6,7 +6,7 @@
 //! the pool policy (`pool.rs`) which pools are connected, hands the pool
 //! messages to `pool/dispatch.rs`, submits shares, keeps the statistics
 //! (`pool/stats.rs`) and the coinbase verification (`pool/coinbase_verify.rs`), and
-//! starts the ping tasks (`ping.rs`, `ping_session.rs`).
+//! starts the ping tasks (`net/ping.rs`, `net/ping_session.rs`).
 //!
 //! The manager lock (`m_mutex`, not recursive) is the mutex around the pool
 //! configs; it is held where the C++ code held it.
@@ -558,7 +558,7 @@ impl crate::pool::stratum_task::Hooks for Ctx {
         self.t.stop.load(Acquire)
     }
     fn network_up(&mut self) -> bool {
-        crate::netmgr::has_ip()
+        crate::net::netmgr::has_ip()
     }
     fn resolve(&mut self, host: &str, family: Family) -> Option<String> {
         const T: &CStr = c"DNS";
@@ -644,7 +644,7 @@ impl Ctx {
             (c.user.clone(), c.password.clone(), c.enonce_sub)
         };
         let (device, asic) = (sys::bapi_mining_agent(), sys::bapi_asic_model());
-        let version = crate::mdns::fw_version();
+        let version = crate::net::mdns::fw_version();
         let setup = v1::Setup {
             device: device.to_bytes(),
             asic: asic.to_bytes(),
@@ -1238,7 +1238,7 @@ impl Manager {
                 t.trigger_reconnect();
             }
             if self.pings[i].load(Acquire) {
-                crate::ping::reset(i as c_int);
+                crate::net::ping::reset(i as c_int);
             }
         }
     }
@@ -1275,7 +1275,7 @@ impl Manager {
             self.coinbase.reset_counts(i as i32);
             self.coinbase.clear_blocked(i as i32);
             if self.pings[i].load(Acquire) {
-                crate::ping::reset(i as c_int);
+                crate::net::ping::reset(i as c_int);
             }
         }
     }
@@ -1438,8 +1438,8 @@ impl Manager {
                 network_difficulty: st.network_difficulty,
                 pool_difficulty: st.pool_difficulty,
                 pool_diff_err: self.policy.pool_diff_err(i as i32),
-                ping_rtt: self.ping_value(i, crate::ping::api::ping_last_rtt),
-                ping_loss: self.ping_value(i, crate::ping::api::ping_recent_loss),
+                ping_rtt: self.ping_value(i, crate::net::ping::api::ping_last_rtt),
+                ping_loss: self.ping_value(i, crate::net::ping::api::ping_recent_loss),
                 verify_blocked: block_reason(self.coinbase_info(i as c_int).blocked)
                     .map(CStr::to_owned),
                 protocol: cfg[i].protocol as c_int,
@@ -1553,14 +1553,14 @@ unsafe extern "C" fn stratum_task_entry(arg: *mut c_void) {
     }
 }
 
-/// The ping task of a pool: the loop in `ping.rs`, the pings in C++.
+/// The ping task of a pool: the loop in `net/ping.rs`, the pings in C++.
 struct PingEnv {
     m: &'static Manager,
     pool: usize,
     tag: &'static CStr,
 }
 
-impl crate::ping::Env for PingEnv {
+impl crate::net::ping::Env for PingEnv {
     fn shutdown(&mut self) -> bool {
         crate::power_mgmt::is_shutdown()
     }
@@ -1576,8 +1576,8 @@ impl crate::ping::Env for PingEnv {
         let ip = self.m.task(self.pool)?.resolved_ip()?;
         Some((host, ip))
     }
-    fn ping(&mut self, ip: &str, host: &str) -> crate::ping::Round {
-        crate::ping_session::perform(self.pool, ip, host)
+    fn ping(&mut self, ip: &str, host: &str) -> crate::net::ping::Round {
+        crate::net::ping_session::perform(self.pool, ip, host)
     }
     fn log(&mut self, line: &str) {
         let level = if line.starts_with("No resolved") {
@@ -1597,7 +1597,7 @@ unsafe extern "C" fn ping_task_entry(arg: *mut c_void) {
         pool,
         tag: [c"ping task (pri)", c"ping task (sec)"][pool & 1],
     };
-    crate::ping::run(pool as c_int, &mut env)
+    crate::net::ping::run(pool as c_int, &mut env)
 }
 
 pub(crate) mod api {
@@ -1673,12 +1673,14 @@ pub(crate) mod api {
 
     /// Round trip time (ms) of the pool the v1 API shows; 0 without ping.
     pub fn pool_mgr_ping_rtt() -> f64 {
-        m().map_or(0.0, |m| m.compat_ping(crate::ping::api::ping_last_rtt))
+        m().map_or(0.0, |m| m.compat_ping(crate::net::ping::api::ping_last_rtt))
     }
 
     /// Recent ping loss (0..1) of the pool the v1 API shows.
     pub fn pool_mgr_ping_loss() -> f64 {
-        m().map_or(0.0, |m| m.compat_ping(crate::ping::api::ping_recent_loss))
+        m().map_or(0.0, |m| {
+            m.compat_ping(crate::net::ping::api::ping_recent_loss)
+        })
     }
 }
 

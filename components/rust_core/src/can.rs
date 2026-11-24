@@ -499,7 +499,7 @@ fn slave_config() -> [u8; can_master::CONFIG_LEN] {
     let text = |s: &[u8]| s[..s.len().min(15)].to_vec();
     let model = text(b.device_model.to_bytes());
     c[..model.len()].copy_from_slice(&model);
-    let fw = text(crate::mdns::fw_version().as_bytes());
+    let fw = text(crate::net::mdns::fw_version().as_bytes());
     c[16..16 + fw.len()].copy_from_slice(&fw);
     let freq = get_u16(b"asicfrequency", b.default_frequency as u16);
     let mv = get_u16(b"asicvoltage", b.default_voltage_mv as u16);

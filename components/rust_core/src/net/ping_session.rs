@@ -1,6 +1,6 @@
 //! One round of ICMP pings with `esp_ping` (port of `ping_perform` in
 //! `main/tasks/ping_task.cpp`); the loop and the statistics are in
-//! `ping.rs`.
+//! `net/ping.rs`.
 
 use crate::idf::idf_const;
 #[cfg(not(target_os = "espidf"))]
@@ -14,7 +14,7 @@ use std::time::Duration;
 use crate::idf::EspErr;
 use crate::idf::ESP_OK;
 use crate::log::log;
-use crate::ping::{Round, COUNT};
+use crate::net::ping::{Round, COUNT};
 
 const INTERVAL_MS: u32 = 1000;
 const TIMEOUT_MS: u32 = 1000;

@@ -89,7 +89,7 @@ pub(crate) fn identify(req: &mut Request) -> EspErr {
         device_model: Some(b.device_model.into()),
         default_theme: Some(b.default_theme.into()),
         otp: cfg_flag(b"otp_enabled", 0),
-        ap_active: crate::netmgr::ap_active(),
+        ap_active: crate::net::netmgr::ap_active(),
         core_dump_download: k::ESP_COREDUMP_ENABLE_TO_FLASH,
         can_enabled: cfg_flag(b"can_enabled", 0),
     };
@@ -101,7 +101,7 @@ pub(crate) fn system(req: &mut Request) -> EspErr {
     let b = board_info();
     let hostname = cfg_str(b"hostname", k::LWIP_LOCAL_HOSTNAME);
     let ssid = cfg_str(b"wifissid", k::ESP_WIFI_SSID);
-    let version = std::ffi::CString::new(crate::mdns::fw_version()).unwrap_or_default();
+    let version = std::ffi::CString::new(crate::net::mdns::fw_version()).unwrap_or_default();
     let ip = crate::system::ip();
     let wifi_status = crate::system::wifi_status();
     let v = V2System {
@@ -112,10 +112,10 @@ pub(crate) fn system(req: &mut Request) -> EspErr {
         last_reset_reason: Some(crate::system::reset_reason().into()),
         hostname: Some(hostname),
         ssid: Some(ssid),
-        mac_addr: Some(crate::network::mac_addr().into()),
+        mac_addr: Some(crate::net::network::mac_addr().into()),
         ip_addr: Some(ip),
         wifi_status: Some(wifi_status),
-        wifi_rssi: crate::network::wifi_rssi(),
+        wifi_rssi: crate::net::network::wifi_rssi(),
         free_heap: crate::idf::task::free_heap(CAP_SPIRAM) as u64,
         free_heap_int: crate::idf::task::free_heap(CAP_INTERNAL) as u64,
     };

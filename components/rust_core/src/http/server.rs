@@ -425,7 +425,7 @@ pub fn start() -> EspErr {
 
     // the captive portal: every A query answered with the access point's
     // address
-    crate::dns::start_server();
+    crate::net::dns::start_server();
     ESP_OK
 }
 

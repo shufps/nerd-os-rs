@@ -692,7 +692,7 @@ unsafe extern "C" fn ip_event(_: *mut c_void, _: *const c_char, id: i32, data: *
     HAS_IP.store(true, Ordering::Release);
     // Start IPv6: a link-local address enables router discovery and SLAAC.
     if let Some(n) = netif() {
-        crate::network::create_ip6_linklocal(n);
+        crate::net::network::create_ip6_linklocal(n);
     }
     log!(
         Warn,
@@ -736,10 +736,10 @@ pub fn start() -> EspErr {
 }
 
 /// The ETH netif once its setup succeeded.
-pub fn netif() -> Option<crate::network::NetifRef> {
+pub fn netif() -> Option<crate::net::network::NetifRef> {
     // SAFETY: NETIF holds only a netif whose setup succeeded, and such a
     // netif is never destroyed (see early_init())
-    unsafe { crate::network::NetifRef::permanent(NETIF.load(Ordering::Acquire)) }
+    unsafe { crate::net::network::NetifRef::permanent(NETIF.load(Ordering::Acquire)) }
 }
 
 pub fn has_ip() -> bool {

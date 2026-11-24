@@ -18,17 +18,15 @@ what a test would need. When an entry has been tested, delete it.
 
 ## Boards
 
-- **Boards other than the Q1373 and the NerdAxeGaia** (`src/board/mod.rs`).
+- **Boards other than the Q1373, the NerdAxeGaia, the NerdAxe and the NerdQAxe++** (`src/board/mod.rs`).
   All twelve boards build, and the init sequence on the Q1373 and the Gaia
-  is the same, line for line, as before. Not run on hardware:
+  is the same, line for line, as before. The NerdAxe (DS4432U DAC with
+  INA260) and the NerdQAxe++ run the alpha releases. Not run on hardware:
   - NerdQAxe+ and NerdOCTAXE+: control pins on GPIOs, chip temperatures
     from the ASICs every 15 s.
-  - NerdQAxe++: runs v2.0.0-alpha.1 (flashed with the web flasher); the
-    rev7 TPS546 detection is not covered.
   - NerdEKO and NerdHAXE-γ.
   - NerdOCTAXE-γ: VR detection on GPIO3, two TMP451 muxes.
   - Q1370: TMP451 mux on the FXL6408.
-  - NerdAxe: DS4432U DAC with INA260.
   - NerdAxeGamma.
 
   Each needs a flash and a comparison with the previous firmware (log of
@@ -47,23 +45,9 @@ what a test would need. When an entry has been tested, delete it.
 
 ## Power / boards
 
-- **rev7 TPS546 path**. Only the NerdAxe path ran on
-  hardware (Gamma). The rev7 path is covered by differential tests only.
-  Needs a NerdQAxe++ rev7.
-
-## OTA
-
-- **Factory OTA with `keep_config=false`** (`src/ota/factory_task.rs`):
-  the NVS erase after the update. Never run on the test boards (it wipes
-  the configuration). The update itself with `keep_config=true` ran on the
-  Q1373 (GitHub release v1.1.2).
-
-## Network
-
-- **Captive portal DNS from an access point client** (`src/net/dns.rs`).
-  This was tested with `dig` over the LAN, where the server also answers
-  with 192.168.4.1. Needs a phone or laptop on the device's access point
-  (no WiFi configured).
+- **rev7 TPS546 path** (also its detection). Only the NerdAxe path ran on
+  hardware (Gamma, Gaia). The rev7 path is covered by differential tests
+  only. Needs a NerdQAxe++ rev7 (none available).
 
 ## CAN (`src/can/mod.rs`, `src/http/v2/can.rs`)
 
@@ -92,8 +76,9 @@ Tested with the user on the Q1373 (2026-11-19):
 - ETH cable pulled and plugged back (WiFi fallback and back to ETH);
 - the access point portal with an empty NVS (AP up, captive DNS, WiFi saved through the portal, station connected after the reboot).
 
+Tested with the user on the NerdAxe (2026-11-24), after a factory update from GitHub with `keep_config=false` (NVS erased, AP up): the portal screen, the captive portal opening on a phone, the WiFi scan in the portal, the WiFi saved through the portal.
+
 Still to test:
-- the WiFi scan in the portal (`/api/v2/wifi/scan` with the AP active);
 - the WiFi reconnect backoff after a lost AP;
 - an ETH init failure (cleanup path). Since the soundness fixes it tears down
   in the IDF order (glue, netif, driver, PHY/MAC) and leaks MAC/PHY instead of
@@ -118,9 +103,10 @@ The screens of the display (formerly `main/displays/ui.cpp`) are built in Rust (
 
 Tested on a Q1373 (screenshots compared with the C++ screens): splash with donation QR, mining, settings, BTC, global stats, the screen cycle with button 1, the network icon switching from WiFi to Ethernet.
 
+Tested later: the power-off screen (Q1373, shutdown over the API), and on the NerdAxe the portal screen and the self test screens.
+
 Still to test:
-- the boards with their own theme (every board except Q1370/Q1373, NerdQAxe++ and NerdQX): the backgrounds and the label positions;
-- the portal screen (AP mode with SSID), the "found block" overlay, the power-off screen, the OTP enrollment QR code, the self test screen.
+- the boards with their own theme (every board except Q1370/Q1373, NerdQAxe++ and NerdQX): the backgrounds and the label positions.
 
 ## Display driver in Rust
 
@@ -128,9 +114,10 @@ The display driver (formerly `main/displays/displayDriver.cpp`, buttons, UI mess
 
 Tested on a Q1373: panel init, splash sequence, screen cycle with button 1, OTP QR screen with cancel by button, auto screen off (countdown, off, on by button), the real buttons (short presses, button 2 toggling the screen) and the shutdown countdown with both held; the found-block image and its close by a button (a real block replayed by a test stratum server).
 
+Tested with the user on the NerdAxe: the self test (`selftest` set, best difficulty 0): ASICs found, the result on the display, the flag cleared.
+
 Still to test:
 - identify (CAN command);
-- the self test (`selftest` set, best difficulty 0) with its two log screens;
 - a board with `flip_screen` (mirrored panel).
 
 ## IPv6 (pool connections and web access)

@@ -18,8 +18,6 @@ pub mod ajson;
 mod alloc;
 pub mod board;
 pub mod can;
-pub mod can_master;
-pub mod can_slave;
 pub mod clock;
 pub mod config;
 pub mod cutil;

@@ -178,9 +178,9 @@ pub struct CanMasterNode {
 /// `GET /api/v2/can/swarm`: the fleet totals, the master and the CAN slaves
 /// (from the CAN master's registry).
 pub fn can_swarm(m: &CanMasterNode) -> Json {
-    use crate::can_master::api as can;
-    use crate::can_master::{slave_config, slave_mac, slave_telemetry};
-    use crate::can_master::{CONFIG_LEN, SLAVE_MAX, TELEMETRY_LEN};
+    use crate::can::master::api as can;
+    use crate::can::master::{slave_config, slave_mac, slave_telemetry};
+    use crate::can::master::{CONFIG_LEN, SLAVE_MAX, TELEMETRY_LEN};
 
     let f32_at = |b: &[u8], at: usize| f32::from_le_bytes(b[at..at + 4].try_into().unwrap());
     let u16_at = |b: &[u8], at: usize| u16::from_le_bytes([b[at], b[at + 1]]);

@@ -2,18 +2,21 @@
 //! `can_master_task.cpp` and `can_slave_task.cpp`): the TWAI driver, the
 //! frames sent, the master's receive task and the slave's three tasks. The
 //! protocol state (master registry, slave negotiation, reassembly) was
-//! Rust already (`can_master.rs`, `can_slave.rs`).
+//! Rust already (`can/master.rs`, `can/slave.rs`).
 //!
 //! The TX mutex is a static, and a bus-off recovery waits for the stopped
 //! state the driver enters after recovery and restarts it.
+
+pub mod master;
+pub mod slave;
 
 use crate::idf::idf_const;
 use core::ffi::{c_int, c_void, CStr};
 use std::sync::Mutex;
 use std::time::Duration;
 
-use crate::can_master::{self, api as master, SLAVE_MAX};
-use crate::can_slave::{self, api as slave};
+use crate::can::master::{api as master_api, SLAVE_MAX};
+use crate::can::slave::api as slave_api;
 use crate::idf::nvs::{err_name, Nvs};
 use crate::idf::twai::{self, Message};
 use crate::idf::{ms_to_ticks, EspErr, ESP_OK};
@@ -26,14 +29,14 @@ const TAG_SENDER: &CStr = c"can_sender";
 const TAG_MASTER: &CStr = c"can_master";
 const TAG_SLAVE: &CStr = c"can_slave";
 
-const ID_HELLO: u32 = can_master::ID_HELLO;
-const ID_ASSIGN: u32 = can_slave::ID_ASSIGN;
-const ID_MASTER_BOOT: u32 = can_slave::ID_MASTER_BOOT;
-const ID_JOB_BASE: u32 = can_slave::ID_JOB_BASE;
-const ID_NONCE_BASE: u32 = can_master::ID_NONCE_BASE;
-const ID_TELEMETRY_BASE: u32 = can_master::ID_TELEMETRY_BASE;
-const ID_SETTINGS_BASE: u32 = can_slave::ID_SETTINGS_BASE;
-const ID_CONFIG_BASE: u32 = can_master::ID_CONFIG_BASE;
+const ID_HELLO: u32 = master::ID_HELLO;
+const ID_ASSIGN: u32 = slave::ID_ASSIGN;
+const ID_MASTER_BOOT: u32 = slave::ID_MASTER_BOOT;
+const ID_JOB_BASE: u32 = slave::ID_JOB_BASE;
+const ID_NONCE_BASE: u32 = master::ID_NONCE_BASE;
+const ID_TELEMETRY_BASE: u32 = master::ID_TELEMETRY_BASE;
+const ID_SETTINGS_BASE: u32 = slave::ID_SETTINGS_BASE;
+const ID_CONFIG_BASE: u32 = master::ID_CONFIG_BASE;
 const SEQ_LAST: u8 = 0xff;
 
 /// The settings commands (master -> slave, one frame).
@@ -270,7 +273,7 @@ pub fn send_settings_cmd(slave_id: u8, payload: &[u8]) {
 /// A job for a slave's ASICs: the `BM1368_job` bytes the chips get and the
 /// pool difficulty (the slave filters its nonces with it).
 pub fn send_raw_job(slave_id: u8, job_id: u8, job: &crate::mining::jobs::BmJob) {
-    let mut p = [0u8; can_slave::JOB_LEN + 4];
+    let mut p = [0u8; slave::JOB_LEN + 4];
     p[0] = job_id;
     p[1] = 0x01; // midstates
     p[2..6].copy_from_slice(&job.starting_nonce.to_le_bytes());
@@ -317,7 +320,7 @@ pub fn delete_slave(slave: u8) {
     if slave as usize >= SLAVE_MAX {
         return;
     }
-    master::can_master_delete(slave);
+    master_api::can_master_delete(slave);
     save_registry();
     log!(Info, TAG_MASTER, "Deleted slave id={slave} from registry");
 }
@@ -329,8 +332,8 @@ fn load_registry() {
     // a blob longer than the registry does not load (as nvs_get_blob()
     // into the registry buffer)
     if let Ok(blob) = nvs.get_blob(REGISTRY_KEY) {
-        if blob.len() <= can_master::REGISTRY_LEN {
-            can_master::load_registry(&blob);
+        if blob.len() <= master::REGISTRY_LEN {
+            master::load_registry(&blob);
         }
     }
 }
@@ -340,7 +343,7 @@ fn save_registry() {
         log!(Warn, TAG_MASTER, "NVS open failed, registry not saved");
         return;
     };
-    let blob = can_master::registry();
+    let blob = master::registry();
     nvs.set_blob(REGISTRY_KEY, &blob);
     nvs.commit();
 }
@@ -417,7 +420,7 @@ fn master_loop() -> ! {
             // about 1 s
             if timeouts >= 10 {
                 timeouts = 0;
-                master::can_master_tick(crate::cutil::now_us());
+                master_api::can_master_tick(crate::cutil::now_us());
                 status_line(TAG_MASTER);
             }
             continue;
@@ -427,14 +430,14 @@ fn master_loop() -> ! {
             continue;
         }
 
-        let ev = can_master::frame(
+        let ev = master::frame(
             msg.identifier,
             msg.data_length_code,
             &msg.data,
             crate::cutil::now_us(),
         );
         match ev.kind {
-            can_master::EVENT_ASSIGN => {
+            master::EVENT_ASSIGN => {
                 if ev.save_registry {
                     save_registry();
                 }
@@ -443,7 +446,7 @@ fn master_loop() -> ! {
                     send_settings_cmd(ev.slave_id, &[CMD_GET_CONFIG]);
                 }
             }
-            can_master::EVENT_NONCE => {
+            master::EVENT_NONCE => {
                 handle_nonce(ev.slave_id, ev.nonce, ev.rolled_version, ev.job_id)
             }
             _ => {}
@@ -455,10 +458,10 @@ fn master_loop() -> ! {
 // slave
 
 /// The live telemetry (`can_slave_telemetry_t`, 49 bytes, offsets as read
-/// by `can_master.rs`).
-fn telemetry() -> [u8; can_master::TELEMETRY_LEN] {
+/// by `can/master.rs`).
+fn telemetry() -> [u8; master::TELEMETRY_LEN] {
     use crate::power::mgmt::{fan_get, get as pm};
-    let mut t = [0u8; can_master::TELEMETRY_LEN];
+    let mut t = [0u8; master::TELEMETRY_LEN];
     let mut put = |at: usize, b: &[u8]| t[at..at + b.len()].copy_from_slice(b);
     put(0, &[TELEMETRY_VERSION]);
     put(1, &pm(3).to_le_bytes());
@@ -491,10 +494,10 @@ fn telemetry() -> [u8; can_master::TELEMETRY_LEN] {
 }
 
 /// The device info and settings (`can_slave_config_t`, 46 bytes).
-fn slave_config() -> [u8; can_master::CONFIG_LEN] {
+fn slave_config() -> [u8; master::CONFIG_LEN] {
     use crate::config::get_u16;
     let b = board_info();
-    let mut c = [0u8; can_master::CONFIG_LEN];
+    let mut c = [0u8; master::CONFIG_LEN];
     // NUL-terminated within 16 bytes
     let text = |s: &[u8]| s[..s.len().min(15)].to_vec();
     let model = text(b.device_model.to_bytes());
@@ -605,8 +608,8 @@ fn handle_settings_cmd(p: &[u8]) {
     }
     if send_config {
         crate::config::nvs::request_flush();
-        let id = slave::can_slave_id();
-        if id != can_slave::UNASSIGNED {
+        let id = slave_api::can_slave_id();
+        if id != slave::UNASSIGNED {
             send_slave_config(id);
         }
     }
@@ -619,10 +622,10 @@ fn now_ms() -> u64 {
 fn slave_loop() -> ! {
     let mac = sta_mac();
     // negotiation, job reassembly and store: can_slave.rs
-    slave::can_slave_init(mac);
+    slave_api::can_slave_init(mac);
     loop {
         // HELLO every second while unassigned
-        if slave::can_slave_hello_due(now_ms()) {
+        if slave_api::can_slave_hello_due(now_ms()) {
             send_hello(&mac);
             status_line(TAG_SLAVE);
         }
@@ -637,14 +640,15 @@ fn slave_loop() -> ! {
             continue;
         }
 
-        let ev = slave::can_slave_frame(msg.identifier, msg.data_length_code, &msg.data, now_ms());
+        let ev =
+            slave_api::can_slave_frame(msg.identifier, msg.data_length_code, &msg.data, now_ms());
         match ev.kind {
-            can_slave::EVENT_ASSIGNED => send_slave_config(ev.id),
-            can_slave::EVENT_COMMAND => {
+            slave::EVENT_ASSIGNED => send_slave_config(ev.id),
+            slave::EVENT_COMMAND => {
                 let n = (ev.id as usize).min(ev.cmd.len());
                 handle_settings_cmd(&ev.cmd[..n]);
             }
-            can_slave::EVENT_JOB => {
+            slave::EVENT_JOB => {
                 if let Some(a) = crate::board::get().and_then(|b| b.asic_handle()) {
                     a.run(|d, u| d.send_raw_job(u, &ev.job));
                 }
@@ -657,7 +661,7 @@ fn slave_loop() -> ! {
 /// A nonce back to the master: nonce, rolled version, job ID (9 bytes, 2
 /// frames, without the TX lock as before).
 fn send_nonce(slave_id: u8, r: &crate::mining::asic::TaskResult) {
-    let mut b = [0u8; can_master::NONCE_LEN];
+    let mut b = [0u8; master::NONCE_LEN];
     b[..4].copy_from_slice(&r.nonce.to_le_bytes());
     b[4..8].copy_from_slice(&r.rolled_version.to_le_bytes());
     b[8] = r.job_id;
@@ -670,8 +674,8 @@ fn send_nonce(slave_id: u8, r: &crate::mining::asic::TaskResult) {
 fn slave_result_loop() -> ! {
     log!(Info, TAG_SLAVE, "CAN slave result task started");
     loop {
-        let id = slave::can_slave_id();
-        if id == can_slave::UNASSIGNED {
+        let id = slave_api::can_slave_id();
+        if id == slave::UNASSIGNED {
             sleep_ms(100);
             continue;
         }
@@ -695,7 +699,7 @@ fn slave_result_loop() -> ! {
             continue;
         }
         // below the stored job's pool difficulty: not sent (can_slave.rs)
-        if slave::can_slave_check_nonce(r.job_id, r.nonce, r.rolled_version) {
+        if slave_api::can_slave_check_nonce(r.job_id, r.nonce, r.rolled_version) {
             send_nonce(id, &r);
         }
     }
@@ -705,8 +709,8 @@ fn slave_telemetry_loop() -> ! {
     log!(Info, TAG_SLAVE, "CAN slave telemetry task started");
     loop {
         sleep_ms(1000);
-        let id = slave::can_slave_id();
-        if id == can_slave::UNASSIGNED {
+        let id = slave_api::can_slave_id();
+        if id == slave::UNASSIGNED {
             continue;
         }
         send_multiframe(ID_TELEMETRY_BASE | (id & 0x7f) as u32, &telemetry());

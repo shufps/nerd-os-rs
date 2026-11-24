@@ -79,7 +79,7 @@ impl JobEnv for Jobs {
         })
     }
     fn slave_active(&mut self, slave: u8) -> bool {
-        crate::can_master::api::can_master_is_slave_active(slave)
+        crate::can::master::api::can_master_is_slave_active(slave)
     }
     fn send_slave_job(&mut self, slave: u8, job_id: u8, job: &BmJob) {
         crate::can::send_raw_job(slave, job_id, job)

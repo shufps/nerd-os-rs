@@ -20,7 +20,7 @@ mod golden;
 use golden::Rec;
 
 // rust_core's own exports (the history and the CAN master are globals)
-use rust_core::can_master::{
+use rust_core::can::master::{
     delete as can_master_delete, frame as can_master_frame,
     load_registry as can_master_load_registry, tick as can_master_tick,
 };

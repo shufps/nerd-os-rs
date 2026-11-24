@@ -394,8 +394,8 @@ pub fn run() -> ! {
         if can_slave {
             // the CAN ID in the IP label, every tick (the negotiation may
             // just have finished)
-            let id = crate::can_slave::api::can_slave_id();
-            let label = if id == crate::can_slave::UNASSIGNED {
+            let id = crate::can::slave::api::can_slave_id();
+            let label = if id == crate::can::slave::UNASSIGNED {
                 c"CAN: ...".into()
             } else {
                 CString::new(format!("CAN ID: {id}")).unwrap_or_default()

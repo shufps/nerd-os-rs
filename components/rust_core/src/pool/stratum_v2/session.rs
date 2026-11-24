@@ -386,6 +386,8 @@ impl Session {
         );
         self.events.push_back(Event::NetworkDifficulty(nbits));
         let first = self.prev.is_none();
+        // a pool may repeat the prev hash it sent last: the work is still good
+        let new_block = self.prev.as_ref().map_or(true, |p| p.hash != hash);
         self.prev = Some(PrevHash { hash, ntime, nbits });
         let slot = job_id as usize % PENDING_JOBS;
         // the first job emitted for the new block drops the old block's jobs,
@@ -443,11 +445,11 @@ impl Session {
 
         // No job went out for the new block: without this the miner would
         // keep hashing the old one until the pool sends the next job.
-        if self.clean_pending {
+        if self.clean_pending && new_block {
             log!(
                 Warn,
                 TAG,
-                "No job is waiting for prev_hash job_id={job_id}: the old work is dropped"
+                "No job is waiting for prev_hash job_id={job_id}: no work until the pool sends one"
             );
             self.events.push_back(Event::Invalidate);
         }
@@ -610,10 +612,15 @@ mod tests {
     }
 
     fn prev_hash(job_id: u32, ntime: u32) -> Vec<u8> {
+        prev_hash_of(job_id, ntime, 0xcd)
+    }
+
+    /// A SetNewPrevHash for the block whose hash is 32 times `hash`.
+    fn prev_hash_of(job_id: u32, ntime: u32, hash: u8) -> Vec<u8> {
         let mut m = Vec::new();
         m.extend(7u32.to_le_bytes());
         m.extend(job_id.to_le_bytes());
-        m.extend([0xcd; 32]);
+        m.extend([hash; 32]);
         m.extend(ntime.to_le_bytes());
         m.extend(0x1703_4219u32.to_le_bytes());
         m
@@ -784,7 +791,7 @@ mod tests {
         // job 9 was never sent, and job 17 has taken its slot: the work for
         // the old block is invalidated
         s.handle(MSG_NEW_EXTENDED_MINING_JOB, &ext_job(17, None, true));
-        s.handle(MSG_SET_NEW_PREV_HASH, &prev_hash(9, 1002));
+        s.handle(MSG_SET_NEW_PREV_HASH, &prev_hash_of(9, 1002, 0xce));
         assert_eq!(
             events(&mut s),
             [
@@ -799,6 +806,14 @@ mod tests {
         // and only that one
         s.handle(MSG_NEW_EXTENDED_MINING_JOB, &ext_job(19, Some(1004), true));
         assert_eq!(jobs(&mut s), [(19, false)]);
+
+        // the same prev hash again, for a job that is not waiting: the work
+        // is for this block and stays
+        s.handle(MSG_SET_NEW_PREV_HASH, &prev_hash_of(99, 1005, 0xce));
+        assert_eq!(
+            events(&mut s),
+            [Event::NetworkDifficulty(0x1703_4219), Event::ValidNotify]
+        );
 
         // Standard channel: the prevhash arrives before any job.
         let mut s = Session::new(false);

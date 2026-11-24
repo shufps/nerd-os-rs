@@ -3,30 +3,39 @@
 The firmware (everything except the display fonts and images and the web
 UI in `main/`). cargo builds this crate as one static library, which the
 ESP-IDF build links like any other component; the entry point is
-`app_main()` in `src/boot_firmware.rs`. Only two symbols are exported to C:
-`app_main` and `ws_log_enqueue` (for `ws_log.c`).
+`app_main()` in `src/board/boot_firmware.rs`. Only two symbols are exported
+to C: `app_main` and `ws_log_enqueue` (for `ws_log.c`).
 
-| Area | Modules |
+| Directory | Contents |
 |---|---|
-| boot, system task | `boot.rs`, `boot_firmware.rs`, `system.rs`, `tasks.rs` |
-| board and hardware | `board*.rs`, `asic/`, `tps546.rs`, `tps536x7.rs`, `emc2101.rs`, `emc2302.rs`, `ina260.rs`, `ds4432u.rs`, `power_mgmt.rs`, `fan_control.rs` |
-| mining | `jobs.rs`, `mining*.rs`, `hashrate.rs`, `history.rs` |
-| pools | `pool*.rs`, `stratum_v1/`, `stratum_v2/`, `stratum_task.rs`, `coinbase.rs` |
-| network, HTTP | `network.rs`, `wifi*.rs`, `w5500.rs`, `http_*.rs`, `ota_*.rs` |
-| display | `display*.rs`, `ui.rs`, `lvgl.rs` |
-| config, OTP, alerts | `config*.rs`, `cfg.rs`, `otp*.rs`, `discord.rs`, `influx.rs` |
-| CAN swarm | `can*.rs` |
+| `board/` | board detection and profiles, power and limits, boot and the firmware entry |
+| `drivers/` | chip drivers (TPS546, TPS536x7, EMC2101/2302, INA260, TMP451/1075, DS4432U, FXL6408, W5500), I2C and UART |
+| `power/` | the power task (telemetry, faults, overheat), fan control |
+| `mining/` | jobs, the mining tasks, hashrate, history, the ASIC drivers (`asic/`) |
+| `pool/` | the pool manager, statistics, coinbase verification, Stratum v1/v2 and their transport |
+| `net/` | Wi-Fi, Ethernet and the network manager, DNS, mDNS, ping |
+| `http/` | the HTTP server, auth, the REST API (`v1/`, `v2/`), web UI files, OTA uploads, websocket log |
+| `display/` | the display driver, buttons, the screens (`ui.rs`) on LVGL (`lvgl.rs`) |
+| `config/` | NVS config, typed getters (`cfg.rs`), applying settings, profiles, Kconfig values |
+| `services/` | webhook alerts and the metrics message, InfluxDB, the mempool API |
+| `security/` | OTP, crypto, secp256k1, the CA bundle |
+| `ota/` | firmware uploads and the update from GitHub |
+| `can/` | the CAN swarm (master, slave) |
+| `util/` | the ArduinoJson-compatible JSON code, C helpers, difficulty suffixes |
+| `idf/` | the ESP-IDF bindings and thin safe wrappers |
 
-Supporting modules:
-- `src/cutil.rs` reproduces C behaviour (`hex2bin`, newlib's `strtoul`) and
-  allocates memory that C frees.
-- `src/alloc.rs` is the global allocator, which prefers PSRAM like the
-  firmware's `MALLOC()`.
-- `src/crypto.rs`: HMAC/HKDF on the (hardware) SHA-256, ChaCha20-Poly1305
-  (RustCrypto), random numbers.
-- `src/secp.rs` binds the existing libsecp256k1 component, instead of a
-  second copy of the library from a crate.
-- `src/log.rs` logs through `esp_log_write`.
+At the top level: `system.rs` (the system task and state), `tasks.rs`,
+`clock.rs`, `stack_monitor.rs`, `alloc.rs` (the global allocator, which
+prefers PSRAM like the firmware's `MALLOC()`) and `log.rs` (logs through
+`esp_log_write`).
+
+Notes:
+- `src/util/cutil.rs` reproduces C behaviour (`hex2bin`, newlib's
+  `strtoul`).
+- `src/security/crypto.rs`: HMAC/HKDF on the (hardware) SHA-256,
+  ChaCha20-Poly1305 (RustCrypto), random numbers.
+- `src/security/secp.rs` binds the existing libsecp256k1 component, instead
+  of a second copy of the library from a crate.
 
 On the host, `build.rs` compiles libsecp256k1 and `host/esp_host.c`
 (stand-ins for `esp_transport_read/write` and `esp_fill_random` that tests

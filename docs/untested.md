@@ -18,7 +18,7 @@ what a test would need. When an entry has been tested, delete it.
 
 ## Boards
 
-- **Boards other than the Q1373 and the NerdAxeGaia** (`src/board.rs`).
+- **Boards other than the Q1373 and the NerdAxeGaia** (`src/board/mod.rs`).
   All twelve boards build, and the init sequence on the Q1373 and the Gaia
   is the same, line for line, as before. Not run on hardware:
   - NerdQAxe+ and NerdOCTAXE+: control pins on GPIOs, chip temperatures
@@ -53,19 +53,19 @@ what a test would need. When an entry has been tested, delete it.
 
 ## OTA
 
-- **Factory OTA with `keep_config=false`** (`src/ota_factory_task.rs`):
+- **Factory OTA with `keep_config=false`** (`src/ota/factory_task.rs`):
   the NVS erase after the update. Never run on the test boards (it wipes
   the configuration). The update itself with `keep_config=true` ran on the
   Q1373 (GitHub release v1.1.2).
 
 ## Network
 
-- **Captive portal DNS from an access point client** (`src/dns.rs`).
+- **Captive portal DNS from an access point client** (`src/net/dns.rs`).
   This was tested with `dig` over the LAN, where the server also answers
   with 192.168.4.1. Needs a phone or laptop on the device's access point
   (no WiFi configured).
 
-## CAN (`src/can.rs`, `src/http_can.rs`)
+## CAN (`src/can/mod.rs`, `src/http/v2/can.rs`)
 
 Tested on the Q1373 as a CAN master without other nodes:
 - the TWAI driver starts;
@@ -80,7 +80,7 @@ Untested (needs a second board on the bus):
 - the settings commands applied on a slave;
 - a bus-off recovery.
 
-## Network (`src/w5500.rs`, `src/network.rs`, PRs N1/N2)
+## Network (`src/drivers/w5500.rs`, `src/net/network.rs`, PRs N1/N2)
 
 Tested on the Q1373 with the cable plugged in:
 - W5500 setup, link up and DHCP over ETH;
@@ -114,7 +114,7 @@ Still to test on a NerdAxe Gaia: the Gaia-Dark theme and the VR gauge on the hom
 
 ## Display screens in Rust
 
-The screens of the display (formerly `main/displays/ui.cpp`) are built in Rust (`src/ui.rs` on the LVGL layer `src/lvgl.rs`); the C++ driver keeps the panel, the LVGL task, the buttons and the screen state machine.
+The screens of the display (formerly `main/displays/ui.cpp`) are built in Rust (`src/display/ui.rs` on the LVGL layer `src/display/lvgl.rs`); the C++ driver keeps the panel, the LVGL task, the buttons and the screen state machine.
 
 Tested on a Q1373 (screenshots compared with the C++ screens): splash with donation QR, mining, settings, BTC, global stats, the screen cycle with button 1, the network icon switching from WiFi to Ethernet.
 
@@ -124,7 +124,7 @@ Still to test:
 
 ## Display driver in Rust
 
-The display driver (formerly `main/displays/displayDriver.cpp`, buttons, UI messages) is in Rust (`src/display_driver.rs`, `src/display.rs`, `src/display_button.rs`), and so is the self test (`boot_firmware.rs`).
+The display driver (formerly `main/displays/displayDriver.cpp`, buttons, UI messages) is in Rust (`src/display/driver.rs`, `src/display/mod.rs`, `src/display/button.rs`), and so is the self test (`board/boot_firmware.rs`).
 
 Tested on a Q1373: panel init, splash sequence, screen cycle with button 1, OTP QR screen with cancel by button, auto screen off (countdown, off, on by button), the real buttons (short presses, button 2 toggling the screen) and the shutdown countdown with both held; the found-block image and its close by a button (a real block replayed by a test stratum server).
 
@@ -141,7 +141,7 @@ Tested with v2.0.0-alpha.4 on a NerdQAxe++ over Wi-Fi with SLAAC (unique-local p
 
 ## Metrics webhook
 
-New: a checkbox on the alert page with an interval (1, 2, 4, 6, 12 or 24 hours); a webhook message at that interval with hashrate, temperatures, power, shares, best difficulty, blocks and uptime (`src/heartbeat.rs`). Tested on a NerdAxe over the API with a local webhook listener.
+New: a checkbox on the alert page with an interval (1, 2, 4, 6, 12 or 24 hours); a webhook message at that interval with hashrate, temperatures, power, shares, best difficulty, blocks and uptime (`src/services/heartbeat.rs`). Tested on a NerdAxe over the API with a local webhook listener.
 
 Still to test:
 - the checkbox and interval select on the alert page in a browser;

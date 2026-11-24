@@ -5,6 +5,10 @@
 //! (`board/boot_firmware.rs`). C calls into it only through `app_main`,
 //! `ws_log_enqueue` and the callbacks it registers.
 //!
+//! The modules are grouped by subsystem (`board`, `drivers`, `power`,
+//! `mining`, `pool`, `net`, `http`, `display`, `config`, `services`,
+//! `security`, `ota`, `can`, `util`, `idf`); see `README.md`.
+//!
 //! All Rust code of the firmware must live in this one crate: two Rust static
 //! libraries in the same firmware would each bring their own copy of `std`.
 

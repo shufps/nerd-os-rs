@@ -10,11 +10,14 @@
 //! * the URL check also looks at the percent-decoded URL, so `%2E%2e` and
 //!   similar mixes are rejected like `%2e%2e`.
 
+use core::ffi::CStr;
+use std::ffi::CString;
+
 use crate::ajson;
 use crate::idf::idf_const;
 use crate::log::log;
 
-const TAG: &core::ffi::CStr = c"http_ota";
+const TAG: &CStr = c"http_ota";
 
 idf_const!(
     /// `HTTPD_SOCK_ERR_TIMEOUT`: the receive timed out (5 s), try again.
@@ -284,4 +287,46 @@ mod tests {
             }
         );
     }
+}
+
+#[cfg(target_os = "espidf")]
+pub use crate::idf::raw::esp_partition_t as Partition;
+
+#[cfg(not(target_os = "espidf"))]
+/// `esp_partition_t` (host model)
+#[repr(C)]
+pub struct Partition {
+    pub flash_chip: *mut core::ffi::c_void,
+    pub type_: core::ffi::c_int,
+    pub subtype: core::ffi::c_int,
+    pub address: u32,
+    pub size: u32,
+    pub erase_size: u32,
+    pub label: [core::ffi::c_char; 17],
+    pub encrypted: bool,
+    pub readonly: bool,
+}
+
+#[cfg(target_os = "espidf")]
+mod sys {
+    pub use crate::idf::raw::esp_ota_get_running_partition;
+}
+
+#[cfg(not(target_os = "espidf"))]
+#[allow(non_snake_case)]
+mod sys {
+    use super::*;
+    pub unsafe fn esp_ota_get_running_partition() -> *const Partition {
+        core::ptr::null()
+    }
+}
+
+pub(crate) fn running_partition() -> CString {
+    // SAFETY: no arguments; returns a pointer into the static partition table or NULL
+    let p = unsafe { sys::esp_ota_get_running_partition() };
+    if p.is_null() {
+        return CString::default();
+    }
+    // SAFETY: non-null and static; the label array is NUL-terminated
+    unsafe { CStr::from_ptr((*p).label.as_ptr()) }.into()
 }

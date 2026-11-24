@@ -321,36 +321,27 @@ unsafe fn register_routes() {
         let cpp = if builtin {
             None
         } else {
-            crate::http::handlers::handler(rt.handler)
-                .or(match rt.handler {
-                    Handler::Websocket => Some(crate::http::ws::handler as httpd::HandlerFn),
-                    Handler::File => Some(crate::http::files::file_handler as httpd::HandlerFn),
-                    Handler::Ota => Some(crate::ota_upload::firmware_update as httpd::HandlerFn),
-                    Handler::OtaWww => Some(crate::ota_upload::www_update as httpd::HandlerFn),
-                    Handler::Coredump => Some(crate::http::coredump::handler as httpd::HandlerFn),
-                    #[cfg(feature = "screenshot")]
-                    Handler::Screenshot => Some(crate::display_shot::handler as httpd::HandlerFn),
-                    #[cfg(feature = "screenshot")]
-                    Handler::Press => Some(crate::display_shot::press as httpd::HandlerFn),
-                    Handler::CanNodes => Some(crate::http::can::nodes as httpd::HandlerFn),
-                    Handler::CanSlaveAction => Some(crate::http::can::action as httpd::HandlerFn),
-                    Handler::CanSlavePatch => Some(crate::http::can::patch as httpd::HandlerFn),
-                    Handler::CanSlaveDelete => Some(crate::http::can::delete as httpd::HandlerFn),
-                    Handler::WifiScan => Some(crate::http::handlers::wifi_scan as httpd::HandlerFn),
-                    Handler::ProfilesGet => Some(crate::profiles::http::get as httpd::HandlerFn),
-                    Handler::ProfilesPatch => {
-                        Some(crate::profiles::http::patch as httpd::HandlerFn)
-                    }
-                    Handler::ProfileApply => Some(crate::profiles::http::apply as httpd::HandlerFn),
-                    Handler::OtaGithubPost => {
-                        Some(crate::ota_factory_task::post_handler as httpd::HandlerFn)
-                    }
-                    Handler::OtaGithubGet => {
-                        Some(crate::ota_factory_task::status_handler as httpd::HandlerFn)
-                    }
-                    _ => None,
-                })
-                .or_else(|| crate::http::data::handler(rt.handler))
+            crate::http::handler(rt.handler).or(match rt.handler {
+                Handler::Websocket => Some(crate::http::ws::handler as httpd::HandlerFn),
+                Handler::File => Some(crate::http::files::file_handler as httpd::HandlerFn),
+                Handler::Ota => Some(crate::ota_upload::firmware_update as httpd::HandlerFn),
+                Handler::OtaWww => Some(crate::ota_upload::www_update as httpd::HandlerFn),
+                Handler::Coredump => Some(crate::http::coredump::handler as httpd::HandlerFn),
+                #[cfg(feature = "screenshot")]
+                Handler::Screenshot => Some(crate::display_shot::handler as httpd::HandlerFn),
+                #[cfg(feature = "screenshot")]
+                Handler::Press => Some(crate::display_shot::press as httpd::HandlerFn),
+                Handler::ProfilesGet => Some(crate::profiles::http::get as httpd::HandlerFn),
+                Handler::ProfilesPatch => Some(crate::profiles::http::patch as httpd::HandlerFn),
+                Handler::ProfileApply => Some(crate::profiles::http::apply as httpd::HandlerFn),
+                Handler::OtaGithubPost => {
+                    Some(crate::ota_factory_task::post_handler as httpd::HandlerFn)
+                }
+                Handler::OtaGithubGet => {
+                    Some(crate::ota_factory_task::status_handler as httpd::HandlerFn)
+                }
+                _ => None,
+            })
         };
         if !routes::active(rt, recovery(), COREDUMP) || (!builtin && cpp.is_none()) {
             continue;

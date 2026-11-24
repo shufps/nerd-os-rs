@@ -384,7 +384,7 @@ pub fn apply(id: usize, s: &mut impl crate::settings_apply::Store) -> Option<Vec
     let p = with(|l| l.get(id).cloned())?;
     let mut applied = crate::settings_apply::Applied::default();
     let pid_use_max = crate::settings_apply::pid_use_max_board();
-    for w in crate::http::settings::settings_v2(&p.settings) {
+    for w in crate::http::v2::settings::settings_v2(&p.settings) {
         crate::settings_apply::apply(&w, &mut applied, pid_use_max, s);
     }
     s.set_u16(ACTIVE_KEY, id as u16);
@@ -421,14 +421,14 @@ pub mod http {
 
     /// `GET /api/v2/profiles`
     pub fn get(req: &mut Request) -> EspErr {
-        ensure_default(crate::http::data::v2_settings_doc);
+        ensure_default(crate::http::v2::settings::v2_settings_doc);
         let (l, a) = list();
         send_doc(req, to_json(&l, a))
     }
 
     /// `PATCH /api/v2/profiles` (OTP): replaces all profiles.
     pub fn patch(req: &mut Request) -> EspErr {
-        ensure_default(crate::http::data::v2_settings_doc);
+        ensure_default(crate::http::v2::settings::v2_settings_doc);
         let Some(b) = body(req) else {
             return ESP_FAIL;
         };
@@ -449,7 +449,7 @@ pub mod http {
     /// `POST /api/v2/profiles/apply` with `{"id": n}` (no OTP: it only
     /// selects a stored profile).
     pub fn apply(req: &mut Request) -> EspErr {
-        ensure_default(crate::http::data::v2_settings_doc);
+        ensure_default(crate::http::v2::settings::v2_settings_doc);
         let Some(b) = body(req) else {
             return ESP_FAIL;
         };
@@ -468,7 +468,7 @@ pub mod http {
                 (b"name".to_vec(), Json::Str(name)),
             ]),
         );
-        crate::http::data::reload_settings();
+        crate::http::sources::reload_settings();
         r
     }
 }

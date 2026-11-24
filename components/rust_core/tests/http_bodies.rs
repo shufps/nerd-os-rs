@@ -7,7 +7,11 @@
 use std::cell::{Cell, RefCell};
 
 use rust_core::http::query::{self, NodeId};
-use rust_core::http::settings::{self, Setting, Write};
+use rust_core::http::settings::{Setting, Write};
+use rust_core::http::v2::alert::settings_alert;
+use rust_core::http::v2::can::can_node;
+use rust_core::http::v2::influx::settings_influx;
+use rust_core::http::v2::otp::{otp_body, OtpBody};
 use rust_core::settings_apply::{apply, Applied, Store};
 
 mod golden;
@@ -69,10 +73,10 @@ fn settings(body: &[u8], parse: impl Fn(&rust_core::ajson::Json) -> Vec<Write>) 
 
 /// 0: ok (`enabled` set), 1: invalid JSON, 2: no bool `enabled`.
 fn otp(body: &[u8]) -> (i32, bool) {
-    match settings::otp_body(body) {
-        settings::OtpBody::Invalid => (1, false),
-        settings::OtpBody::NoEnabled => (2, false),
-        settings::OtpBody::Enabled(b) => (0, b),
+    match otp_body(body) {
+        OtpBody::Invalid => (1, false),
+        OtpBody::NoEnabled => (2, false),
+        OtpBody::Enabled(b) => (0, b),
     }
 }
 
@@ -83,7 +87,7 @@ fn can_body(body: &[u8], slave: u8) -> (bool, String) {
         return (false, String::new());
     };
     let mut log = String::new();
-    for w in settings::can_node(&doc) {
+    for w in can_node(&doc) {
         let n = w.num;
         let line = match w.setting {
             Setting::CanFrequency => format!("freq {slave} {}", n as u16),
@@ -226,10 +230,10 @@ fn influx_alert_otp_bodies_match_reference() {
     ];
     for _ in 0..20_000 {
         let b = body(&rng, &influx);
-        let new = settings(b.as_bytes(), settings::settings_influx);
+        let new = settings(b.as_bytes(), settings_influx);
         rec.add(format!("influx {b:?} -> {}\n{}", new.0, new.1));
         let b = body(&rng, &alert);
-        let new = settings(b.as_bytes(), settings::settings_alert);
+        let new = settings(b.as_bytes(), settings_alert);
         rec.add(format!("alert {b:?} -> {}\n{}", new.0, new.1));
         let b = body(&rng, &["enabled"]);
         let (new, e1) = otp(b.as_bytes());

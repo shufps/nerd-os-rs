@@ -1,7 +1,6 @@
-//! Settings request bodies of the HTTP API (port of the JSON handling in
-//! `PATCH /api/system` with `StratumManager::saveSettings()`, and
-//! `PATCH /api/v2/settings`): the body is parsed into typed writes, which
-//! `settings_apply.rs` applies to the config.
+//! Settings request bodies of the HTTP API: the typed writes
+//! (`settings_apply.rs` applies them to the config) and the field readers
+//! shared by the parsers next to the handlers in `v1/` and `v2/`.
 //!
 //! The JSON is read with ArduinoJson's rules ([`crate::ajson`]), and
 //! `is<T>()` only accepts values of that type (integers in range for integer
@@ -100,56 +99,56 @@ pub struct Write {
 
 // ---- ArduinoJson's is<T>() / as<T>() on the parsed value ----
 
-const NULL: Json = Json::Null;
+pub(crate) const NULL: Json = Json::Null;
 
-fn field<'a>(v: &'a Json, key: &str) -> &'a Json {
+pub(crate) fn field<'a>(v: &'a Json, key: &str) -> &'a Json {
     v.get(key)
 }
 
 /// `is<uintN_t>()` with the given maximum.
-fn uint(v: &Json, max: u64) -> Option<u32> {
+pub(crate) fn uint(v: &Json, max: u64) -> Option<u32> {
     v.as_uint(max).map(|n| n as u32)
 }
 
 /// The auto screen off time: 5 s to 1 h, else ignored.
-fn screen_off_secs(v: &Json) -> Option<u32> {
+pub(crate) fn screen_off_secs(v: &Json) -> Option<u32> {
     uint(v, 0xffff)
         .filter(|s| (crate::cfg::SCREEN_OFF_MIN_S..=crate::cfg::SCREEN_OFF_MAX_S).contains(s))
 }
 
-fn boolean(v: &Json) -> Option<bool> {
+pub(crate) fn boolean(v: &Json) -> Option<bool> {
     v.as_bool()
 }
 
 /// `is<const char *>()`, as C sees it.
-fn string(v: &Json) -> Option<Vec<u8>> {
+pub(crate) fn string(v: &Json) -> Option<Vec<u8>> {
     v.as_cstr().map(<[u8]>::to_vec)
 }
 
 /// `is<float>()` (any number), `as<float>()`.
-fn float(v: &Json) -> Option<f32> {
+pub(crate) fn num_f32(v: &Json) -> Option<f32> {
     v.as_f32()
 }
 
 /// `is<bool>() || is<int>()`, then `as<int>() != 0`.
-fn flag(v: &Json) -> Option<bool> {
+pub(crate) fn flag(v: &Json) -> Option<bool> {
     v.as_bool().or_else(|| v.as_int().map(|i| i != 0))
 }
 
 /// A PID factor as stored: hundredths, rounded, saturated.
-fn hundredths(f: f32) -> u32 {
+pub(crate) fn hundredths(f: f32) -> u32 {
     (f * 100.0).round() as u16 as u32
 }
 
 /// The coinbase fee as stored: tenths of a percent, rounded, saturated.
-fn tenths(f: f32) -> u32 {
+pub(crate) fn tenths(f: f32) -> u32 {
     (f * 10.0).round() as u16 as u32
 }
 
-struct Out(Vec<Write>);
+pub(crate) struct Out(pub(crate) Vec<Write>);
 
 impl Out {
-    fn num(&mut self, setting: Setting, index: i32, num: Option<u32>) {
+    pub(crate) fn num(&mut self, setting: Setting, index: i32, num: Option<u32>) {
         if let Some(num) = num {
             self.0.push(Write {
                 setting,
@@ -159,10 +158,10 @@ impl Out {
             });
         }
     }
-    fn bool(&mut self, setting: Setting, index: i32, b: Option<bool>) {
+    pub(crate) fn bool(&mut self, setting: Setting, index: i32, b: Option<bool>) {
         self.num(setting, index, b.map(u32::from));
     }
-    fn text(&mut self, setting: Setting, index: i32, text: Option<Vec<u8>>) {
+    pub(crate) fn text(&mut self, setting: Setting, index: i32, text: Option<Vec<u8>>) {
         if let Some(text) = text {
             self.0.push(Write {
                 setting,
@@ -174,11 +173,11 @@ impl Out {
     }
 }
 
-use Setting as S;
+pub(crate) use Setting as S;
 
 /// The `fans` array: at most two entries (channels 0 and 1); entries that
 /// are not objects still take a channel.
-fn fans(doc: &Json, out: &mut Out) {
+pub(crate) fn fans(doc: &Json, out: &mut Out) {
     let Some(fans) = field(doc, "fans").as_array() else {
         return;
     };
@@ -203,242 +202,16 @@ fn fans(doc: &Json, out: &mut Out) {
                 ch,
                 uint(field(pid, "targetTemp"), 0xffff),
             );
-            out.num(S::FanPidP, ch, float(field(pid, "p")).map(hundredths));
-            out.num(S::FanPidI, ch, float(field(pid, "i")).map(hundredths));
-            out.num(S::FanPidD, ch, float(field(pid, "d")).map(hundredths));
+            out.num(S::FanPidP, ch, num_f32(field(pid, "p")).map(hundredths));
+            out.num(S::FanPidI, ch, num_f32(field(pid, "i")).map(hundredths));
+            out.num(S::FanPidD, ch, num_f32(field(pid, "d")).map(hundredths));
         }
     }
 }
 
 /// ASIC values the handlers only take when not 0.
-fn nonzero(v: &Json) -> Option<u32> {
+pub(crate) fn nonzero(v: &Json) -> Option<u32> {
     uint(v, 0xffff).filter(|&n| n > 0)
-}
-
-/// `PATCH /api/system` (v1): the flat fields, then `fans`, then the flat
-/// stratum fields of `StratumManager::saveSettings()`; in dual pool mode
-/// `poolBalance` before them (`StratumManagerDualPool::saveSettings()`).
-pub fn settings_v1(doc: &Json, dual_pool: bool) -> Vec<Write> {
-    let mut out = Out(Vec::new());
-    let f = |k| field(doc, k);
-    out.text(S::WifiSsid, 0, string(f("ssid")));
-    out.text(S::WifiPass, 0, string(f("wifiPass")));
-    out.text(S::Hostname, 0, string(f("hostname")));
-    out.num(S::AsicVoltage, 0, nonzero(f("coreVoltage")));
-    out.num(S::AsicFrequency, 0, nonzero(f("frequency")));
-    out.num(S::AsicJobInterval, 0, nonzero(f("jobInterval")));
-    out.num(
-        S::StratumDifficulty,
-        0,
-        uint(f("stratumDifficulty"), 0xffff_ffff),
-    );
-    out.bool(S::FlipScreen, 0, boolean(f("flipscreen")));
-    out.num(S::OverheatTemp, 0, uint(f("overheat_temp"), 0xffff));
-    out.bool(S::InvertScreen, 0, boolean(f("invertscreen")));
-    out.bool(S::FanPolarity, 0, boolean(f("invertfanpolarity")));
-    out.num(S::TempControlMode, 0, uint(f("autofanspeed"), 0xffff));
-    out.num(S::FanSpeed, 0, uint(f("manualFanSpeed"), 0xffff));
-    out.bool(S::AutoScreenOff, 0, boolean(f("autoscreenoff")));
-    out.num(
-        S::AutoScreenOffTimeout,
-        0,
-        screen_off_secs(f("autoscreenofftimeout")),
-    );
-    out.bool(S::StratumKeepalive, 0, flag(f("stratum_keep")));
-    out.num(S::PidTargetTemp, 0, uint(f("pidTargetTemp"), 0xffff));
-    out.num(S::PidP, 0, float(f("pidP")).map(hundredths));
-    out.num(S::PidI, 0, float(f("pidI")).map(hundredths));
-    out.num(S::PidD, 0, float(f("pidD")).map(hundredths));
-    out.num(S::VrFrequency, 0, uint(f("vrFrequency"), 0xffff_ffff));
-    fans(doc, &mut out);
-
-    // StratumManager::saveSettings()
-    if dual_pool {
-        out.num(S::PoolBalance, 0, uint(f("poolBalance"), 0xffff));
-    }
-    out.num(S::PoolMode, 0, uint(f("poolMode"), 1));
-    for (pool, prefix) in [(0, ""), (1, "fallback")] {
-        let key = |name: &str| {
-            if prefix.is_empty() {
-                format!("stratum{name}")
-            } else {
-                format!("fallbackStratum{name}")
-            }
-        };
-        let f = |name: &str| field(doc, &key(name));
-        out.text(S::StratumUrl, pool, string(f("URL")));
-        out.text(S::StratumUser, pool, string(f("User")));
-        out.text(S::StratumPass, pool, string(f("Password")));
-        out.num(S::StratumPort, pool, uint(f("Port"), 0xffff));
-        out.bool(
-            S::StratumEnonceSubscribe,
-            pool,
-            boolean(f("EnonceSubscribe")),
-        );
-        out.bool(S::StratumTls, pool, boolean(f("TLS")));
-    }
-    out.num(S::StratumProtocol, 0, uint(f("stratumProtocol"), 0xffff));
-    out.num(
-        S::StratumProtocol,
-        1,
-        uint(f("fallbackStratumProtocol"), 0xffff),
-    );
-    out.text(S::Sv2AuthorityPubkey, 0, string(f("sv2AuthorityPubkey")));
-    out.text(
-        S::Sv2AuthorityPubkey,
-        1,
-        string(f("fallbackSv2AuthorityPubkey")),
-    );
-    out.num(S::Sv2ChannelType, 0, uint(f("sv2ChannelType"), 0xffff));
-    out.num(
-        S::Sv2ChannelType,
-        1,
-        uint(f("fallbackSv2ChannelType"), 0xffff),
-    );
-    out.0
-}
-
-/// `PATCH /api/v2/settings`: the flat fields, `fans`, then `pools` (at most
-/// two; entries that are not objects are skipped).
-pub fn settings_v2(doc: &Json) -> Vec<Write> {
-    let mut out = Out(Vec::new());
-    let f = |k| field(doc, k);
-    out.text(S::WifiSsid, 0, string(f("ssid")));
-    out.text(S::WifiPass, 0, string(f("wifiPass")));
-    out.text(S::Hostname, 0, string(f("hostname")));
-    out.num(S::AsicVoltage, 0, nonzero(f("coreVoltage")));
-    out.num(S::AsicFrequency, 0, nonzero(f("frequency")));
-    out.num(S::AsicJobInterval, 0, nonzero(f("jobInterval")));
-    out.num(
-        S::StratumDifficulty,
-        0,
-        uint(f("stratumDifficulty"), 0xffff_ffff),
-    );
-    out.num(S::VrFrequency, 0, uint(f("vrFrequency"), 0xffff_ffff));
-    out.bool(S::FlipScreen, 0, boolean(f("flipScreen")));
-    out.bool(S::InvertScreen, 0, boolean(f("invertScreen")));
-    out.bool(S::AutoScreenOff, 0, boolean(f("autoScreenOff")));
-    out.num(
-        S::AutoScreenOffTimeout,
-        0,
-        screen_off_secs(f("autoScreenOffTimeout")),
-    );
-    out.bool(S::MempoolCustom, 0, boolean(f("mempoolCustom")));
-    out.text(S::MempoolUrl, 0, string(f("mempoolUrl")));
-    out.bool(S::FanPolarity, 0, boolean(f("invertFanPolarity")));
-    // only some boards apply it (settings_apply.cpp)
-    out.bool(S::FanPidUseMax, 0, boolean(f("pidUseMax")));
-    out.bool(S::StratumKeepalive, 0, flag(f("stratumKeep")));
-    out.bool(S::CanEnabled, 0, flag(f("canMaster")));
-    fans(doc, &mut out);
-
-    out.num(S::PoolMode, 0, uint(f("poolMode"), 1));
-    out.num(S::PoolBalance, 0, uint(f("poolBalance"), 0xffff));
-    if let Some(pools) = f("pools").as_array() {
-        for (i, pool) in pools.iter().take(2).enumerate() {
-            let i = i as i32;
-            let p = |k| field(pool, k);
-            out.text(S::StratumUrl, i, string(p("url")));
-            out.num(S::StratumPort, i, uint(p("port"), 0xffff));
-            out.text(S::StratumUser, i, string(p("user")));
-            out.text(S::StratumPass, i, string(p("password")));
-            out.bool(S::StratumEnonceSubscribe, i, boolean(p("enonceSubscribe")));
-            out.bool(S::StratumTls, i, boolean(p("tls")));
-            out.num(S::StratumProtocol, i, uint(p("protocol"), 0xffff));
-            out.text(S::Sv2AuthorityPubkey, i, string(p("sv2AuthorityPubkey")));
-            out.num(S::Sv2ChannelType, i, uint(p("sv2ChannelType"), 0xffff));
-            out.bool(S::Sv2RequireAuth, i, boolean(p("sv2RequireAuth")));
-            out.num(
-                S::CoinbaseVerifyMode,
-                i,
-                uint(p("coinbaseVerifyMode"), 0xffff),
-            );
-            out.num(S::CoinbaseMaxFee, i, float(p("coinbaseMaxFee")).map(tenths));
-            out.bool(S::CoinbaseVerifyForce, i, boolean(p("coinbaseVerifyForce")));
-        }
-    }
-    out.0
-}
-
-/// `PATCH /api/v2/influx`.
-pub fn settings_influx(doc: &Json) -> Vec<Write> {
-    let mut out = Out(Vec::new());
-    let f = |k| field(doc, k);
-    out.bool(S::InfluxEnabled, 0, boolean(f("enabled")));
-    out.text(S::InfluxUrl, 0, string(f("url")));
-    out.num(S::InfluxPort, 0, uint(f("port"), 0xffff));
-    out.text(S::InfluxToken, 0, string(f("token")));
-    out.text(S::InfluxBucket, 0, string(f("bucket")));
-    out.text(S::InfluxOrg, 0, string(f("org")));
-    out.text(S::InfluxPrefix, 0, string(f("prefix")));
-    out.0
-}
-
-/// `PATCH /api/v2/alert`.
-pub fn settings_alert(doc: &Json) -> Vec<Write> {
-    let mut out = Out(Vec::new());
-    let f = |k| field(doc, k);
-    out.text(S::DiscordWebhook, 0, string(f("webhookUrl")));
-    out.bool(S::DiscordWatchdog, 0, boolean(f("watchdogEnable")));
-    out.bool(S::DiscordBlockFound, 0, boolean(f("blockFoundEnable")));
-    out.bool(S::DiscordBestDiff, 0, boolean(f("bestDiffEnable")));
-    out.bool(
-        S::DiscordCoinbaseVerify,
-        0,
-        boolean(f("coinbaseVerifyEnable")),
-    );
-    out.bool(S::ShowBlockFound, 0, boolean(f("showBlockFoundScreen")));
-    out.num(
-        S::HeartbeatHours,
-        0,
-        uint(f("heartbeatHours"), crate::heartbeat::MAX_HOURS as u64),
-    );
-    out.0
-}
-
-/// `PATCH /api/v2/can/nodes/{id}`: frequency, voltage, a fan command per
-/// entry of `fans` (at most two; values converted like `as<uint8_t>()`, so
-/// missing ones are 0), then the display flags if either is a bool.
-pub fn can_node(doc: &Json) -> Vec<Write> {
-    let mut out = Out(Vec::new());
-    let f = |k| field(doc, k);
-    out.num(S::CanFrequency, 0, uint(f("frequency"), 0xffff));
-    out.num(S::CanVoltage, 0, uint(f("coreVoltage"), 0xffff));
-    if let Some(fans) = f("fans").as_array() {
-        for (ch, fan) in fans.iter().take(2).enumerate() {
-            let fan = if fan.is_object() { fan } else { &NULL };
-            let b = |k| field(fan, k).to_u8() as u32;
-            let num =
-                b("mode") | b("manualSpeed") << 8 | b("targetTemp") << 16 | b("overheatTemp") << 24;
-            out.num(S::CanFan, ch as i32, Some(num));
-        }
-    }
-    let (flip, auto_off) = (f("flipScreen"), f("autoScreenOff"));
-    if flip.as_bool().is_some() || auto_off.as_bool().is_some() {
-        out.num(
-            S::CanDisplay,
-            0,
-            Some(flip.truthy() as u32 | (auto_off.truthy() as u32) << 1),
-        );
-    }
-    out.0
-}
-
-/// `PATCH /api/v2/otp`: the `enabled` flag.
-pub enum OtpBody {
-    Invalid,
-    NoEnabled,
-    Enabled(bool),
-}
-
-pub fn otp_body(body: &[u8]) -> OtpBody {
-    match crate::ajson::deserialize(body) {
-        Err(_) => OtpBody::Invalid,
-        Ok(doc) => doc
-            .get("enabled")
-            .as_bool()
-            .map_or(OtpBody::NoEnabled, OtpBody::Enabled),
-    }
 }
 
 #[cfg(test)]
@@ -455,39 +228,10 @@ mod tests {
     }
 
     #[test]
-    fn auto_screen_off_timeout_range() {
-        let get = |body: &str| {
-            let doc = crate::ajson::deserialize(body.as_bytes()).unwrap();
-            settings_v2(&doc)
-                .into_iter()
-                .find(|w| w.setting == Setting::AutoScreenOffTimeout)
-                .map(|w| w.num)
-        };
-        assert_eq!(get(r#"{"autoScreenOffTimeout":300}"#), Some(300));
-        assert_eq!(get(r#"{"autoScreenOffTimeout":5}"#), Some(5));
-        assert_eq!(get(r#"{"autoScreenOffTimeout":3600}"#), Some(3600));
-        assert_eq!(get(r#"{"autoScreenOffTimeout":4}"#), None);
-        assert_eq!(get(r#"{"autoScreenOffTimeout":3601}"#), None);
-        assert_eq!(get(r#"{"autoScreenOffTimeout":"60"}"#), None);
-    }
-
-    #[test]
     fn pid_factors_keep_their_hundredths() {
         // 0.53 * 100.0 is 52.999996 in f32
         for h in 0..1000u32 {
             assert_eq!(hundredths(h as f32 / 100.0), h);
         }
-    }
-
-    #[test]
-    fn heartbeat_hours() {
-        let parse = |b: &str| settings_alert(&crate::ajson::deserialize(b.as_bytes()).unwrap());
-        let w = parse(r#"{"heartbeatHours":6}"#);
-        assert_eq!((w.len(), w[0].setting, w[0].num), (1, S::HeartbeatHours, 6));
-        assert_eq!(parse(r#"{"heartbeatHours":0}"#)[0].num, 0);
-        // out of range or not a number: ignored
-        assert!(parse(r#"{"heartbeatHours":25}"#).is_empty());
-        assert!(parse(r#"{"heartbeatHours":-1}"#).is_empty());
-        assert!(parse(r#"{"heartbeatHours":"6"}"#).is_empty());
     }
 }

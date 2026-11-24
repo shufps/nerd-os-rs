@@ -7,7 +7,7 @@
 use crate::idf::idf_const;
 use core::ffi::{c_void, CStr};
 
-use crate::http::data::Partition;
+use crate::http::ota::Partition;
 use crate::idf::httpd::{self, err, Request};
 use crate::idf::nvs::err_name;
 use crate::idf::{EspErr, ESP_FAIL, ESP_OK};

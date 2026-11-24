@@ -5,7 +5,9 @@
 
 use std::cell::{Cell, RefCell};
 
-use rust_core::http::settings::{self, Write};
+use rust_core::http::settings::Write;
+use rust_core::http::v1::settings as v1;
+use rust_core::http::v2::settings as v2;
 use rust_core::settings_apply::{apply, Applied, Store};
 
 mod golden;
@@ -306,12 +308,12 @@ fn run(
 }
 
 fn settings_v1(body: &[u8], dual_pool: bool) -> (bool, String) {
-    let ((ok, _), log) = run(body, |d| settings::settings_v1(d, dual_pool));
+    let ((ok, _), log) = run(body, |d| v1::settings_v1(d, dual_pool));
     (ok, log)
 }
 
 fn settings_v2(body: &[u8]) -> ((bool, [bool; 2]), String) {
-    let ((ok, a), log) = run(body, settings::settings_v2);
+    let ((ok, a), log) = run(body, v2::settings_v2);
     ((ok, a.verify_changed), log)
 }
 

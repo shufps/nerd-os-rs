@@ -9,7 +9,7 @@
 use crate::idf::idf_const;
 use core::ffi::{c_int, c_void, CStr};
 
-use crate::http::data::Partition;
+use crate::http::ota::Partition;
 use crate::http::ota::{receive_upload, UploadError, UploadIo};
 use crate::idf::httpd::{self, err, Request};
 use crate::idf::{EspErr, ESP_FAIL, ESP_OK};

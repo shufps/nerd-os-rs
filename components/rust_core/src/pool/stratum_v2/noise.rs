@@ -17,10 +17,10 @@ use core::ffi::{c_char, c_int, c_void, CStr};
 use std::sync::atomic::{AtomicBool, Ordering};
 
 use super::protocol::{parse_frame_header, FRAME_HEADER_SIZE};
-use crate::crypto::{decrypt_into, encrypt, hkdf2, random32, wipe, TAG_LEN};
 use crate::log::log;
 use crate::mining::sha256;
-use crate::secp::Context;
+use crate::security::crypto::{decrypt_into, encrypt, hkdf2, random32, wipe, TAG_LEN};
+use crate::security::secp::Context;
 
 pub const PROTOCOL_NAME: &[u8] = b"Noise_NX_Secp256k1+EllSwift_ChaChaPoly_SHA256";
 

@@ -145,7 +145,7 @@ pub fn validate_otp(req: &mut Request, force: bool) -> EspErr {
     let sess = header(req, c"X-OTP-Session", 128);
     let totp = header(req, c"X-TOTP", 16);
     use crate::clock;
-    let auth = crate::otp::request(
+    let auth = crate::security::otp::request(
         force,
         sess.as_deref().map(CStr::to_bytes),
         totp.as_deref().map(CStr::to_bytes),
@@ -154,12 +154,12 @@ pub fn validate_otp(req: &mut Request, force: bool) -> EspErr {
         clock::now_ms(),
     );
     match auth {
-        crate::otp::Auth::Ok => ESP_OK,
-        crate::otp::Auth::Blocked => {
+        crate::security::otp::Auth::Ok => ESP_OK,
+        crate::security::otp::Auth::Blocked => {
             req.send_err(err::E401_UNAUTHORIZED, Some(c"blocked for 5 minutes"));
             ESP_FAIL
         }
-        crate::otp::Auth::Failed => {
+        crate::security::otp::Auth::Failed => {
             req.send_err(err::E401_UNAUTHORIZED, Some(c"OTP/Session required"));
             ESP_FAIL
         }

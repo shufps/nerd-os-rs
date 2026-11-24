@@ -8,7 +8,6 @@
 use std::cell::RefCell;
 use std::collections::VecDeque;
 
-use rust_core::crypto::{encrypt, hkdf2};
 use rust_core::mining::sha256;
 use rust_core::pool::stratum_v2::noise::{
     self_test, Cipher, Handshake, Wire, ACT2_LEN, PROTOCOL_NAME,
@@ -16,7 +15,8 @@ use rust_core::pool::stratum_v2::noise::{
 use rust_core::pool::stratum_v2::protocol::{
     encode_frame_header, parse_frame_header, FRAME_HEADER_SIZE,
 };
-use rust_core::secp::{self, Context, Keypair, Opaque64};
+use rust_core::security::crypto::{encrypt, hkdf2};
+use rust_core::security::secp::{self, Context, Keypair, Opaque64};
 
 mod golden;
 use golden::Rec;

@@ -54,12 +54,12 @@ idf_const!(
 const SESSION_TTL_S: u32 = 24 * 3600;
 
 pub(crate) fn create(req: &mut Request) -> EspErr {
-    use crate::otp::api::otp_is_enabled;
+    use crate::security::otp::api::otp_is_enabled;
     if otp_is_enabled() {
         return send_err(req, err::E405_METHOD_NOT_ALLOWED, c"OTP is enabled");
     }
     // an enrollment already started: no new QR, no error
-    match crate::otp_device::api::otp_dev_start_enrollment() {
+    match crate::security::otp_device::api::otp_dev_start_enrollment() {
         ESP_ERR_NOT_FINISHED => {
             end_chunks(req);
             return ESP_OK;
@@ -81,8 +81,8 @@ pub(crate) fn create(req: &mut Request) -> EspErr {
 }
 
 pub(crate) fn patch(req: &mut Request) -> EspErr {
-    use crate::otp::api::{otp_save, otp_set_enabled};
-    use crate::otp::disable_enrollment as otp_disable_enrollment;
+    use crate::security::otp::api::{otp_save, otp_set_enabled};
+    use crate::security::otp::disable_enrollment as otp_disable_enrollment;
     // stops an enrollment (if one runs), hides the QR in any case
     otp_disable_enrollment();
     crate::display::send_hide_qr();
@@ -115,11 +115,11 @@ pub(crate) fn patch(req: &mut Request) -> EspErr {
 }
 
 pub(crate) fn status(req: &mut Request) -> EspErr {
-    send_doc(req, otp_status(crate::otp::api::otp_is_enabled()))
+    send_doc(req, otp_status(crate::security::otp::api::otp_is_enabled()))
 }
 
 pub(crate) fn session(req: &mut Request) -> EspErr {
-    if !crate::otp::api::otp_is_enabled() {
+    if !crate::security::otp::api::otp_is_enabled() {
         return send_err(req, err::E405_METHOD_NOT_ALLOWED, c"OTP disabled");
     }
     const TOTP_CAP: usize = 16;
@@ -135,15 +135,18 @@ pub(crate) fn session(req: &mut Request) -> EspErr {
     // behind the rate limit
     let now = crate::clock::now() as i64;
     let synced = crate::clock::is_time_synced();
-    match crate::otp::login(totp.to_bytes(), now, synced, crate::clock::now_ms()) {
-        crate::otp::Auth::Ok => {}
-        crate::otp::Auth::Blocked => {
+    match crate::security::otp::login(totp.to_bytes(), now, synced, crate::clock::now_ms()) {
+        crate::security::otp::Auth::Ok => {}
+        crate::security::otp::Auth::Blocked => {
             return send_err(req, err::E401_UNAUTHORIZED, c"blocked for 5 minutes")
         }
-        crate::otp::Auth::Failed => return send_err(req, err::E401_UNAUTHORIZED, c"Invalid TOTP"),
+        crate::security::otp::Auth::Failed => {
+            return send_err(req, err::E401_UNAUTHORIZED, c"Invalid TOTP")
+        }
     }
     // (the former 96 byte buffer)
-    let Some(token) = crate::otp::mint(SESSION_TTL_S, now).filter(|t| t.len() < 96) else {
+    let Some(token) = crate::security::otp::mint(SESSION_TTL_S, now).filter(|t| t.len() < 96)
+    else {
         log!(Error, c"http_otp", "createSessionToken failed");
         return send_err(req, err::E500_INTERNAL_SERVER_ERROR, c"Session error");
     };

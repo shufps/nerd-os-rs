@@ -270,7 +270,10 @@ impl Transport {
                     log!(Error, TAG, "esp_transport_ssl_init failed");
                     return false;
                 }
-                sys::esp_transport_ssl_crt_bundle_attach(t, Some(crate::crt_bundle::attach));
+                sys::esp_transport_ssl_crt_bundle_attach(
+                    t,
+                    Some(crate::security::crt_bundle::attach),
+                );
                 sys::esp_transport_ssl_set_common_name(t, host.as_ptr());
                 t
             } else {

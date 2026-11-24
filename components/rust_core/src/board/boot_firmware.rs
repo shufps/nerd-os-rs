@@ -472,7 +472,7 @@ impl Hooks for Firmware {
         let mac = crate::net::network::mac_addr()
             .to_string_lossy()
             .into_owned();
-        crate::otp_device::init(&hostname, &mac, &model);
+        crate::security::otp_device::init(&hostname, &mac, &model);
     }
 
     fn sntp_start(&mut self) {

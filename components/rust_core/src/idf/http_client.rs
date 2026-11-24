@@ -75,7 +75,7 @@ impl Config {
     /// All zero with the firmware's certificate bundle.
     pub fn with_bundle() -> Self {
         Config {
-            crt_bundle_attach: Some(crate::crt_bundle::attach),
+            crt_bundle_attach: Some(crate::security::crt_bundle::attach),
             ..Config::default()
         }
     }
@@ -190,7 +190,7 @@ impl Client {
             url: url.as_ptr(),
             method,
             timeout_ms,
-            crt_bundle_attach: Some(crate::crt_bundle::attach),
+            crt_bundle_attach: Some(crate::security::crt_bundle::attach),
             ..Config::default()
         };
         // SAFETY: `config` is a valid local and `url` a NUL-terminated string; init copies the strings it keeps.
@@ -229,7 +229,7 @@ impl Client {
             url: url.as_ptr(),
             event_handler: Some(handler),
             user_data,
-            crt_bundle_attach: Some(crate::crt_bundle::attach),
+            crt_bundle_attach: Some(crate::security::crt_bundle::attach),
             ..Config::default()
         };
         // SAFETY: `config` is a valid local and `url` NUL-terminated (copied); the caller keeps

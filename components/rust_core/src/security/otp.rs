@@ -2,7 +2,7 @@
 //! the session key and boot ID for session tokens, enabled and enrollment
 //! state, persisted in the configuration; checking a TOTP code with replay
 //! protection, minting and checking session tokens, and the `otpauth://`
-//! URI of a new enrollment (its QR code: `otp_device.rs`).
+//! URI of a new enrollment (its QR code: `security/otp_device.rs`).
 //! The algorithms are in `http/auth.rs`.
 //!
 //! All state is behind one lock, including the secret, the enabled flag

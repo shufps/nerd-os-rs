@@ -16,7 +16,7 @@
 use std::net::{IpAddr, Ipv6Addr};
 use std::sync::Mutex;
 
-use crate::crypto::{ct_eq, hmac_sha1, hmac_sha256};
+use crate::security::crypto::{ct_eq, hmac_sha1, hmac_sha256};
 
 const B32_ALPHABET: &[u8; 32] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
 

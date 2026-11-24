@@ -440,7 +440,7 @@ impl Driver {
                 if b1 || b2 {
                     // aborts the enrollment (and ends the overlay, as the
                     // web UI's cancel does)
-                    crate::otp::disable_enrollment();
+                    crate::security::otp::disable_enrollment();
                     self.overlay = false;
                     self.enter(State::Mining, now);
                 }
@@ -548,11 +548,11 @@ impl Driver {
         };
         match m {
             Msg::ShowQr => {
-                if !crate::otp::enrollment_active() {
+                if !crate::security::otp::enrollment_active() {
                     log!(Error, TAG, "no otp enrollment active");
                     return;
                 }
-                let qr = crate::otp_device::qr();
+                let qr = crate::security::otp_device::qr();
                 if self.ui.create_qr(&self.l, qr.as_ref()) {
                     self.enter(State::ShowQr, now);
                 }

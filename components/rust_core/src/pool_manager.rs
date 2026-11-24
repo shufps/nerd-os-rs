@@ -66,7 +66,7 @@ const SV2_SUBMIT_BUF: usize = 6 + 24 + 1 + 32;
 #[cfg(target_os = "espidf")]
 mod sys {
     use super::*;
-    pub use crate::board_api::*;
+    pub use crate::board::board_api::*;
     use crate::idf::raw;
     pub use crate::idf::raw::{
         esp_task_wdt_add, esp_task_wdt_delete, esp_task_wdt_reset, uxTaskGetStackHighWaterMark,
@@ -1248,8 +1248,8 @@ impl Manager {
     pub fn load_settings(&self) {
         let mut cfg = self.lock();
         let mut reconnect = false;
-        let (mode, _) = crate::boot::pool_mode(crate::cfg::pool_mode() as c_int);
-        self.set_mode(mode == crate::boot::PoolMode::Dual);
+        let (mode, _) = crate::board::boot::pool_mode(crate::cfg::pool_mode() as c_int);
+        self.set_mode(mode == crate::board::boot::PoolMode::Dual);
         if self.is_dual() {
             // a changed balance resets the dithering and reconnects
             let balance = config::get_u16(b"pool_balance", 50);

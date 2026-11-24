@@ -1,11 +1,11 @@
-//! Golden tests of the power sequencing (rust_core::board_power): the calls
+//! Golden tests of the power sequencing (rust_core::board::power): the calls
 //! and delays on recording hardware, results and board state for random
 //! parameters, limits and failing buck/ASIC steps, against the outputs of
 //! the former NerdQaxePlus/NerdQaxePlus2/NerdAxe code
 //! (tests/golden/board_power.txt, recorded by the differential tests).
 
-use rust_core::board_core::Limits;
-use rust_core::board_power::{self, Hw, Params, Variant};
+use rust_core::board::board_core::Limits;
+use rust_core::board::power::{self, Hw, Params, Variant};
 
 mod golden;
 use golden::Rec;
@@ -174,10 +174,10 @@ fn sequences() {
         };
         let pr = params(&p);
         let res = match what {
-            0 => board_power::init_asics(&mut f, v, &pr),
-            1 => board_power::set_voltage(&mut f, v, volts, &pr.limits),
+            0 => power::init_asics(&mut f, v, &pr),
+            1 => power::set_voltage(&mut f, v, volts, &pr.limits),
             _ => {
-                board_power::shutdown(&mut f, v, &pr.limits);
+                power::shutdown(&mut f, v, &pr.limits);
                 false
             }
         };
@@ -236,10 +236,10 @@ fn nerdaxe_sequences() {
         let v = [Variant::Axe, Variant::AxeGamma, Variant::AxeGaia][which as usize];
         let pr = params(&p);
         let res = match what {
-            0 => board_power::init_asics(&mut f, v, &pr),
-            1 => board_power::set_voltage(&mut f, v, volts, &pr.limits),
+            0 => power::init_asics(&mut f, v, &pr),
+            1 => power::set_voltage(&mut f, v, volts, &pr.limits),
             _ => {
-                board_power::shutdown(&mut f, v, &pr.limits);
+                power::shutdown(&mut f, v, &pr.limits);
                 false
             }
         };
@@ -264,7 +264,7 @@ fn ds4432_codes() {
     for mv in 0..=2500u32 {
         for frac in [0.0f32, 0.0004, 0.0009] {
             let v = mv as f32 / 1000.0 + frac;
-            let code = board_power::ds4432_code(v);
+            let code = power::ds4432_code(v);
             // the DAC range: as the former code; outside, the Rust version
             // limits the magnitude
             let raw = (((0.6 / 3320.0) - ((v as f64 - 0.6) / 4750.0)) / 0.000098921 * 127.0)
@@ -281,6 +281,6 @@ fn ds4432_codes() {
     }
     assert!(checked > 3000, "{checked}");
     // 0.98 V: 0x82 before (about 1.43 V), now the lowest code
-    assert_eq!(board_power::ds4432_code(0.98), 0xff);
+    assert_eq!(power::ds4432_code(0.98), 0xff);
     rec.finish();
 }

@@ -3,14 +3,21 @@
 //! `nerdqx.cpp`, `nerdeko.cpp`, `nerdhaxegamma.cpp`, `nerdoctaxegamma.cpp`,
 //! `q1370.cpp`, `q1373.cpp`, `nerdaxe.cpp`, `nerdaxegamma.cpp`,
 //! `nerdaxegaia.cpp` and the TMP451 multiplexers `tmp451_mux*.cpp`): the
-//! board's constants (`board_profile.rs`) and settings, its hardware
+//! board's constants (`board/profile.rs`) and settings, its hardware
 //! (regulator, fans, temperature sensors, ethernet and CAN options, control
-//! pins) on the Rust drivers, the power sequencing (`board_power.rs`). The
+//! pins) on the Rust drivers, the power sequencing (`board/power.rs`). The
 //! firmware is built for one board; it is chosen at runtime by its
 //! `BOARD_*` id.
 //!
 //! The class hierarchy is flattened: each method matches the board id the
 //! way the C++ overrides did.
+
+pub mod board_api;
+pub mod board_core;
+pub mod boot;
+pub mod boot_firmware;
+pub mod power;
+pub mod profile;
 
 use crate::asic::driver::api::Handle as Asics;
 use crate::idf::idf_const;
@@ -18,9 +25,9 @@ use core::ffi::{c_int, CStr};
 use std::sync::{Mutex, MutexGuard, OnceLock};
 use std::time::Instant;
 
-use crate::board_core::{self, Limits};
-use crate::board_power::{self as power, Params, Variant};
-use crate::board_profile::{self, BoardId, Detect, Pid, Profile};
+use crate::board::board_core::Limits;
+use crate::board::power::{Params, Variant};
+use crate::board::profile::{BoardId, Detect, Pid, Profile};
 use crate::config;
 use crate::drivers::fxl6408::Fxl6408;
 use crate::drivers::i2c::Master;
@@ -663,7 +670,7 @@ impl Board {
             }
             _ => {}
         }
-        let p = board_profile::profile(id, &detect);
+        let p = profile::profile(id, &detect);
 
         if !is_axe(id) {
             let chip = match id {

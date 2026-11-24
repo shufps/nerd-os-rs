@@ -109,7 +109,7 @@ impl ResultEnv for Results {
         })
     }
     fn set_chip_temp(&mut self, asic_nr: c_int, temp: f32) {
-        crate::board_core::CHIP_TEMPS.set(asic_nr, temp);
+        crate::board::board_core::CHIP_TEMPS.set(asic_nr, temp);
     }
     fn asic_max_difficulty(&mut self) -> u32 {
         board_info().max_difficulty

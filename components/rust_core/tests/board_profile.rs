@@ -1,11 +1,11 @@
-//! Golden tests of the board profiles (rust_core::board_profile): every
+//! Golden tests of the board profiles (rust_core::board::profile): every
 //! field (strings and lists by content) for every board and detection,
 //! against the outputs of the former board constructors
 //! (tests/golden/board_profile.txt, recorded by the differential tests).
 
 use std::ffi::CStr;
 
-use rust_core::board_profile::{profile, BoardId, Detect, Profile};
+use rust_core::board::profile::{profile, BoardId, Detect, Profile};
 
 mod golden;
 use golden::Rec;

@@ -15,7 +15,7 @@
 
 use core::ffi::{c_int, CStr};
 
-use crate::board_core::{validate_voltage, Limits};
+use crate::board::board_core::{validate_voltage, Limits};
 use crate::cutil::fixed;
 use crate::log::log;
 

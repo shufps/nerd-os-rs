@@ -7,7 +7,7 @@
 use core::ffi::{c_int, CStr};
 
 use crate::board::api::{self as b, info};
-use crate::board_core::CHIP_TEMPS;
+use crate::board::board_core::CHIP_TEMPS;
 
 pub fn bapi_is_initialized() -> bool {
     b::board_is_initialized()

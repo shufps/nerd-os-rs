@@ -2,7 +2,7 @@
 //! `main/fan_controller.cpp`): the hardware lock (a FreeRTOS recursive
 //! mutex shared by everything that touches the ASICs and the I2C devices),
 //! shutdown and restart, the task that runs the power loop (`power_task.rs`)
-//! with the fan control (`fan_control.rs`) on the board (`board_api.rs`), and
+//! with the fan control (`fan_control.rs`) on the board (`board/board_api.rs`), and
 //! the values the other tasks read.
 
 use core::ffi::{c_int, c_void, CStr};
@@ -19,7 +19,7 @@ const TAG: &CStr = c"power_management";
 
 #[cfg(target_os = "espidf")]
 mod sys {
-    pub use crate::board_api::*;
+    pub use crate::board::board_api::*;
     pub use crate::idf::raw::{
         xQueueCreateMutex, xQueueGiveMutexRecursive, xQueueTakeMutexRecursive,
     };

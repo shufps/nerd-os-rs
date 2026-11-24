@@ -45,7 +45,7 @@ pub fn nodes(req: &mut Request) -> EspErr {
     let b = board_info();
     let version = CString::new(crate::mdns::fw_version()).unwrap_or_default();
     let temps: Vec<f32> = (0..b.asic_count.max(0))
-        .map(|j| crate::board_core::CHIP_TEMPS.get(j))
+        .map(|j| crate::board::board_core::CHIP_TEMPS.get(j))
         .collect();
 
     let mut fans: [FanInfo; 2] = Default::default();

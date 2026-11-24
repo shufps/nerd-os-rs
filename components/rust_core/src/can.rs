@@ -464,7 +464,7 @@ fn telemetry() -> [u8; can_master::TELEMETRY_LEN] {
     put(1, &pm(3).to_le_bytes());
     put(5, &pm(4).to_le_bytes());
     for i in 0..4 {
-        let temp = crate::board_core::CHIP_TEMPS.get(i as c_int);
+        let temp = crate::board::board_core::CHIP_TEMPS.get(i as c_int);
         put(9 + 4 * i, &temp.to_le_bytes());
     }
     put(25, &fan_get(0, 0).to_le_bytes());
@@ -686,7 +686,7 @@ fn slave_result_loop() -> ! {
             match r.reg {
                 0xb4 => {
                     if let Some(t) = crate::mining_tasks::chip_temp(r.data) {
-                        crate::board_core::CHIP_TEMPS.set(r.asic_nr, t);
+                        crate::board::board_core::CHIP_TEMPS.set(r.asic_nr, t);
                     }
                 }
                 0x90 => crate::hashrate::on_counter(r.asic_nr, r.data),

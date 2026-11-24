@@ -5,7 +5,7 @@
 //! OTP, SNTP, alerts, ASICs and the mining, API, monitor, CAN master, OTA
 //! and stratum tasks), and the idle loop (suspend on shutdown, low heap
 //! warning). The order and the decisions are here; the steps are the
-//! [`Hooks`] (the firmware's: `boot_firmware.rs`, with `app_main()`).
+//! [`Hooks`] (the firmware's: `board/boot_firmware.rs`, with `app_main()`).
 //!
 //! An invalid pool mode in the config falls back to failover, so the boot
 //! always reaches display, network and HTTP server and the setting can be

@@ -1,10 +1,10 @@
-//! Golden tests of the board logic (rust_core::board_core): validation,
+//! Golden tests of the board logic (rust_core::board::board_core): validation,
 //! settings clamping, chip temperature maximum and the PMBus fault decoding
 //! over all status combinations that matter, against the outputs of the
 //! former Board/NerdQaxePlus code (tests/golden/board_core.txt, recorded by
 //! the differential tests).
 
-use rust_core::board_core::{self, ChipTemps, Limits};
+use rust_core::board::board_core::{self, ChipTemps, Limits};
 
 mod golden;
 use golden::Rec;

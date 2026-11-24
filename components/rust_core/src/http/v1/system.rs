@@ -72,7 +72,7 @@ pub(crate) fn info(req: &mut Request) -> EspErr {
     let asic_temps: Vec<f32> = (0..b.asic_count.max(1))
         .map(|i| {
             if i < b.asic_count {
-                crate::board_core::CHIP_TEMPS.get(i)
+                crate::board::board_core::CHIP_TEMPS.get(i)
             } else {
                 0.0
             }

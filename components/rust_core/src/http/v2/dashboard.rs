@@ -277,7 +277,8 @@ pub(crate) fn get(req: &mut Request) -> EspErr {
             .push(crate::hashrate::api::hashrate_monitor_chip(i));
         d.chip_error_rate
             .push(crate::hashrate::api::hashrate_monitor_chip_errors(i));
-        d.asic_temps.push(crate::board_core::CHIP_TEMPS.get(i));
+        d.asic_temps
+            .push(crate::board::board_core::CHIP_TEMPS.get(i));
     }
 
     d.watts = power_mgmt::get(0);

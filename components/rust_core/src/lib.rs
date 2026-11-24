@@ -2,7 +2,7 @@
 //!
 //! This crate is built as a single static library and linked into the ESP-IDF
 //! firmware by `CMakeLists.txt`; its entry point is `app_main()`
-//! (`boot_firmware.rs`). C calls into it only through `app_main`,
+//! (`board/boot_firmware.rs`). C calls into it only through `app_main`,
 //! `ws_log_enqueue` and the callbacks it registers.
 //!
 //! All Rust code of the firmware must live in this one crate: two Rust static
@@ -21,12 +21,6 @@ pub mod apis;
 pub mod apis_fetcher;
 pub mod asic;
 pub mod board;
-pub mod board_api;
-pub mod board_core;
-pub mod board_power;
-pub mod board_profile;
-pub mod boot;
-pub mod boot_firmware;
 pub mod can;
 pub mod can_master;
 pub mod can_slave;

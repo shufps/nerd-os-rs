@@ -7,7 +7,7 @@ use crate::idf::idf_const;
 use core::ffi::{c_int, c_void, CStr};
 use std::time::Duration;
 
-use crate::boot::{Hooks, PoolMode};
+use crate::board::boot::{Hooks, PoolMode};
 use crate::idf::nvs::err_name;
 use crate::idf::task::{create_internal, TaskFn};
 use crate::idf::{EspErr, ESP_OK};
@@ -113,8 +113,8 @@ unsafe extern "C" fn psram_free(p: *mut c_void) {
 }
 
 /// The board the firmware is built for (`BOARD`, build.rs).
-fn board_id() -> Option<crate::board_profile::BoardId> {
-    use crate::board_profile::BoardId::*;
+fn board_id() -> Option<crate::board::profile::BoardId> {
+    use crate::board::profile::BoardId::*;
     Some(match crate::sdkconfig::BOARD {
         "NERDAXE" => NerdAxe,
         "NERDAXEGAMMA" => NerdAxeGamma,
@@ -542,6 +542,6 @@ impl Hooks for Firmware {
 #[no_mangle]
 pub extern "C" fn app_main() {
     let mut f = Firmware::default();
-    crate::boot::start(&mut f);
-    while crate::boot::idle(&mut f) {}
+    crate::board::boot::start(&mut f);
+    while crate::board::boot::idle(&mut f) {}
 }

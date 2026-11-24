@@ -4,7 +4,7 @@
 //! hashrate, and the system task: every 5 s it updates the display (IP,
 //! found block overlay, error overlay, values) and pushes a history sample.
 //! The display is reached through [`crate::display`], the board through
-//! `board_api.rs`.
+//! `board/board_api.rs`.
 //!
 //! The strings that change at runtime (WiFi status, SSID, IP address) are
 //! copied out under a lock, so a reader never sees a half-written string.
@@ -84,7 +84,7 @@ pub fn reset_reason_text(reason: c_int) -> &'static CStr {
 
 #[cfg(target_os = "espidf")]
 mod sys {
-    pub use crate::board_api::*;
+    pub use crate::board::board_api::*;
     pub use crate::idf::raw::esp_reset_reason;
 }
 

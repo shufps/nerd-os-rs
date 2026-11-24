@@ -1,7 +1,7 @@
 //! The factory update from GitHub (port of
 //! `main/http_server/handler_ota_factory.cpp`): `POST
 //! /api/system/OTA/github` starts it, `GET` reports its state
-//! (`ota_factory.rs`). A task in internal RAM (the flash writes turn the
+//! (`ota/factory.rs`). A task in internal RAM (the flash writes turn the
 //! cache off) follows the redirects to the factory image, writes its
 //! firmware part (4 MB at 0x10000) into the next OTA partition with the
 //! board shut down, buffers the web UI part (3 MB) in PSRAM, writes it to
@@ -20,7 +20,7 @@ use crate::idf::http_client::{self, Event};
 use crate::idf::httpd::{self, err, Request};
 use crate::idf::{EspErr, ESP_FAIL, ESP_OK};
 use crate::log::log;
-use crate::ota_factory::{redirect, updater, Redirect, Step, FW_LEN, MAX_REDIRECTS, WWW_LEN};
+use crate::ota::factory::{redirect, updater, Redirect, Step, FW_LEN, MAX_REDIRECTS, WWW_LEN};
 use crate::power_mgmt;
 
 const TAG: &CStr = c"http_ota";

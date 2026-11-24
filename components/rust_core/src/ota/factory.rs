@@ -3,7 +3,7 @@
 //! keep-config flag) handed from the HTTP handler to the update task, the
 //! step and the progress shown by `GET /api/v2/ota/status`, the status JSON
 //! and the redirect policy of the download. The download itself
-//! (`esp_http_client`, OTA and partition writes) is `ota_factory_task.rs`.
+//! (`esp_http_client`, OTA and partition writes) is `ota/factory_task.rs`.
 //!
 //! Resetting the progress also resets the received WWW bytes, so a second
 //! attempt does not start with the first one's progress.

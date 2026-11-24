@@ -1,7 +1,7 @@
 //! Firmware and web UI updates over HTTP (port of the input handling of
 //! `handler_ota.cpp` and `handler_ota_factory.cpp`): receiving an upload
 //! into flash, the body of `POST /api/system/OTA/github` and the check of the
-//! factory image URL. Used by `ota_upload.rs` and `ota_factory_task.rs`.
+//! factory image URL. Used by `ota/upload.rs` and `ota/factory_task.rs`.
 //!
 //! Behaviour notes:
 //! * an upload gives up after [`MAX_STALLS`] receive timeouts in a row,

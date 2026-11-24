@@ -324,8 +324,8 @@ unsafe fn register_routes() {
             crate::http::handler(rt.handler).or(match rt.handler {
                 Handler::Websocket => Some(crate::http::ws::handler as httpd::HandlerFn),
                 Handler::File => Some(crate::http::files::file_handler as httpd::HandlerFn),
-                Handler::Ota => Some(crate::ota_upload::firmware_update as httpd::HandlerFn),
-                Handler::OtaWww => Some(crate::ota_upload::www_update as httpd::HandlerFn),
+                Handler::Ota => Some(crate::ota::upload::firmware_update as httpd::HandlerFn),
+                Handler::OtaWww => Some(crate::ota::upload::www_update as httpd::HandlerFn),
                 Handler::Coredump => Some(crate::http::coredump::handler as httpd::HandlerFn),
                 #[cfg(feature = "screenshot")]
                 Handler::Screenshot => Some(crate::display::shot::handler as httpd::HandlerFn),
@@ -341,10 +341,10 @@ unsafe fn register_routes() {
                     Some(crate::config::profiles::http::apply as httpd::HandlerFn)
                 }
                 Handler::OtaGithubPost => {
-                    Some(crate::ota_factory_task::post_handler as httpd::HandlerFn)
+                    Some(crate::ota::factory_task::post_handler as httpd::HandlerFn)
                 }
                 Handler::OtaGithubGet => {
-                    Some(crate::ota_factory_task::status_handler as httpd::HandlerFn)
+                    Some(crate::ota::factory_task::status_handler as httpd::HandlerFn)
                 }
                 _ => None,
             })

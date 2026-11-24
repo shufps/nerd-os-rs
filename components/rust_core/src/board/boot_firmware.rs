@@ -509,7 +509,7 @@ impl Hooks for Firmware {
 
     fn start_ota_task(&mut self) {
         // writes flash: its task is in internal RAM
-        crate::ota_factory_task::api::ota_factory_start();
+        crate::ota::factory_task::api::ota_factory_start();
     }
 
     fn start_stratum_task(&mut self) {

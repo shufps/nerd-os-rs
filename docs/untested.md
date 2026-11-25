@@ -12,9 +12,6 @@ what a test would need. When an entry has been tested, delete it.
   error clears was not watched on the screen.
 - **CAN slave label**. The display shows "CAN ID: n" or "CAN: ..."
   instead of the IP address. Needs a board in CAN slave mode.
-- **Boards without a hashrate counter**. The current hashrate comes
-  from the 10 min share average on these boards. Only the Q1373, which has
-  a counter, was tested after S4.
 
 ## Boards
 

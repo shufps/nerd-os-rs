@@ -90,7 +90,11 @@
     "BLOCK_VALUE": "Valeur",
     "BLOCK_FEE": "Frais",
     "BLOCK_SHARE": "Part",
-    "BOARD_ERROR_HINT": "la protection du régulateur de tension a coupé la tension des ASIC. Vérifiez le refroidissement et l'alimentation ou baissez la fréquence/la tension, puis redémarrez le mineur."
+    "BOARD_ERROR_HINT_1": "l'ASIC a trop chauffé et sa tension a été coupée. Vérifiez le refroidissement et les ventilateurs, ou ajustez la température d'arrêt ou baissez la fréquence/la tension, puis redémarrez le mineur.",
+    "BOARD_ERROR_HINT_2": "le régulateur de tension a trop chauffé et la tension des ASIC a été coupée. Vérifiez la circulation d'air sur le régulateur ou baissez la fréquence/la tension, puis redémarrez le mineur.",
+    "BOARD_ERROR_HINT_3": "l'alimentation est hors plage (tension d'entrée absente, trop haute ou trop basse, ou courant d'entrée trop élevé) et la tension des ASIC a été coupée. Vérifiez l'alimentation, la prise et les câbles, puis redémarrez le mineur.",
+    "BOARD_ERROR_HINT_4": "le régulateur de tension s'est coupé à cause d'une surintensité. Baissez la fréquence/la tension, puis redémarrez le mineur.",
+    "BOARD_ERROR_HINT_5": "le régulateur de tension s'est coupé car sa tension de sortie était hors plage. Vérifiez le réglage de la tension du cœur, puis redémarrez le mineur."
   },
   "PERFORMANCE": {
     "TITLE": "Performance",

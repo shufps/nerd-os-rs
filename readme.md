@@ -3,15 +3,21 @@
 # NerdOS (Rust)
 
 Firmware for the NerdAxe and NerdQAxe family of Bitcoin miners (ESP32-S3,
-ESP-IDF 5.3). The firmware core is written in Rust: Stratum v1 and v2, pool
+ESP-IDF 5.3). The firmware is written in Rust: Stratum v1 and v2, pool
 management, the job pipeline, ASIC and board drivers, power and fan control,
-the HTTP API, networking, OTA and boot. The LVGL display and the ASIC self
-test stay C/C++. The web UI is AxeOS-based.
+the HTTP API, networking, OTA, boot, the display driver and screens, and the
+ASIC self test. Only the LVGL library and the display fonts and images are C.
+The web UI is AxeOS-based.
 
-This is the Rust line of the
-[ESP-Miner-NerdQAxePlus](https://github.com/shufps/ESP-Miner-NerdQAxePlus)
-firmware. Both lines share the partition layout and the settings stored on the
-device.
+NerdOS (Rust) is the successor of the C/C++ firmware
+[ESP-Miner-NerdQAxePlus](https://github.com/shufps/ESP-Miner-NerdQAxePlus),
+which is in feature freeze (security fixes only). Both share the partition
+layout and the settings stored on the device, so a device keeps its settings
+when it switches with the web flasher.
+
+> [!NOTE]
+> The current releases are pre-releases (2.0.0-alpha); a stable 2.0.0 is
+> planned within the next couple of weeks.
 
 ## Supported boards
 
@@ -34,15 +40,23 @@ device.
 
 - Stratum v1 and Stratum v2 (encrypted Noise connection), optional TLS for v1
 - Primary and fallback pool, or dual-pool mining with a configurable balance
-- Coinbase verification: checks that the pool pays to your address
+- Coinbase verification: checks that the pool pays to your address (and,
+  optionally, its fee)
 - Web UI and REST API ([docs/API.md](docs/API.md)), live log over WebSocket
 - Firmware updates from the web UI (GitHub releases or file upload)
+- Settings profiles: save and switch frequency, voltage, pools and fan settings
 - Optional OTP (TOTP) protection for settings and updates
 - WiFi with a setup access point (captive portal); Ethernet on boards with a
-  W5500
+  W5500; IPv4 and IPv6 (pool connections and web access)
 - InfluxDB telemetry with a Grafana dashboard ([monitoring/](monitoring/))
-- Discord webhook alerts (watchdog, block found)
+- Webhook alerts to Discord or any HTTP(S) endpoint: watchdog, block found,
+  new best difficulty, failed coinbase verification, and an optional metrics
+  message every 1 to 24 hours
 - Fan control: manual, automatic, or PID towards a target temperature
+- Protection: overheat shutdown, and the voltage regulator's protection
+  faults (over-current etc.) shown on the display and in the web UI
+- Display: screen cycle, found-block screen, auto screen off with a
+  configurable timeout
 
 ## Installing and updating
 
@@ -199,6 +213,7 @@ kept in the build directory's CMake cache).
 | `components/rust_core/` | the Rust firmware core ([README](components/rust_core/README.md)) |
 | `main/` | display fonts and images (C arrays), web UI (`main/http_server/axe-os/`) |
 | `docs/API.md` | REST API |
+| `docs/untested.md`, `docs/todo.md` | what is not yet tested on hardware, small open items |
 | `docker/` | build image and helper scripts |
 | `monitoring/` | InfluxDB + Grafana setup |
 | `config.cvs.example` | settings template for factory images |

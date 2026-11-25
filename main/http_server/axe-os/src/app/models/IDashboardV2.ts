@@ -106,6 +106,14 @@ export interface IDashboardV2Coinbase {
     pools: IDashboardV2CoinbasePool[];
 }
 
+/** The last found block (null if none). */
+export interface IDashboardV2LastBlock {
+    height: number;      // 0 if the pool's coinbase was not decoded
+    time: number;        // Unix seconds, 0 without a synced clock
+    pool: string | null;
+    difficulty: number;
+}
+
 export interface IDashboardV2 {
     system: IDashboardV2System;
     performance: IDashboardV2Performance;
@@ -114,5 +122,6 @@ export interface IDashboardV2 {
     stratum: IDashboardV2Stratum;
     can: IDashboardV2Can;
     coinbase: IDashboardV2Coinbase;
+    lastBlock?: IDashboardV2LastBlock | null;
     history?: IHistory;
 }

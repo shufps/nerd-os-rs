@@ -94,7 +94,9 @@
     "BOARD_ERROR_HINT_2": "el regulador de voltaje se calentó demasiado y se apagó el voltaje del ASIC. Revisa el flujo de aire sobre el regulador o baja la frecuencia/el voltaje, y reinicia el minero.",
     "BOARD_ERROR_HINT_3": "la alimentación está fuera de rango (sin voltaje de entrada, demasiado alto o bajo, o demasiada corriente de entrada) y se apagó el voltaje del ASIC. Revisa la fuente de alimentación, el conector y los cables, y reinicia el minero.",
     "BOARD_ERROR_HINT_4": "el regulador de voltaje se apagó por sobrecorriente. Baja la frecuencia/el voltaje y reinicia el minero.",
-    "BOARD_ERROR_HINT_5": "el regulador de voltaje se apagó porque su voltaje de salida estaba fuera de rango. Revisa el ajuste del voltaje del núcleo y reinicia el minero."
+    "BOARD_ERROR_HINT_5": "el regulador de voltaje se apagó porque su voltaje de salida estaba fuera de rango. Revisa el ajuste del voltaje del núcleo y reinicia el minero.",
+    "BLOCK_FOUND": "¡Bloque encontrado!",
+    "BLOCK_DISMISS": "YAY 🥳"
   },
   "PERFORMANCE": {
     "TITLE": "Rendimiento",

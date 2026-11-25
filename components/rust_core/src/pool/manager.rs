@@ -187,6 +187,17 @@ fn now_us() -> u64 {
     crate::util::cutil::now_us().max(1) as u64
 }
 
+/// The last found block (config keys).
+pub const LAST_BLOCK_HEIGHT: &[u8] = b"lastblk_height";
+pub const LAST_BLOCK_TIME: &[u8] = b"lastblk_time";
+pub const LAST_BLOCK_POOL: &[u8] = b"lastblk_pool";
+pub const LAST_BLOCK_DIFF: &[u8] = b"lastblk_diff";
+
+/// Two network difficulties from the same `nbits` (computed the same way).
+fn same_difficulty(a: f64, b: f64) -> bool {
+    b > 0.0 && (a - b).abs() <= b * 1e-9
+}
+
 fn set_u64(key: &[u8], v: u64) {
     config::set(key, Json::Num(Num::U(v)));
     crate::config::nvs::request_flush();
@@ -1359,6 +1370,8 @@ impl Manager {
         self.stats.reset_all_time();
         set_u64(b"bestdiff", 0);
         set_u64(b"totalblocks", 0);
+        // the last found block goes with them
+        set_u64(LAST_BLOCK_DIFF, 0);
     }
 
     pub fn check_best_diff(&self, pool: c_int, diff: f64, nbits: u32) {
@@ -1370,11 +1383,12 @@ impl Manager {
         crate::services::discord::api::discord_send_best_diff(diff, ev.network_difficulty);
     }
 
-    pub fn check_found_block(&self, diff: f64, nbits: u32) {
+    pub fn check_found_block(&self, pool: c_int, diff: f64, nbits: u32) {
         let ev = self.stats.found_block(diff, nbits);
         if !ev.found_block {
             return;
         }
+        self.remember_last_block(pool, diff, ev.network_difficulty);
         log!(
             Info,
             TAG,
@@ -1384,6 +1398,32 @@ impl Manager {
         );
         set_u64(b"totalblocks", ev.total_found_blocks as u64);
         crate::services::discord::api::discord_send_block_found(diff, ev.network_difficulty);
+    }
+
+    /// Keeps the found block for the web UI (`lastBlock` in the dashboard):
+    /// its height, the time (0 without a synced clock), the pool and the
+    /// share difficulty. The height comes from the pool's decoded coinbase,
+    /// but only if that coinbase is for the block the share was found on (the
+    /// same network difficulty): a coinbase that failed to decode leaves the
+    /// previous one, possibly of another pool, and then the height is 0.
+    fn remember_last_block(&self, pool: c_int, diff: f64, network_difficulty: f64) {
+        let cb = self.coinbase_info(pool).result;
+        let height = if same_difficulty(cb.network_difficulty, network_difficulty) {
+            cb.block_height
+        } else {
+            0
+        };
+        let time = if crate::clock::is_time_synced() {
+            crate::clock::now()
+        } else {
+            0
+        };
+        let host = self.pool_host(pool);
+        config::set(LAST_BLOCK_HEIGHT, Json::Num(Num::U(height as u64)));
+        config::set(LAST_BLOCK_TIME, Json::Num(Num::U(time as u64)));
+        config::set(LAST_BLOCK_POOL, Json::Str(host.to_bytes().to_vec()));
+        // set last: a block is shown only with a difficulty
+        set_u64(LAST_BLOCK_DIFF, diff as u64);
     }
 
     pub fn pool_host(&self, pool: c_int) -> CString {
@@ -1633,9 +1673,9 @@ pub(crate) mod api {
         }
     }
 
-    pub fn pool_mgr_check_found_block(_pool: c_int, diff: f64, nbits: u32) {
+    pub fn pool_mgr_check_found_block(pool: c_int, diff: f64, nbits: u32) {
         if let Some(m) = m() {
-            m.check_found_block(diff, nbits);
+            m.check_found_block(pool, diff, nbits);
         }
     }
 
@@ -1686,6 +1726,17 @@ pub(crate) mod api {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn block_height_only_from_the_same_block() {
+        use crate::pool::coinbase::network_difficulty;
+        let d = network_difficulty(0x1702_1673);
+        assert!(same_difficulty(network_difficulty(0x1702_1673), d));
+        // another block's coinbase (other nbits), or none decoded yet
+        assert!(!same_difficulty(network_difficulty(0x1703_4219), d));
+        assert!(!same_difficulty(0.0, d));
+        assert!(!same_difficulty(0.0, 0.0));
+    }
+
     use super::*;
 
     fn manager(dual: bool) -> &'static Manager {

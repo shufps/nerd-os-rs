@@ -111,3 +111,9 @@ A latched TPS546 fault (over-current etc.) sets the board error, keeps the ASIC 
 Still to test:
 - the home page alert in a browser (standard and Gaia layout);
 - a NerdAxe Gamma.
+
+## Found block on the home page
+
+When a block is found, the firmware keeps its height, time, pool and difficulty (`lastBlock` in `GET /api/v2/dashboard`), and the home page shows a golden banner with confetti and a 🎉 in the tab title until it is dismissed (per browser). Tested on the Q1373 with the test stratum server (a replayed block); the user checked the banner, the tab title and the dismiss button in the standard layout.
+
+Still to test: the banner in the Gaia layout; a real block with its height and the mempool.space link (the test server's coinbase is not decoded, so its height is 0).

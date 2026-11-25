@@ -21,7 +21,7 @@ import { map,
 import { HashSuffixPipe } from '../../pipes/hash-suffix.pipe';
 import { OtpAuthService } from '../../services/otp-auth.service';
 import { SystemService } from '../../services/system.service';
-import { IDashboardV2, IDashboardV2BlockHeader, IDashboardV2Pool } from '../../models/IDashboardV2';
+import { IDashboardV2, IDashboardV2BlockHeader, IDashboardV2Pool, IDashboardV2LastBlock } from '../../models/IDashboardV2';
 import { Chart } from 'chart.js';  // Import Chart.js
 import { registerHomeChartPlugins } from './plugins';
 import { HOME_CFG,
@@ -108,6 +108,17 @@ export class HomeComponent implements AfterViewChecked, OnInit, OnDestroy {
   public hardwareError = hardwareBoardError;
   /** the hint for that error (translation key) */
   public hardwareErrorHint = hardwareBoardErrorHint;
+
+  /** a found block not dismissed in this browser yet (null: none) */
+  public unseenBlock: IDashboardV2LastBlock | null = null;
+  /** the confetti pieces of the found-block banner */
+  public readonly confetti = Array.from({ length: 36 }, (_, i) => ({
+    x: (i * 37) % 100,
+    delay: ((i * 7) % 18) / 10,
+    color: ['#f7931a', '#ffd166', '#ef476f', '#06d6a0', '#118ab2', '#ffffff'][i % 6],
+  }));
+  private static readonly BLOCK_SEEN_KEY = '__nerdBlockSeen';
+  private static readonly TITLE_MARK = '🎉 ';
   @ViewChild('myChart') ctx!: ElementRef<HTMLCanvasElement>;
 
   // Persisted UI state: chart collapsed (visual-only; data continues tracking).
@@ -790,6 +801,7 @@ export class HomeComponent implements AfterViewChecked, OnInit, OnDestroy {
       onInfo: (info) => {
         if (!info) return;
         this._info = info;
+        this.updateFoundBlock(info);
         try {
           const flagKey = '__nerdCharts_clearChartHistoryOnce';
           if (this.localStorageGet(flagKey) === '1') {
@@ -1167,7 +1179,43 @@ ngOnInit() {
     })();
 }
 
+  /** Shows a found block until it is dismissed (per browser), with a mark in the tab title. */
+  private updateFoundBlock(info: IDashboardV2): void {
+    const b = info.lastBlock;
+    const seen = this.localStorageGet(HomeComponent.BLOCK_SEEN_KEY);
+    this.unseenBlock = b && HomeComponent.blockId(b) !== seen ? b : null;
+    this.setTitleMark(!!this.unseenBlock);
+  }
+
+  public dismissBlock(): void {
+    if (this.unseenBlock) {
+      this.localStorageSet(HomeComponent.BLOCK_SEEN_KEY, HomeComponent.blockId(this.unseenBlock));
+    }
+    this.unseenBlock = null;
+    this.setTitleMark(false);
+  }
+
+  /** The block on mempool.space (null without a height). */
+  public blockLink(b: IDashboardV2LastBlock): string | null {
+    return b.height > 0 ? `https://mempool.space/block/${b.height}` : null;
+  }
+
+  private static blockId(b: IDashboardV2LastBlock): string {
+    return `${b.height}:${b.time}:${b.difficulty}`;
+  }
+
+  private setTitleMark(on: boolean): void {
+    const mark = HomeComponent.TITLE_MARK;
+    const t = document.title;
+    if (on && !t.startsWith(mark)) {
+      document.title = mark + t;
+    } else if (!on && t.startsWith(mark)) {
+      document.title = t.slice(mark.length);
+    }
+  }
+
   ngOnDestroy(): void {
+    this.setTitleMark(false);
     // Destroy Chart.js instance to release canvas resources and internal listeners.
     if (this.chart) {
       this.chart.destroy();

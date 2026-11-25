@@ -94,7 +94,9 @@
     "BOARD_ERROR_HINT_2": "spændingsregulatoren blev for varm, og ASIC-spændingen blev slukket. Tjek luftstrømmen over regulatoren eller sænk frekvens/spænding, og genstart derefter mineren.",
     "BOARD_ERROR_HINT_3": "strømforsyningen er uden for området (ingen, for høj eller for lav indgangsspænding eller for høj indgangsstrøm), og ASIC-spændingen blev slukket. Tjek strømforsyning, stik og kabler, og genstart derefter mineren.",
     "BOARD_ERROR_HINT_4": "spændingsregulatoren slukkede på grund af overstrøm. Sænk frekvens/spænding, og genstart derefter mineren.",
-    "BOARD_ERROR_HINT_5": "spændingsregulatoren slukkede, fordi dens udgangsspænding var uden for området. Tjek indstillingen af kernespændingen, og genstart derefter mineren."
+    "BOARD_ERROR_HINT_5": "spændingsregulatoren slukkede, fordi dens udgangsspænding var uden for området. Tjek indstillingen af kernespændingen, og genstart derefter mineren.",
+    "BLOCK_FOUND": "Blok fundet!",
+    "BLOCK_DISMISS": "YAY 🥳"
   },
   "PERFORMANCE": {
     "TITLE": "Ydelse",

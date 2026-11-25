@@ -85,18 +85,6 @@ Still to test:
   freeing them when the driver refuses to uninstall. Needs a W5500 that fails
   after the driver install, for example a missing interrupt line.
 
-## Settings profiles: the profile "default"
-
-On the first access to the profiles of a device that never had profiles (no `profiles` blob in NVS: a new device or one updated from v2.0.0-alpha.1 or the C firmware), the profile "default" is created from the current settings and marked active.
-
-Tested on hardware: a NerdQAxe++ updated over OTA from v2.0.0-alpha.1 got "default" (its 600 MHz / 1150 mV, failover without a balance, both fans) marked active; a Q1373 whose list exists kept it unchanged.
-
-## From upstream v1.1.3-alpha.1 (Gaia)
-
-Ported from the C firmware: the Gaia-Dark Nebular theme (#765) and the VR temperature gauge of the Gaia home page scaled to the VR shutdown temperature (#766, `vrOverheatTemp` in `GET /api/v2/dashboard`). The new dashboard field is checked by the differential test and on a Q1373 (two fan channels: `vrOverheatTemp` = fan channel 1's shutdown temperature).
-
-Still to test on a NerdAxe Gaia: the Gaia-Dark theme and the VR gauge on the home page.
-
 ## Display screens in Rust
 
 The screens of the display (formerly `main/displays/ui.cpp`) are built in Rust (`src/display/ui.rs` on the LVGL layer `src/display/lvgl.rs`); the C++ driver keeps the panel, the LVGL task, the buttons and the screen state machine.
@@ -118,20 +106,6 @@ Tested with the user on the NerdAxe: the rotated panel (`flip_screen`; the NerdA
 
 Still to test:
 - identify (CAN command).
-
-## IPv6 (pool connections and web access)
-
-Ported from #18/#19. Tested on a Q1373 over Ethernet with SLAAC (global prefix from the router): IPv6 to a dual-stack TLS pool (solo.atlaspool.io:4333) with accepted shares; fallback to IPv4 when the pool refuses IPv6 (ckpool); web access from a link-local client allowed, from a global IPv6 client refused.
-
-Tested with v2.0.0-alpha.4 on a NerdQAxe++ over Wi-Fi with SLAAC (unique-local prefix): IPv6 to a pool given as an IPv6 literal without and with brackets, and as a dual-stack name, each with accepted shares; web access from a unique-local client allowed. The web UI accepts an IPv6 literal (with or without brackets) as the pool address and still refuses a port or `stratum+tcp://` in it.
-
-## Metrics webhook
-
-New: a checkbox on the alert page with an interval (1, 2, 4, 6, 12 or 24 hours); a webhook message at that interval with hashrate, temperatures, power, shares, best difficulty, blocks and uptime (`src/services/heartbeat.rs`). Tested on a NerdAxe over the API with a local webhook listener.
-
-Still to test:
-- the checkbox and interval select on the alert page in a browser;
-- a real Discord webhook (the message is sent in the same JSON as the alerts).
 
 ## TPS546 faults on NerdAxeGamma/Gaia
 

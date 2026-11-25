@@ -18,7 +18,7 @@
         aria-hidden="true">{{ getPoolVerificationTooltip(1) }}</span>
   <div *ngIf="info$ | async as info; else loading">
     <nb-alert *ngIf="hardwareError(info.system.boardError) as err" status="danger" class="board-error-alert">
-      <strong>{{ err }}</strong> — {{ 'HOME.BOARD_ERROR_HINT' | translate }}
+      <strong>{{ err }}</strong> — {{ hardwareErrorHint(info.system.boardError) | translate }}
     </nb-alert>
   <div *ngIf="!info.system.shutdown; else shutdown">
       <!-- GAIA-ONLY top summary cards (NEROQ+ style: icon-left, colored, progress) -->

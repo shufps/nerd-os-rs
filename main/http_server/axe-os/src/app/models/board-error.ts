@@ -13,6 +13,11 @@ export function boardErrorStr(code: number | undefined): string {
   return BOARD_ERROR_STRINGS[code] ?? 'ERROR';
 }
 
+/** The translation key of the hint shown with a hardware protection error. */
+export function hardwareBoardErrorHint(code: number | undefined): string {
+  return `HOME.BOARD_ERROR_HINT_${code}`;
+}
+
 /** The hardware protection errors (1..5) as text; '' for none or another error. */
 export function hardwareBoardError(code: number | undefined): string {
   return code && code >= 1 && code <= 5 ? boardErrorStr(code) : '';

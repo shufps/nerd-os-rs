@@ -549,7 +549,8 @@ fn receive_all(chunks: &[Vec<u8>]) -> Vec<Option<Vec<u8>>> {
     };
     let mut lines = Vec::new();
     loop {
-        match receive_line(&mut t, &mut api.lines, || false) {
+        // the stub never times out: no deadline
+        match receive_line(&mut t, &mut api.lines, || false, u64::MAX) {
             Ok(line) => {
                 // as the C string the firmware gets
                 let end = line.iter().position(|&b| b == 0).unwrap_or(line.len());

@@ -94,7 +94,9 @@
     "BOARD_ERROR_HINT_2": "regulatorul de tensiune s-a supraîncălzit și tensiunea ASIC a fost oprită. Verifică fluxul de aer peste regulator sau scade frecvența/tensiunea, apoi repornește minerul.",
     "BOARD_ERROR_HINT_3": "alimentarea este în afara limitelor (tensiune de intrare lipsă, prea mare sau prea mică ori curent de intrare prea mare) și tensiunea ASIC a fost oprită. Verifică sursa, mufa și cablurile, apoi repornește minerul.",
     "BOARD_ERROR_HINT_4": "regulatorul de tensiune s-a oprit din cauza supracurentului. Scade frecvența/tensiunea, apoi repornește minerul.",
-    "BOARD_ERROR_HINT_5": "regulatorul de tensiune s-a oprit deoarece tensiunea de ieșire era în afara limitelor. Verifică setarea tensiunii de nucleu, apoi repornește minerul."
+    "BOARD_ERROR_HINT_5": "regulatorul de tensiune s-a oprit deoarece tensiunea de ieșire era în afara limitelor. Verifică setarea tensiunii de nucleu, apoi repornește minerul.",
+    "BLOCK_FOUND": "Bloc găsit!",
+    "BLOCK_DISMISS": "YAY 🥳"
   },
   "PERFORMANCE": {
     "TITLE": "Performanță",

@@ -94,7 +94,9 @@
     "BOARD_ERROR_HINT_2": "il regolatore di tensione si è surriscaldato e la tensione degli ASIC è stata spenta. Controlla il flusso d'aria sul regolatore o riduci frequenza/tensione, poi riavvia il miner.",
     "BOARD_ERROR_HINT_3": "l'alimentazione è fuori intervallo (tensione d'ingresso assente, troppo alta o troppo bassa, o corrente d'ingresso eccessiva) e la tensione degli ASIC è stata spenta. Controlla alimentatore, spina e cavi, poi riavvia il miner.",
     "BOARD_ERROR_HINT_4": "il regolatore di tensione si è spento per sovracorrente. Riduci frequenza/tensione, poi riavvia il miner.",
-    "BOARD_ERROR_HINT_5": "il regolatore di tensione si è spento perché la sua tensione di uscita era fuori intervallo. Controlla l'impostazione della tensione del core, poi riavvia il miner."
+    "BOARD_ERROR_HINT_5": "il regolatore di tensione si è spento perché la sua tensione di uscita era fuori intervallo. Controlla l'impostazione della tensione del core, poi riavvia il miner.",
+    "BLOCK_FOUND": "Blocco trovato!",
+    "BLOCK_DISMISS": "YAY 🥳"
   },
   "PERFORMANCE": {
     "TITLE": "Prestazioni",

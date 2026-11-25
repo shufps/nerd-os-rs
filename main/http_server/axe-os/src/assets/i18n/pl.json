@@ -94,7 +94,9 @@
     "BOARD_ERROR_HINT_2": "regulator napięcia się przegrzał i napięcie ASIC zostało wyłączone. Sprawdź przepływ powietrza nad regulatorem lub obniż częstotliwość/napięcie, a następnie uruchom ponownie koparkę.",
     "BOARD_ERROR_HINT_3": "zasilanie jest poza zakresem (brak, zbyt wysokie lub zbyt niskie napięcie wejściowe albo zbyt duży prąd wejściowy) i napięcie ASIC zostało wyłączone. Sprawdź zasilacz, wtyczkę i kable, a następnie uruchom ponownie koparkę.",
     "BOARD_ERROR_HINT_4": "regulator napięcia wyłączył się z powodu przetężenia. Obniż częstotliwość/napięcie, a następnie uruchom ponownie koparkę.",
-    "BOARD_ERROR_HINT_5": "regulator napięcia wyłączył się, ponieważ jego napięcie wyjściowe było poza zakresem. Sprawdź ustawienie napięcia rdzenia, a następnie uruchom ponownie koparkę."
+    "BOARD_ERROR_HINT_5": "regulator napięcia wyłączył się, ponieważ jego napięcie wyjściowe było poza zakresem. Sprawdź ustawienie napięcia rdzenia, a następnie uruchom ponownie koparkę.",
+    "BLOCK_FOUND": "Znaleziono blok!",
+    "BLOCK_DISMISS": "YAY 🥳"
   },
   "PERFORMANCE": {
     "TITLE": "Wydajność",

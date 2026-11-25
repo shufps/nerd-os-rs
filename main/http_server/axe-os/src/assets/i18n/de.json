@@ -85,7 +85,7 @@
     "RESET_STATS_ALL_TIME": "Auch Statistiken aller Zeiten zurücksetzen (beste Diff, gefundene Blöcke). Kann nicht rückgängig gemacht werden.",
     "BLOCK_HEADER": "Block Header",
     "BLOCK_HEIGHT": "Höhe",
-    "BLOCK_DIFFICULTY": "Schwierigkeit",
+    "BLOCK_DIFFICULTY": "Difficulty",
     "BLOCK_SCRIPTSIG": "Scriptsig",
     "BLOCK_VALUE": "Wert",
     "BLOCK_FEE": "Gebühr",
@@ -94,7 +94,9 @@
     "BOARD_ERROR_HINT_2": "der Spannungsregler war zu heiß, die ASIC-Spannung wurde abgeschaltet. Prüfe den Luftstrom am Regler oder senke Frequenz/Spannung und starte den Miner dann neu.",
     "BOARD_ERROR_HINT_3": "die Stromversorgung liegt außerhalb des zulässigen Bereichs (keine, zu hohe oder zu niedrige Eingangsspannung oder zu hoher Eingangsstrom), die ASIC-Spannung wurde abgeschaltet. Prüfe Netzteil, Stecker und Kabel und starte den Miner dann neu.",
     "BOARD_ERROR_HINT_4": "der Spannungsregler hat wegen Überstrom abgeschaltet. Senke Frequenz/Spannung und starte den Miner dann neu.",
-    "BOARD_ERROR_HINT_5": "der Spannungsregler hat abgeschaltet, weil seine Ausgangsspannung außerhalb des zulässigen Bereichs lag. Prüfe die eingestellte Kernspannung und starte den Miner dann neu."
+    "BOARD_ERROR_HINT_5": "der Spannungsregler hat abgeschaltet, weil seine Ausgangsspannung außerhalb des zulässigen Bereichs lag. Prüfe die eingestellte Kernspannung und starte den Miner dann neu.",
+    "BLOCK_FOUND": "Block gefunden!",
+    "BLOCK_DISMISS": "YAY 🥳"
   },
   "PERFORMANCE": {
     "TITLE": "Leistung",

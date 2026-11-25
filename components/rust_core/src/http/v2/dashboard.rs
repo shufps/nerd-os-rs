@@ -34,6 +34,17 @@ pub struct DashCoinbase {
     pub force: bool,
 }
 
+/// The last found block (`lastBlock`).
+#[derive(Clone, Debug, Default)]
+pub struct LastBlock {
+    /// 0 if the pool's coinbase was not decoded
+    pub height: u32,
+    /// Unix time, 0 without a synced clock
+    pub time: u32,
+    pub pool: Option<CString>,
+    pub difficulty: u64,
+}
+
 /// `dashboard_t`: the values of `GET /api/v2/dashboard`.
 #[derive(Clone, Debug, Default)]
 pub struct Dashboard {
@@ -91,6 +102,7 @@ pub struct Dashboard {
     pub history_current: u64,
     pub history_limit: u32,
     pub now_ms: u64,
+    pub last_block: Option<LastBlock>,
 }
 
 /// `GET /api/v2/dashboard`
@@ -224,6 +236,20 @@ pub fn dashboard(s: &Dashboard) -> Json {
     coinbase.arr("blockHeaders", headers).arr("pools", cb_pools);
     d.obj("coinbase", coinbase);
 
+    match &s.last_block {
+        Some(b) => {
+            let mut lb = Obj::new();
+            lb.uint("height", b.height as u64)
+                .uint("time", b.time as u64)
+                .set("pool", cstr(b.pool.as_deref()))
+                .uint("difficulty", b.difficulty);
+            d.obj("lastBlock", lb);
+        }
+        None => {
+            d.set("lastBlock", Json::Null);
+        }
+    }
+
     if !s.shutdown && s.history_requested {
         let end = s.history_start.wrapping_add(s.history_span_ms);
         d.obj(
@@ -338,6 +364,27 @@ pub(crate) fn get(req: &mut Request) -> EspErr {
     d.history_current = q.current;
     d.history_limit = q.limit;
     d.now_ms = now_ms();
+    d.last_block = last_block();
 
     send_doc(req, dashboard(&d))
+}
+
+/// The last found block from the config; None if there is none.
+fn last_block() -> Option<LastBlock> {
+    use crate::config;
+    use crate::pool::manager::{
+        LAST_BLOCK_DIFF, LAST_BLOCK_HEIGHT, LAST_BLOCK_POOL, LAST_BLOCK_TIME,
+    };
+    let difficulty = config::get_u64(LAST_BLOCK_DIFF, 0);
+    if difficulty == 0 {
+        return None;
+    }
+    let pool = config::get_str(LAST_BLOCK_POOL)
+        .and_then(|v| CString::new(crate::util::cutil::until_nul(&v).to_vec()).ok());
+    Some(LastBlock {
+        height: config::get_u64(LAST_BLOCK_HEIGHT, 0) as u32,
+        time: config::get_u64(LAST_BLOCK_TIME, 0) as u32,
+        pool,
+        difficulty,
+    })
 }

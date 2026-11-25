@@ -90,7 +90,9 @@
     "BLOCK_VALUE": "Valor",
     "BLOCK_FEE": "Comisión",
     "BLOCK_SHARE": "Participación",
-    "BOARD_ERROR_HINT": "la protección del regulador de voltaje apagó el voltaje del ASIC. Revisa la refrigeración y la fuente de alimentación o baja la frecuencia/el voltaje y reinicia el minero."
+    "BOARD_ERROR_HINT": "la protección del regulador de voltaje apagó el voltaje del ASIC. Revisa la refrigeración y la fuente de alimentación o baja la frecuencia/el voltaje y reinicia el minero.",
+    "BLOCK_FOUND": "¡Bloque encontrado!",
+    "BLOCK_DISMISS": "YAY 🥳"
   },
   "PERFORMANCE": {
     "TITLE": "Rendimiento",

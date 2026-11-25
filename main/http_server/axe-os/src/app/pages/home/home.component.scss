@@ -2460,3 +2460,45 @@ nb-card-header{
 :host-context(.nb-theme-light) .block-header-box{
   background: rgba(255, 255, 255, 0.5);
 }
+
+/* found block: a golden banner with a short confetti burst */
+.block-found {
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+  margin-bottom: 1rem;
+  padding: 0.9rem 1.1rem;
+  border-radius: 0.5rem;
+  color: #2b1d00;
+  background: linear-gradient(135deg, #ffd166 0%, #f7931a 55%, #ffb347 100%);
+  box-shadow: 0 0 18px rgba(247, 147, 26, 0.55);
+  animation: block-found-glow 2.4s ease-in-out infinite alternate;
+}
+.block-found__text { display: flex; flex-direction: column; flex: 1; min-width: 14rem; z-index: 1; }
+.block-found__title { font-size: 1.25rem; font-weight: 800; }
+.block-found__details a { color: inherit; font-weight: 700; text-decoration: underline; }
+.block-found__dismiss { z-index: 1; }
+.block-found__confetti { position: absolute; inset: 0; pointer-events: none; }
+.block-found__confetti i {
+  position: absolute;
+  top: -12px;
+  width: 7px;
+  height: 12px;
+  border-radius: 2px;
+  opacity: 0;
+  animation: block-found-confetti 2.6s ease-in 3 forwards;
+}
+@keyframes block-found-confetti {
+  0% { transform: translateY(0) rotate(0deg); opacity: 1; }
+  100% { transform: translateY(140px) rotate(540deg); opacity: 0; }
+}
+@keyframes block-found-glow {
+  from { box-shadow: 0 0 10px rgba(247, 147, 26, 0.35); }
+  to { box-shadow: 0 0 26px rgba(247, 147, 26, 0.8); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .block-found, .block-found__confetti i { animation: none; }
+}

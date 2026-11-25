@@ -9,7 +9,7 @@ use rust_core::http::json::{FanInfo, ManagerInfo, ManagerPool};
 use rust_core::http::v1::json::{self as v1_json, AsicInfo, SystemInfo};
 use rust_core::http::v2::alert::{self, AlertInfo};
 use rust_core::http::v2::can::{self, CanMasterNode};
-use rust_core::http::v2::dashboard::{self, DashCoinbase, Dashboard};
+use rust_core::http::v2::dashboard::{self, DashCoinbase, Dashboard, LastBlock};
 use rust_core::http::v2::influx::{self, InfluxInfo};
 use rust_core::http::v2::otp;
 use rust_core::http::v2::settings::{self as v2_settings, SettingsPool, V2Settings};
@@ -415,6 +415,13 @@ fn dashboard() {
             history_current: 0,
             history_limit: 0,
             now_ms: 36_000_000 + r.below(10_000),
+            // no random draw here: the other values keep their recorded order
+            last_block: (s.uptime_seconds % 3 == 0).then(|| LastBlock {
+                height: 955_474,
+                time: 1_795_533_386,
+                pool: Some(CString::new("solo.ckpool.org").unwrap()),
+                difficulty: 145_000_000_000_000,
+            }),
         };
         let mut d = d;
         d.history_current = 1_700_000_000_000 + r.below(1_000_000);

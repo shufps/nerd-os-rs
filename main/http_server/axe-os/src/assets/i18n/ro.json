@@ -90,7 +90,9 @@
     "BLOCK_VALUE": "Valoare",
     "BLOCK_FEE": "Taxă",
     "BLOCK_SHARE": "Cotă",
-    "BOARD_ERROR_HINT": "protecția regulatorului de tensiune a oprit tensiunea ASIC. Verifică răcirea și sursa de alimentare sau scade frecvența/tensiunea, apoi repornește minerul."
+    "BOARD_ERROR_HINT": "protecția regulatorului de tensiune a oprit tensiunea ASIC. Verifică răcirea și sursa de alimentare sau scade frecvența/tensiunea, apoi repornește minerul.",
+    "BLOCK_FOUND": "Bloc găsit!",
+    "BLOCK_DISMISS": "YAY 🥳"
   },
   "PERFORMANCE": {
     "TITLE": "Performanță",

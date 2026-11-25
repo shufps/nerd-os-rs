@@ -85,12 +85,14 @@
     "RESET_STATS_ALL_TIME": "Auch Statistiken aller Zeiten zurücksetzen (beste Diff, gefundene Blöcke). Kann nicht rückgängig gemacht werden.",
     "BLOCK_HEADER": "Block Header",
     "BLOCK_HEIGHT": "Höhe",
-    "BLOCK_DIFFICULTY": "Schwierigkeit",
+    "BLOCK_DIFFICULTY": "Difficulty",
     "BLOCK_SCRIPTSIG": "Scriptsig",
     "BLOCK_VALUE": "Wert",
     "BLOCK_FEE": "Gebühr",
     "BLOCK_SHARE": "Anteil",
-    "BOARD_ERROR_HINT": "der Schutz des Spannungsreglers hat die ASIC-Spannung abgeschaltet. Prüfe Kühlung und Netzteil oder senke Frequenz/Spannung und starte den Miner dann neu."
+    "BOARD_ERROR_HINT": "der Schutz des Spannungsreglers hat die ASIC-Spannung abgeschaltet. Prüfe Kühlung und Netzteil oder senke Frequenz/Spannung und starte den Miner dann neu.",
+    "BLOCK_FOUND": "Block gefunden!",
+    "BLOCK_DISMISS": "YAY 🥳"
   },
   "PERFORMANCE": {
     "TITLE": "Leistung",

@@ -17,6 +17,21 @@
         [style.left.px]="poolVerifyTooltipX" [style.top.px]="poolVerifyTooltipY"
         aria-hidden="true">{{ getPoolVerificationTooltip(1) }}</span>
   <div *ngIf="info$ | async as info; else loading">
+    <div *ngIf="unseenBlock as b" class="block-found" role="status">
+      <div class="block-found__confetti" aria-hidden="true">
+        <i *ngFor="let c of confetti" [style.left.%]="c.x" [style.animation-delay.s]="c.delay" [style.background]="c.color"></i>
+      </div>
+      <div class="block-found__text">
+        <span class="block-found__title">🎉 {{ 'HOME.BLOCK_FOUND' | translate }}</span>
+        <span class="block-found__details">
+          <ng-container *ngIf="blockLink(b) as link">{{ 'HOME.BLOCK_HEIGHT' | translate }} <a [href]="link" target="_blank" rel="noopener">{{ b.height }}</a> · </ng-container>
+          <ng-container *ngIf="b.pool">{{ b.pool }} · </ng-container>
+          {{ 'HOME.BLOCK_DIFFICULTY' | translate }} {{ b.difficulty | humanReadable }}
+          <ng-container *ngIf="b.time > 0"> · {{ b.time * 1000 | date: 'medium' }}</ng-container>
+        </span>
+      </div>
+      <button nbButton size="small" class="block-found__dismiss" (click)="dismissBlock()">{{ 'HOME.BLOCK_DISMISS' | translate }}</button>
+    </div>
     <nb-alert *ngIf="hardwareError(info.system.boardError) as err" status="danger" class="board-error-alert">
       <strong>{{ err }}</strong> — {{ 'HOME.BOARD_ERROR_HINT' | translate }}
     </nb-alert>

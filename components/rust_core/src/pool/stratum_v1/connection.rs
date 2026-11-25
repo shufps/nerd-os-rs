@@ -19,6 +19,11 @@ const TAG: &core::ffi::CStr = c"stratum_api";
 pub const MAX_SEND_STALLS: u32 = 3;
 /// Pause between retries, as in the C++ code.
 const RETRY_DELAY_MS: u32 = 10;
+/// A pool that sends no line for this long is dropped, as a receive error:
+/// it may keep the connection (and answer TCP keepalives) without sending
+/// anything. Pools send a `mining.notify` every 30-60 s; one that sends only
+/// per block costs at most a reconnect after a long block.
+pub const IDLE_LIMIT_MS: u64 = 10 * 60 * 1000;
 /// EAGAIN (= EWOULDBLOCK) on newlib and Linux
 const EAGAIN: i32 = 11;
 
@@ -51,6 +56,10 @@ pub trait Io {
     fn recv(&mut self, buf: &mut [u8]) -> Transfer;
     fn is_connected(&mut self) -> bool;
     fn delay_ms(&mut self, ms: u32);
+    /// A monotonic clock for the idle limit.
+    fn now_ms(&mut self) -> u64 {
+        crate::util::cutil::now_us().max(0) as u64 / 1000
+    }
 }
 
 /// The task and the manager.
@@ -132,15 +141,19 @@ pub enum RecvEnd {
     Failed,
     /// `interrupted()` returned true during a receive timeout
     Interrupted,
+    /// nothing arrived before the deadline
+    Idle,
 }
 
 /// The next line, reading from the socket as needed (port of
 /// `StratumApi::receiveJsonRpcLine`). `interrupted` is asked on every
-/// receive timeout.
+/// receive timeout, and the line must arrive before `deadline_ms`
+/// ([`Io::now_ms`]).
 pub fn receive_line(
     io: &mut impl Io,
     lines: &mut LineBuffer,
     mut interrupted: impl FnMut() -> bool,
+    deadline_ms: u64,
 ) -> Result<Vec<u8>, RecvEnd> {
     loop {
         if let Some(line) = lines.take_line() {
@@ -167,6 +180,9 @@ pub fn receive_line(
                 }
                 if interrupted() {
                     return Err(RecvEnd::Interrupted);
+                }
+                if io.now_ms() >= deadline_ms {
+                    return Err(RecvEnd::Idle);
                 }
                 io.delay_ms(RETRY_DELAY_MS);
             }
@@ -280,9 +296,13 @@ pub fn run(
             return Exit::SocketDisconnected;
         }
 
-        let line = receive_line(io, lines, || {
-            hooks.reconnect_requested() || hooks.stop_requested()
-        });
+        let deadline = io.now_ms() + IDLE_LIMIT_MS;
+        let line = receive_line(
+            io,
+            lines,
+            || hooks.reconnect_requested() || hooks.stop_requested(),
+            deadline,
+        );
         if hooks.reconnect_requested() {
             log!(Info, TAG, "reconnect requested ...");
             return Exit::ReconnectRequested;
@@ -290,6 +310,15 @@ pub fn run(
         let line = match line {
             Ok(line) => line,
             Err(RecvEnd::Interrupted) => return Exit::StopRequested,
+            Err(RecvEnd::Idle) => {
+                log!(
+                    Error,
+                    TAG,
+                    "No data from the pool for {} s, reconnecting ...",
+                    IDLE_LIMIT_MS / 1000
+                );
+                return Exit::ReceiveFailed;
+            }
             Err(RecvEnd::Failed) => {
                 log!(
                     Error,
@@ -402,7 +431,12 @@ mod tests {
                     }
                     Transfer::Bytes(n)
                 }
-                Some(t) => t,
+                Some(t) => {
+                    if t == Transfer::Error(EAGAIN) {
+                        self.timeouts += 1;
+                    }
+                    t
+                }
                 None => {
                     self.timeouts += 1;
                     Transfer::Error(EAGAIN)
@@ -414,6 +448,10 @@ mod tests {
                 .map_or(true, |n| self.timeouts < n)
         }
         fn delay_ms(&mut self, _ms: u32) {}
+        /// every receive timeout takes 30 s, as on the device
+        fn now_ms(&mut self) -> u64 {
+            self.timeouts as u64 * 30_000
+        }
     }
 
     #[derive(Default)]
@@ -521,6 +559,29 @@ mod tests {
             Exit::ReconnectRequested
         );
         assert!(io.timeouts >= 1);
+    }
+
+    /// A pool that keeps the connection but sends nothing is dropped after
+    /// the idle limit; every line starts the limit again.
+    #[test]
+    fn a_silent_pool_is_dropped() {
+        let limit = (IDLE_LIMIT_MS / 30_000) as usize;
+        let mut io = FakeIo::default();
+        let mut hooks = FakeHooks::default();
+        assert_eq!(run_with(&mut io, &mut hooks, false), Exit::ReceiveFailed);
+        assert_eq!((io.timeouts, hooks.connected), (limit, 0));
+
+        // a line after 5 quiet minutes, then silence: dropped a full limit
+        // after that line
+        let mut io = FakeIo::default();
+        for _ in 0..limit / 2 {
+            io.incoming.push_back(Transfer::Error(EAGAIN));
+        }
+        io.feed(b"{\"id\":1,\"result\":[[],\"0800\",8],\"error\":null}\n");
+        let mut hooks = FakeHooks::default();
+        assert_eq!(run_with(&mut io, &mut hooks, false), Exit::ReceiveFailed);
+        assert_eq!(hooks.connected, 1);
+        assert_eq!(io.timeouts, limit / 2 + limit);
     }
 
     #[test]

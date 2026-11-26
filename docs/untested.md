@@ -28,9 +28,6 @@ what a test would need. When an entry has been tested, delete it.
 
   Each needs a flash and a comparison with the previous firmware (log of
   the init sequence, `/api/system/info`).
-- **Ethernet HAT detection on the NerdQAxe family**: the W5500 probe
-  on the HAT pins, skipped when the CAN extension or a TMP451 mux uses
-  them. Needs a NerdQAxe with an ethernet HAT.
 - **CAN extension detection and slave pin on the NerdQAxe+ family**.
   Needs the CAN HAT.
 
@@ -116,4 +113,6 @@ Still to test:
 
 When a block is found, the firmware keeps its height, time, pool and difficulty (`lastBlock` in `GET /api/v2/dashboard`), and the home page shows a golden banner with confetti and a 🎉 in the tab title until it is dismissed (per browser). Tested on the Q1373 with the test stratum server (a replayed block); the user checked the banner, the tab title and the dismiss button in the standard layout.
 
-Still to test: the banner in the Gaia layout; a real block with its height and the mempool.space link (the test server's coinbase is not decoded, so its height is 0).
+The user checked the banner in all themes, the Gaia layout included.
+
+Still to test: a real block with its height and the mempool.space link (the test server's coinbase is not decoded, so its height is 0).

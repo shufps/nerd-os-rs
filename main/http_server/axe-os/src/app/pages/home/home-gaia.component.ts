@@ -81,6 +81,11 @@ export class HomeGaiaComponent extends HomeComponent {
   // `seed` varies the shape per metric; width/height match the SVG viewBox.
   private static readonly SPARK_W = 90;
   private static readonly SPARK_H = 28;
+  /** How many values the pool card shows (diff, best, rejected; ping and loss if supported; the share in dual pool mode). */
+  public poolStatCount(pool: any): number {
+    return 3 + (this.supportsPing(pool?.host) ? 2 : 0) + (this.isDualPool ? 1 : 0);
+  }
+
   public get sparkW(): number { return HomeGaiaComponent.SPARK_W; }
   public get sparkH(): number { return HomeGaiaComponent.SPARK_H; }
 

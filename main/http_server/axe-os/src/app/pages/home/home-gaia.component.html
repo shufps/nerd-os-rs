@@ -215,14 +215,15 @@
             <div class="nerd-pool__id">
               <a class="nerd-pool__host" [href]="getQuickLink(pool?.host, pool?.user)" target="_blank">{{ pool?.host }}<span class="nerd-pool__port">:{{ pool?.port }}</span></a>
               <span class="nerd-pool__meta">
-                {{ (fallback ? 'POOL_INFO.FALLBACK' : 'POOL_INFO.PRIMARY') | translate }}
+                <ng-container *ngIf="isDualPool; else poolRole">{{ 'POOL_INFO.TITLE' | translate }} {{ (idx ?? 0) + 1 }}</ng-container>
+                <ng-template #poolRole>{{ (fallback ? 'POOL_INFO.FALLBACK' : 'POOL_INFO.PRIMARY') | translate }}</ng-template>
                 · {{ pool?.activeProtocol === 1 ? 'SV2' : 'SV1' }}<nb-icon *ngIf="pool?.encrypted" icon="lock-outline" title="Encrypted"></nb-icon>
               </span>
             </div>
             <span class="nerd-pool__dot" [class.is-on]="pool?.connected" aria-hidden="true"></span>
           </div>
 
-          <div class="nerd-pool__stats" *ngIf="pool?.connected; else poolDown">
+          <div class="nerd-pool__stats" [class.nerd-pool__stats--two]="poolStatCount(pool) === 4" *ngIf="pool?.connected; else poolDown">
             <div class="nerd-pool__stat">
               <span class="nerd-pool__stat-value">{{ poolDiff(pool) | number:'1.0-0' }}</span>
               <span class="nerd-pool__stat-label">{{ 'POOL_INFO.DIFF' | translate }}</span>

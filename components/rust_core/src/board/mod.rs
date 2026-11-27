@@ -1279,6 +1279,11 @@ impl Board {
     }
 
     pub fn request_buck_telemetry(&self) {
+        // switched off on purpose (shutdown, mining pause): its OFF status
+        // bits are no error
+        if self.state().shutdown {
+            return;
+        }
         match &self.hw().buck {
             Buck::Tps536x7(d) => d.status(&mut SmBus),
             Buck::Rev7(d) => d.print_status(&mut SmBus),

@@ -51,7 +51,9 @@ Tested with the user (2026-11-27) with a Q1370 as master and two Q1373 as slaves
 - "CAN ID: n" on the slaves' displays;
 - bus-off recovery: slaves marked offline when the cable was pulled, back and mining after it was plugged in again.
 
-Still to test: the frequency, voltage and fan commands applied on a slave.
+The voltage command (1010 → 1020 → 1010 mV, the TPS53647 followed) and the fan command (manual 60 % and back to PID) were tested on a slave too.
+
+Still to test: the frequency command applied on a slave.
 
 ## Network (`src/drivers/w5500.rs`, `src/net/network.rs`, PRs N1/N2)
 

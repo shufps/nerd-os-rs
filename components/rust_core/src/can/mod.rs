@@ -570,6 +570,9 @@ fn handle_settings_cmd(p: &[u8]) {
             set_u16(k(b"fanspeed", b"fan1speed"), speed as u16);
             set_u16(k(b"pid_temp", b"fan1_pid_temp"), target as u16);
             set_u16(k(b"overheat_temp", b"fan1_overheat"), overheat as u16);
+            // the board holds the mode and the PID target, the fan control
+            // the rest (as the settings handlers reload both)
+            crate::board::api::board_load_settings();
             crate::power::mgmt::fan_load_settings();
             log!(
                 Info,

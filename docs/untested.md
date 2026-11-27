@@ -10,32 +10,24 @@ what a test would need. When an entry has been tested, delete it.
 - **Error overlay hidden again** (`src/system.rs`). Showing it ran on a
   NerdQAxe++ (coinbase verification fault); that it goes away when the
   error clears was not watched on the screen.
-- **CAN slave label**. The display shows "CAN ID: n" or "CAN: ..."
-  instead of the IP address. Needs a board in CAN slave mode.
 
 ## Boards
 
-- **Boards other than the Q1373, the NerdAxeGaia, the NerdAxe and the NerdQAxe++** (`src/board/mod.rs`).
+- **Boards other than the Q1373, Q1370, NerdAxeGaia, NerdAxe, NerdQAxe+ and NerdQAxe++** (`src/board/mod.rs`).
   All twelve boards build, and the init sequence on the Q1373 and the Gaia
   is the same, line for line, as before. The NerdAxe (DS4432U DAC with
   INA260) and the NerdQAxe++ run the alpha releases. Not run on hardware:
-  - NerdQAxe+ and NerdOCTAXE+: control pins on GPIOs, chip temperatures
-    from the ASICs every 15 s.
+  - NerdOCTAXE+: control pins on GPIOs, chip temperatures from the ASICs
+    every 15 s (the same code ran on a NerdQAxe+: hashrate, power and chip
+    temperatures as with the C firmware).
   - NerdEKO and NerdHAXE-γ.
   - NerdOCTAXE-γ: VR detection on GPIO3, two TMP451 muxes.
-  - Q1370: TMP451 mux on the FXL6408.
   - NerdAxeGamma.
 
   Each needs a flash and a comparison with the previous firmware (log of
   the init sequence, `/api/system/info`).
 - **CAN extension detection and slave pin on the NerdQAxe+ family**.
   Needs the CAN HAT.
-
-## CAN
-
-- **CAN master receive** and **CAN slave protocol**.
-  Only differential tests ran. Needs a CAN setup with a
-  master and at least one slave board.
 
 ## Power / boards
 
@@ -52,11 +44,14 @@ Tested on the Q1373 as a CAN master without other nodes:
 - the settings commands are queued;
 - the swarm API (nodes JSON, actions, PATCH, DELETE incl. errors) matches the C++ code.
 
-Untested (needs a second board on the bus):
-- slave negotiation (HELLO/ASSIGN, registry in NVS);
-- slave jobs, nonces, telemetry and config;
-- the settings commands applied on a slave;
-- a bus-off recovery.
+Tested with the user (2026-11-27) with a Q1370 as master and two Q1373 as slaves:
+- slave negotiation (HELLO/ASSIGN, IDs 1 and 2) and the registry in NVS (both slaves known again after a master restart);
+- jobs from the master, the nonce filter on the slaves, their shares submitted by the master, telemetry and config in the swarm API;
+- identify (display blinks), the display settings and restart sent to a slave;
+- "CAN ID: n" on the slaves' displays;
+- bus-off recovery: slaves marked offline when the cable was pulled, back and mining after it was plugged in again.
+
+Still to test: the frequency, voltage and fan commands applied on a slave.
 
 ## Network (`src/drivers/w5500.rs`, `src/net/network.rs`, PRs N1/N2)
 
@@ -97,9 +92,6 @@ The display driver (formerly `main/displays/displayDriver.cpp`, buttons, UI mess
 Tested on a Q1373: panel init, splash sequence, screen cycle with button 1, OTP QR screen with cancel by button, auto screen off (countdown, off, on by button), the real buttons (short presses, button 2 toggling the screen) and the shutdown countdown with both held; the found-block image and its close by a button (a real block replayed by a test stratum server).
 
 Tested with the user on the NerdAxe: the rotated panel (`flip_screen`; the NerdAxe looks normal, the other boards rotate by 180°), and the self test (`selftest` set, best difficulty 0): ASICs found, the result on the display, the flag cleared.
-
-Still to test:
-- identify (CAN command).
 
 ## TPS546 faults on NerdAxeGamma/Gaia
 

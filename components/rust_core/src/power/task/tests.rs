@@ -317,7 +317,10 @@ fn pause_waits_for_the_parked_tasks() {
     f.fault = (4, 1);
     t.cycle(&mut f);
     let l = f.take();
-    assert!(!l.contains(&"board pause".to_string()), "tasks not parked yet");
+    assert!(
+        !l.contains(&"board pause".to_string()),
+        "tasks not parked yet"
+    );
     assert!(l.contains(&"error 4 00000001".to_string()));
 
     f.parked = true;
@@ -329,9 +332,9 @@ fn pause_waits_for_the_parked_tasks() {
     // telemetry and the fans go on
     f.mv = 1100;
     let l = cycles(&t, &mut f, 3, 2_000_000);
-    assert!(!l.iter().any(|s| s.starts_with("voltage")
-        || s.starts_with("error")
-        || s == "chip temps"));
+    assert!(!l
+        .iter()
+        .any(|s| s.starts_with("voltage") || s.starts_with("error") || s == "chip temps"));
     assert!(l.iter().any(|s| s.starts_with("fan ")));
     assert!(l.iter().any(|s| s.starts_with("influx pwr")));
     // a second pause changes nothing

@@ -123,7 +123,10 @@ impl Driver {
     /// (mining resume): the frequency ramp starts at the chips' reset
     /// frequency, and the ticket mask is sent again.
     pub fn reset(&self) {
-        *self.state() = Self::new(self.chip).state.into_inner().unwrap_or_else(|e| e.into_inner());
+        *self.state() = Self::new(self.chip)
+            .state
+            .into_inner()
+            .unwrap_or_else(|e| e.into_inner());
     }
 
     fn state(&self) -> std::sync::MutexGuard<'_, State> {

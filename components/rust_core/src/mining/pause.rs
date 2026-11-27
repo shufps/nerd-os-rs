@@ -113,9 +113,7 @@ pub fn request(r: Request) -> Result<(), Refused> {
         return Err(Refused::Unavailable);
     }
     match (r, state()) {
-        (Request::Pause, State::Resuming) | (Request::Resume, State::Pausing) => {
-            Err(Refused::Busy)
-        }
+        (Request::Pause, State::Resuming) | (Request::Resume, State::Pausing) => Err(Refused::Busy),
         _ => {
             let v = match r {
                 Request::Pause => 1,

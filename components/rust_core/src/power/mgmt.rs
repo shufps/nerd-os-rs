@@ -12,8 +12,8 @@ use std::sync::OnceLock;
 use crate::config;
 use crate::config::sdkconfig;
 use crate::log::log;
-use crate::power::fan_control::{ChannelConfig, FanController, Fans, MAX_FANS};
 use crate::mining::pause;
+use crate::power::fan_control::{ChannelConfig, FanController, Fans, MAX_FANS};
 use crate::power::task::{Env, MiningState, PowerTask, Request, POLL_MS};
 
 const TAG: &CStr = c"power_management";

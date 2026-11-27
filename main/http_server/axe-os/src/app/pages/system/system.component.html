@@ -23,9 +23,11 @@
               {{ 'SYSTEM.SHUTDOWN' | translate }}
             </button>
             &nbsp;
-            <button nbButton size="small" (click)="pauseMining()" status="basic">
-              {{ 'SYSTEM.PAUSE_MINING' | translate }}
-            </button>
+            <ng-container *ngIf="miningButton(info.miningState) as mb">
+              <button nbButton size="small" (click)="toggleMining(info.miningState)" status="basic" [disabled]="mb.disabled">
+                {{ mb.key | translate }}
+              </button>
+            </ng-container>
           </td>
         </tr>
         <tr>

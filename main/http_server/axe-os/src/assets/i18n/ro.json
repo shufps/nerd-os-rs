@@ -273,6 +273,8 @@
     "PAUSE_MINING": "Pune minarea pe pauză",
     "PAUSE_SUCCESS": "Minarea este pusă pe pauză",
     "PAUSE_FAILED": "Punerea pe pauză a eșuat",
+    "RESUME_MINING": "Reia minarea",
+    "RESUME_SUCCESS": "Minarea este reluată",
     "LOGS_ALREADY_OPEN_OTHER_TAB": "Jurnalele sunt deja deschise în altă filă."
   },
   "SWARM": {

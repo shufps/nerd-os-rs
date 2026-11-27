@@ -273,6 +273,8 @@
     "PAUSE_MINING": "Wstrzymaj kopanie",
     "PAUSE_SUCCESS": "Kopanie jest wstrzymywane",
     "PAUSE_FAILED": "Wstrzymanie nie powiodło się",
+    "RESUME_MINING": "Wznów kopanie",
+    "RESUME_SUCCESS": "Kopanie jest wznawiane",
     "LOGS_ALREADY_OPEN_OTHER_TAB": "Logi są już otwarte w innej karcie."
   },
   "SWARM": {

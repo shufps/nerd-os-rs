@@ -273,6 +273,8 @@
     "PAUSE_MINING": "Metti in pausa il mining",
     "PAUSE_SUCCESS": "Il mining viene messo in pausa",
     "PAUSE_FAILED": "Pausa non riuscita",
+    "RESUME_MINING": "Riprendi il mining",
+    "RESUME_SUCCESS": "Il mining viene ripreso",
     "LOGS_ALREADY_OPEN_OTHER_TAB": "I log sono già aperti in un'altra scheda."
   },
   "SWARM": {

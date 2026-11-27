@@ -275,6 +275,8 @@
     "PAUSE_MINING": "Pause mining",
     "PAUSE_SUCCESS": "Mining is being paused",
     "PAUSE_FAILED": "Pause failed",
+    "RESUME_MINING": "Resume mining",
+    "RESUME_SUCCESS": "Mining is being resumed",
     "LOGS_ALREADY_OPEN_OTHER_TAB": "Logs are already open in another tab."
   },
   "SWARM": {

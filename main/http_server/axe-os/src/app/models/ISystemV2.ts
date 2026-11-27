@@ -17,6 +17,8 @@ export interface ISystemV2 {
     asicModel: string;
     version: string;
     uptimeSeconds: number;
+    /** 'running' | 'pausing' | 'paused' | 'resuming' */
+    miningState?: string;
     lastResetReason: string;
     network: ISystemV2Network;
     memory: ISystemV2Memory;

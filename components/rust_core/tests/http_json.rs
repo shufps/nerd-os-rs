@@ -457,6 +457,8 @@ fn v2_system_and_identify() {
             asic_model: pick(&mut r),
             version: pick(&mut r),
             uptime_seconds: r.below(1 << 40) as i64,
+            // (no random draw: the other values stay as recorded)
+            mining_state: Default::default(),
             last_reset_reason: pick(&mut r),
             hostname: pick(&mut r),
             ssid: pick(&mut r),

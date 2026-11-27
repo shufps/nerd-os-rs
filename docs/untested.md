@@ -5,12 +5,6 @@ only by host tests: unit tests, and golden tests with the outputs of the
 former C/C++ code where those exist. Each entry names the PR, what is missing and
 what a test would need. When an entry has been tested, delete it.
 
-## Display / system task
-
-- **Error overlay hidden again** (`src/system.rs`). Showing it ran on a
-  NerdQAxe++ (coinbase verification fault); that it goes away when the
-  error clears was not watched on the screen.
-
 ## Boards
 
 - **Boards other than the Q1373, Q1370, NerdAxeGaia, NerdAxe, NerdQAxe+ and NerdQAxe++** (`src/board/mod.rs`).
@@ -64,14 +58,6 @@ Tested later: the power-off screen (Q1373, shutdown over the API), and on the Ne
 
 Still to test:
 - the boards with their own theme (every board except Q1370/Q1373, NerdQAxe++ and NerdQX): the backgrounds and the label positions.
-
-## Display driver in Rust
-
-The display driver (formerly `main/displays/displayDriver.cpp`, buttons, UI messages) is in Rust (`src/display/driver.rs`, `src/display/mod.rs`, `src/display/button.rs`), and so is the self test (`board/boot_firmware.rs`).
-
-Tested on a Q1373: panel init, splash sequence, screen cycle with button 1, OTP QR screen with cancel by button, auto screen off (countdown, off, on by button), the real buttons (short presses, button 2 toggling the screen) and the shutdown countdown with both held; the found-block image and its close by a button (a real block replayed by a test stratum server).
-
-Tested with the user on the NerdAxe: the rotated panel (`flip_screen`; the NerdAxe looks normal, the other boards rotate by 180°), and the self test (`selftest` set, best difficulty 0): ASICs found, the result on the display, the flag cleared.
 
 ## TPS546 faults on NerdAxeGamma/Gaia
 

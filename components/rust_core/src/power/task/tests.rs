@@ -18,6 +18,10 @@ struct Fake {
     fault: (c_int, u32),
     overheated: [bool; 2],
     now: u64,
+    request: Option<Request>,
+    parked: bool,
+    resume_ok: bool,
+    mining_state: Option<MiningState>,
 }
 
 impl Fake {
@@ -116,6 +120,31 @@ impl Env for Fake {
     }
     fn now_us(&mut self) -> u64 {
         self.now
+    }
+    fn take_mining_request(&mut self) -> Option<Request> {
+        self.request.take()
+    }
+    fn set_mining_state(&mut self, s: MiningState) {
+        self.mining_state = Some(s);
+    }
+    fn close_mining_gate(&mut self, closed: bool) {
+        self.rec(if closed { "gate closed" } else { "gate open" });
+    }
+    fn mining_parked(&mut self) -> bool {
+        self.parked
+    }
+    fn pause_board(&mut self) {
+        self.rec("board pause");
+        self.initialized = false;
+        self.chips.iter_mut().for_each(|c| *c = 0.0);
+    }
+    fn resume_board(&mut self) -> bool {
+        self.rec("board resume");
+        self.initialized = self.resume_ok;
+        self.resume_ok
+    }
+    fn clear_hardware_errors(&mut self) {
+        self.rec("errors cleared");
     }
 }
 
@@ -259,4 +288,123 @@ fn faults_and_overheat() {
     f.power[6] = f32::NAN;
     t.cycle(&mut f);
     assert!(f.take().contains(&"error 1 00460047".to_string()));
+}
+
+/// Runs cycles until `n` have passed, `dt_us` apart.
+fn cycles(t: &PowerTask, f: &mut Fake, n: usize, dt_us: u64) -> Vec<String> {
+    let mut l = Vec::new();
+    for _ in 0..n {
+        f.now += dt_us;
+        t.cycle(f);
+        l.extend(f.take());
+    }
+    l
+}
+
+#[test]
+fn pause_waits_for_the_parked_tasks() {
+    let t = PowerTask::new(false);
+    let mut f = running();
+    t.cycle(&mut f);
+    f.take();
+
+    f.request = Some(Request::Pause);
+    t.cycle(&mut f);
+    let l = f.take();
+    assert_eq!(l[..2], ["lock", "gate closed"]);
+    assert_eq!(f.mining_state, Some(MiningState::Pausing));
+    // still powered: faults count until the chain is off
+    f.fault = (4, 1);
+    t.cycle(&mut f);
+    let l = f.take();
+    assert!(!l.contains(&"board pause".to_string()), "tasks not parked yet");
+    assert!(l.contains(&"error 4 00000001".to_string()));
+
+    f.parked = true;
+    t.cycle(&mut f);
+    let l = f.take();
+    assert_eq!(l[..2], ["lock", "board pause"]);
+    assert_eq!(f.mining_state, Some(MiningState::Paused));
+    // paused: no settings, no chip temperatures, no regulator faults; the
+    // telemetry and the fans go on
+    f.mv = 1100;
+    let l = cycles(&t, &mut f, 3, 2_000_000);
+    assert!(!l.iter().any(|s| s.starts_with("voltage")
+        || s.starts_with("error")
+        || s == "chip temps"));
+    assert!(l.iter().any(|s| s.starts_with("fan ")));
+    assert!(l.iter().any(|s| s.starts_with("influx pwr")));
+    // a second pause changes nothing
+    f.request = Some(Request::Pause);
+    assert!(!cycles(&t, &mut f, 1, 2_000_000).contains(&"board pause".to_string()));
+}
+
+#[test]
+fn resume_reinitializes_and_applies_the_settings() {
+    let t = PowerTask::new(false);
+    let mut f = running();
+    f.parked = true;
+    f.resume_ok = true;
+    t.cycle(&mut f);
+    f.request = Some(Request::Pause);
+    cycles(&t, &mut f, 2, 2_000_000);
+    assert_eq!(f.mining_state, Some(MiningState::Paused));
+
+    // too early: the request waits for the minimum off time
+    f.request = Some(Request::Resume);
+    let l = cycles(&t, &mut f, 2, 2_000_000);
+    assert!(!l.contains(&"board resume".to_string()));
+    assert_eq!(f.mining_state, Some(MiningState::Paused));
+
+    // a voltage changed while paused is applied after the resume, the
+    // unchanged frequency is sent again (the chain was reset)
+    f.mv = 1100;
+    let l = cycles(&t, &mut f, 1, 2_000_000);
+    assert_eq!(
+        l[..7],
+        [
+            "lock",
+            "board resume",
+            "errors cleared",
+            "gate open",
+            "voltage 1.1",
+            "frequency 600",
+            "vr 4000"
+        ]
+    );
+    assert_eq!(f.mining_state, Some(MiningState::Running));
+    // faults count again
+    f.fault = (3, 2);
+    assert!(cycles(&t, &mut f, 1, 2_000_000).contains(&"error 3 00000002".to_string()));
+}
+
+#[test]
+fn a_failed_resume_stays_paused() {
+    let t = PowerTask::new(false);
+    let mut f = running();
+    f.parked = true;
+    t.cycle(&mut f);
+    f.request = Some(Request::Pause);
+    cycles(&t, &mut f, 2, 2_000_000);
+    f.request = Some(Request::Resume);
+    let l = cycles(&t, &mut f, 1, PAUSE_MIN_US);
+    assert_eq!(l[..3], ["lock", "board resume", "board pause"]);
+    assert!(!l.contains(&"gate open".to_string()));
+    assert_eq!(f.mining_state, Some(MiningState::Paused));
+    // a new request tries again
+    f.resume_ok = true;
+    f.request = Some(Request::Resume);
+    let l = cycles(&t, &mut f, 1, PAUSE_MIN_US);
+    assert!(l.contains(&"gate open".to_string()));
+}
+
+#[test]
+fn no_pause_steps_in_shutdown() {
+    let t = PowerTask::new(false);
+    let mut f = running();
+    f.shutdown = true;
+    f.request = Some(Request::Pause);
+    t.cycle(&mut f);
+    assert!(!f.take().contains(&"gate closed".to_string()));
+    assert_eq!(f.mining_state, None);
 }

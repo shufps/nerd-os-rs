@@ -96,7 +96,13 @@
     "BOARD_ERROR_HINT_4": "regulatorul de tensiune s-a oprit din cauza supracurentului. Scade frecvența/tensiunea, apoi repornește minerul.",
     "BOARD_ERROR_HINT_5": "regulatorul de tensiune s-a oprit deoarece tensiunea de ieșire era în afara limitelor. Verifică setarea tensiunii de nucleu, apoi repornește minerul.",
     "BLOCK_FOUND": "Bloc găsit!",
-    "BLOCK_DISMISS": "YAY 🥳"
+    "BLOCK_DISMISS": "YAY 🥳",
+    "MINING_PAUSED": "Minarea este în pauză",
+    "MINING_PAUSING": "Se pune minarea pe pauză …",
+    "MINING_RESUMING": "Se reia minarea …",
+    "MINING_PAUSED_HINT": "ASIC-urile sunt oprite, pool-urile rămân conectate.",
+    "RESUME": "Reia",
+    "RESUME_FAILED": "Reluarea a eșuat"
   },
   "PERFORMANCE": {
     "TITLE": "Performanță",
@@ -264,6 +270,9 @@
     "SHUTDOWN": "Oprire",
     "SHUTDOWN_SUCCESS": "Sistemul se oprește",
     "SHUTDOWN_FAILED": "Oprire eșuată",
+    "PAUSE_MINING": "Pune minarea pe pauză",
+    "PAUSE_SUCCESS": "Minarea este pusă pe pauză",
+    "PAUSE_FAILED": "Punerea pe pauză a eșuat",
     "LOGS_ALREADY_OPEN_OTHER_TAB": "Jurnalele sunt deja deschise în altă filă."
   },
   "SWARM": {

@@ -366,6 +366,8 @@ fn dashboard() {
         let d = Dashboard {
             uptime_seconds: s.uptime_seconds,
             shutdown: s.shutdown,
+            // (no random draw: the other values stay as recorded)
+            mining_state: Default::default(),
             board_error: r.below(7) as c_int,
             overheat_temp: s.overheat_temp,
             vr_overheat_temp: r.below(120) as u16,

@@ -5,6 +5,7 @@ pub mod alert;
 pub mod can;
 pub mod dashboard;
 pub mod influx;
+pub mod mining;
 pub mod otp;
 pub mod settings;
 pub mod system;
@@ -35,6 +36,8 @@ pub fn handler(h: Handler) -> Option<HandlerFn> {
         Handler::CanSlavePatch => can::patch,
         Handler::CanSlaveDelete => can::delete,
         Handler::WifiScan => wifi::scan,
+        Handler::MiningPause => mining::pause,
+        Handler::MiningResume => mining::resume,
         _ => return None,
     })
 }

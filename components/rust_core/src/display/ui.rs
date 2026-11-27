@@ -1108,6 +1108,17 @@ impl Ui {
     }
 
     pub(crate) fn show_error(&mut self, l: &Lvgl, msg: &CStr, code: u32) {
+        let sub = format!("Guru Meditation #{:08X}", code);
+        self.message_box(l, msg, &sub, color(0xe60000));
+    }
+
+    /// The mining pause (in the error overlay's place).
+    pub(crate) fn show_paused(&mut self, l: &Lvgl) {
+        self.message_box(l, c"MINING PAUSED", "resume in the web UI", color(0xffb000));
+    }
+
+    /// The error overlay's box: a title and a line below, in `fg`.
+    fn message_box(&mut self, l: &Lvgl, msg: &CStr, sub: &str, fg: raw::lv_color_t) {
         self.hide_error(l);
         let Some(scr) = Obj::active_screen(l) else {
             return;
@@ -1116,15 +1127,13 @@ impl Ui {
         c.size(l, 278, 80)
             .align(l, lv::CENTER, 0, -20)
             .clear_flag(l, raw::LV_OBJ_FLAG_SCROLLABLE);
-        c.bg_color(l, color(0x111111))
-            .border(l, 2, Some(color(0xe60000)));
-        let red = color(0xe60000);
+        c.bg_color(l, color(0x111111)).border(l, 2, Some(fg));
         let e = c.label(l);
         e.size(l, lv::SIZE_CONTENT, lv::SIZE_CONTENT)
             .pos(l, 0, 0)
             .set_align(l, lv::TOP_MID)
             .set_text(l, msg)
-            .text_color(l, red)
+            .text_color(l, fg)
             .text_opa(l, 255)
             .font(l, asset!(ui_font_vt323_35))
             .text_align(l, lv::TEXT_CENTER);
@@ -1132,8 +1141,8 @@ impl Ui {
         k.size(l, lv::SIZE_CONTENT, lv::SIZE_CONTENT)
             .pos(l, 0, 0)
             .set_align(l, lv::BOTTOM_MID)
-            .set_text_str(l, &format!("Guru Meditation #{:08X}", code))
-            .text_color(l, red)
+            .set_text_str(l, sub)
+            .text_color(l, fg)
             .text_opa(l, 255)
             .font(l, asset!(ui_font_vt323_21))
             .text_align(l, lv::TEXT_CENTER);

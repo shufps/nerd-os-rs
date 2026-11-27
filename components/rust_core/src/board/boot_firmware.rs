@@ -500,6 +500,7 @@ impl Hooks for Firmware {
             4096,
             1,
         );
+        crate::mining::pause::enable();
     }
 
     fn can_master_wanted(&mut self) -> bool {

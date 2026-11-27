@@ -96,7 +96,13 @@
     "BOARD_ERROR_HINT_4": "regulator napięcia wyłączył się z powodu przetężenia. Obniż częstotliwość/napięcie, a następnie uruchom ponownie koparkę.",
     "BOARD_ERROR_HINT_5": "regulator napięcia wyłączył się, ponieważ jego napięcie wyjściowe było poza zakresem. Sprawdź ustawienie napięcia rdzenia, a następnie uruchom ponownie koparkę.",
     "BLOCK_FOUND": "Znaleziono blok!",
-    "BLOCK_DISMISS": "YAY 🥳"
+    "BLOCK_DISMISS": "YAY 🥳",
+    "MINING_PAUSED": "Kopanie wstrzymane",
+    "MINING_PAUSING": "Wstrzymywanie kopania …",
+    "MINING_RESUMING": "Wznawianie kopania …",
+    "MINING_PAUSED_HINT": "układy ASIC są wyłączone, pule pozostają połączone.",
+    "RESUME": "Wznów",
+    "RESUME_FAILED": "Wznowienie nie powiodło się"
   },
   "PERFORMANCE": {
     "TITLE": "Wydajność",
@@ -264,6 +270,9 @@
     "SHUTDOWN": "Wyłączenie",
     "SHUTDOWN_SUCCESS": "System się wyłącza",
     "SHUTDOWN_FAILED": "Wyłączenie nie powiodło się",
+    "PAUSE_MINING": "Wstrzymaj kopanie",
+    "PAUSE_SUCCESS": "Kopanie jest wstrzymywane",
+    "PAUSE_FAILED": "Wstrzymanie nie powiodło się",
     "LOGS_ALREADY_OPEN_OTHER_TAB": "Logi są już otwarte w innej karcie."
   },
   "SWARM": {

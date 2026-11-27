@@ -50,6 +50,7 @@ pub struct LastBlock {
 pub struct Dashboard {
     pub uptime_seconds: i64,
     pub shutdown: bool,
+    pub mining_state: crate::mining::pause::State,
     pub board_error: c_int,
     pub overheat_temp: u16,
     /// fan channel 1's shutdown temperature (the VR)
@@ -113,6 +114,7 @@ pub fn dashboard(s: &Dashboard) -> Json {
     let mut sys = Obj::new();
     sys.int("uptime", s.uptime_seconds)
         .bool("shutdown", s.shutdown)
+        .cstr("miningState", Some(s.mining_state.name()))
         .int("boardError", s.board_error as i64)
         .uint("overheatTemp", s.overheat_temp as u64)
         // the VR shutdown runs on fan channel 1: boards with two channels
@@ -279,6 +281,7 @@ pub(crate) fn get(req: &mut Request) -> EspErr {
     let mut d = Dashboard::default();
     d.uptime_seconds = uptime_seconds();
     d.shutdown = mgmt::is_shutdown();
+    d.mining_state = crate::mining::pause::state();
     d.board_error = crate::system::error().0;
     d.overheat_temp = cfg::overheat_temp();
     d.vr_overheat_temp = cfg::fan_overheat_temp(1);

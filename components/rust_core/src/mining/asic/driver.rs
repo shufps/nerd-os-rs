@@ -18,6 +18,8 @@ use super::{
 use crate::log::log;
 
 const TAG: &core::ffi::CStr = c"asic";
+/// a result read (ms)
+const RX_TIMEOUT_MS: u16 = 1000;
 
 const TYPE_CMD: u8 = 0x40;
 const GROUP_SINGLE: u8 = 0x00;
@@ -115,6 +117,13 @@ impl Driver {
 
     pub fn chip(&self) -> Chip {
         self.chip
+    }
+
+    /// The state of a new driver, for a chain that is enumerated again
+    /// (mining resume): the frequency ramp starts at the chips' reset
+    /// frequency, and the ticket mask is sent again.
+    pub fn reset(&self) {
+        *self.state() = Self::new(self.chip).state.into_inner().unwrap_or_else(|e| e.into_inner());
     }
 
     fn state(&self) -> std::sync::MutexGuard<'_, State> {
@@ -286,7 +295,9 @@ impl Driver {
     /// on a timeout, an error or garbage (then the UART is flushed).
     pub fn process_work(&self, uart: &mut impl Uart) -> Option<TaskResult> {
         let mut buf = [0u8; RESPONSE_LEN];
-        let n = uart.rx(&mut buf, 60_000);
+        // short, so the result task reaches its pause point within a power
+        // task cycle (an idle chain just gives an empty read)
+        let n = uart.rx(&mut buf, RX_TIMEOUT_MS);
         if n < 0 {
             log!(Info, TAG, "Error in serial RX");
             return None;

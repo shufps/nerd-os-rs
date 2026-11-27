@@ -612,6 +612,20 @@ export class SystemComponent implements OnDestroy, AfterViewInit {
       });
   }
 
+  /** Pauses mining (no OTP, as on the device: home automation); the home page offers the resume. */
+  public pauseMining() {
+    this.systemService.pauseMining().subscribe({
+      next: () => this.toastrService.success(
+        this.translateService.instant('SYSTEM.PAUSE_SUCCESS'),
+        this.translateService.instant('COMMON.SUCCESS')
+      ),
+      error: () => this.toastrService.danger(
+        this.translateService.instant('SYSTEM.PAUSE_FAILED'),
+        this.translateService.instant('COMMON.ERROR')
+      ),
+    });
+  }
+
   public downloadCoreDump(deviceModel: string, version: string): void {
     if (this.coreDumpDownloading) return;
 

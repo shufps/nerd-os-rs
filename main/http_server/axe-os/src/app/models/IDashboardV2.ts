@@ -3,6 +3,8 @@ import { IHistory } from './IHistory';
 export interface IDashboardV2System {
     uptime: number;
     shutdown: boolean;
+    /** 'running' | 'pausing' | 'paused' | 'resuming' */
+    miningState?: string;
     boardError: number;
     overheatTemp: number;
     vrOverheatTemp?: number;   // 0 = no VR shutdown on this board

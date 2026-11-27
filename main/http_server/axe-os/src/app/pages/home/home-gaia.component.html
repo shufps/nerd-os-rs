@@ -35,6 +35,10 @@
     <nb-alert *ngIf="hardwareError(info.system.boardError) as err" status="danger" class="board-error-alert">
       <strong>{{ err }}</strong> — {{ hardwareErrorHint(info.system.boardError) | translate }}
     </nb-alert>
+    <nb-alert *ngIf="info.system.miningState && info.system.miningState !== 'running'" status="warning" class="board-error-alert mining-paused-alert">
+      <span><strong>{{ miningStateText(info.system.miningState) | translate }}</strong> — {{ 'HOME.MINING_PAUSED_HINT' | translate }}</span>
+      <button nbButton size="small" status="primary" [disabled]="info.system.miningState !== 'paused' || resumeBusy" (click)="resumeMining()">{{ 'HOME.RESUME' | translate }}</button>
+    </nb-alert>
   <div *ngIf="!info.system.shutdown; else shutdown">
       <!-- GAIA-ONLY top summary cards (NEROQ+ style: icon-left, colored, progress) -->
       <div class="nerd-summary-grid">

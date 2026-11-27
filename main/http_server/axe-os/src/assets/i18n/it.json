@@ -96,7 +96,13 @@
     "BOARD_ERROR_HINT_4": "il regolatore di tensione si è spento per sovracorrente. Riduci frequenza/tensione, poi riavvia il miner.",
     "BOARD_ERROR_HINT_5": "il regolatore di tensione si è spento perché la sua tensione di uscita era fuori intervallo. Controlla l'impostazione della tensione del core, poi riavvia il miner.",
     "BLOCK_FOUND": "Blocco trovato!",
-    "BLOCK_DISMISS": "YAY 🥳"
+    "BLOCK_DISMISS": "YAY 🥳",
+    "MINING_PAUSED": "Mining in pausa",
+    "MINING_PAUSING": "Messa in pausa del mining …",
+    "MINING_RESUMING": "Ripresa del mining …",
+    "MINING_PAUSED_HINT": "gli ASIC sono spenti, i pool restano connessi.",
+    "RESUME": "Riprendi",
+    "RESUME_FAILED": "Ripresa non riuscita"
   },
   "PERFORMANCE": {
     "TITLE": "Prestazioni",
@@ -264,6 +270,9 @@
     "SHUTDOWN": "Spegnimento",
     "SHUTDOWN_SUCCESS": "Sistema in corso di spegnimento",
     "SHUTDOWN_FAILED": "Spegnimento non riuscito",
+    "PAUSE_MINING": "Metti in pausa il mining",
+    "PAUSE_SUCCESS": "Il mining viene messo in pausa",
+    "PAUSE_FAILED": "Pausa non riuscita",
     "LOGS_ALREADY_OPEN_OTHER_TAB": "I log sono già aperti in un'altra scheda."
   },
   "SWARM": {

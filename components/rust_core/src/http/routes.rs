@@ -10,8 +10,8 @@
 //!
 //! Checks that depend on the request stay in their handlers: the WiFi scan
 //! sets CORS only after its access point check, the statistics reset needs
-//! OTP only for `allTime`. Restart and shutdown deliberately have no OTP
-//! check (home automation pauses mining with them).
+//! OTP only for `allTime`. Restart, shutdown and the mining pause and
+//! resume deliberately have no OTP check (home automation).
 
 use core::ffi::CStr;
 
@@ -66,6 +66,8 @@ pub enum Handler {
     ProfilesGet,
     ProfilesPatch,
     ProfileApply,
+    MiningPause,
+    MiningResume,
     /// GET /api/debug/screen (development)
     #[cfg(feature = "screenshot")]
     Screenshot,
@@ -149,7 +151,7 @@ const API: u16 = CLOSE | NET | CORS | CTX;
 const PREFLIGHT: u16 = CLOSE | NET | CORS;
 
 /// The routes in registration order.
-pub static ROUTES: [Route; 50] = [
+pub static ROUTES: [Route; 53] = [
     r(c"/recovery", Get, H::Recovery, CLOSE | NET | CTX),
     r(c"/api/system/info", Get, H::SystemInfo, API),
     r(c"/api/system/asic", Get, H::SystemAsic, API),
@@ -219,6 +221,10 @@ pub static ROUTES: [Route; 50] = [
     // no OTP on purpose: only selects a stored profile (home automation)
     r(c"/api/v2/profiles/apply", Post, H::ProfileApply, API),
     r(c"/api/v2/profiles/apply", Options, H::Options, PREFLIGHT),
+    // no OTP on purpose (home automation)
+    r(c"/api/v2/mining/pause", Post, H::MiningPause, API),
+    r(c"/api/v2/mining/resume", Post, H::MiningResume, API),
+    r(c"/api/v2/mining/*", Options, H::Options, PREFLIGHT),
     r(c"/api/system/OTA", Post, H::Ota, CLOSE | NET | OTP),
     // the web UI can be reinstalled from the recovery page without OTP
     r(
@@ -273,6 +279,8 @@ mod tests {
                 H::Restart
                     | H::Shutdown
                     | H::ProfileApply
+                    | H::MiningPause
+                    | H::MiningResume
                     | H::ResetStats
                     | H::OtpCreate
                     | H::OtpSession

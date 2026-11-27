@@ -18,10 +18,13 @@ use std::sync::Mutex;
 use std::time::{Duration, Instant};
 
 use crate::log::log;
+pub use crate::mining::pause::{Request, State as MiningState};
 use crate::util::cutil::fixed;
 
 const TAG: &CStr = c"power_management";
 pub const POLL_MS: u64 = 2000;
+/// the chain stays off at least this long before a resume
+pub const PAUSE_MIN_US: u64 = 5_000_000;
 const TELEMETRY_PERIOD_US: u64 = 15_000_000;
 
 pub const ERROR_NONE: c_int = 0;
@@ -61,6 +64,19 @@ pub trait Env {
     fn influx_temperature(&mut self, chip: f32, vr: f32);
     fn influx_fan(&mut self, v: [f32; 4]);
     fn now_us(&mut self) -> u64;
+    /// Mining pause/resume (`mining/pause.rs`): the request since the last
+    /// cycle, the published state, the mining tasks' gate.
+    fn take_mining_request(&mut self) -> Option<Request>;
+    fn set_mining_state(&mut self, s: MiningState);
+    /// Closed: the mining tasks park; opened: they run again.
+    fn close_mining_gate(&mut self, closed: bool);
+    fn mining_parked(&mut self) -> bool;
+    /// The chain off (`Board::pause()`), the hashrate cleared.
+    fn pause_board(&mut self);
+    /// Faults cleared, the chain powered and enumerated as at boot.
+    fn resume_board(&mut self) -> bool;
+    /// The hardware errors (overheat, regulator faults) cleared.
+    fn clear_hardware_errors(&mut self);
 }
 
 /// The values the other tasks read (single-word atomics).
@@ -91,6 +107,26 @@ struct Last {
     telemetry_due: Option<u64>,
     /// the regulator fault last logged
     fault: c_int,
+    pause: Pause,
+}
+
+/// The pause state machine (a step per cycle).
+struct Pause {
+    state: MiningState,
+    /// the latest request not acted on yet
+    wish: Option<Request>,
+    /// when the chain was switched off
+    since_us: u64,
+}
+
+impl Default for Pause {
+    fn default() -> Self {
+        Self {
+            state: MiningState::Running,
+            wish: None,
+            since_us: 0,
+        }
+    }
 }
 
 pub struct PowerTask {
@@ -173,7 +209,7 @@ impl PowerTask {
         log!(Info, TAG, "chip temperatures: {}", temps.join(" / "));
     }
 
-    fn telemetry(&self, env: &mut impl Env, last: &mut Last) {
+    fn telemetry(&self, env: &mut impl Env, last: &mut Last, powered: bool) {
         if !env.is_buck_initialized() {
             return;
         }
@@ -205,7 +241,13 @@ impl PowerTask {
             f(vr_temp_int)
         );
         env.influx_pwr([vin, iin, pin, vout, iout, pout]);
-        let (error, status) = env.fault();
+        // (paused: the regulator is off on purpose; its faults are cleared
+        // on resume)
+        let (error, status) = if powered {
+            env.fault()
+        } else {
+            (ERROR_NONE, 0)
+        };
         if error != ERROR_NONE {
             if error != last.fault {
                 log!(
@@ -223,17 +265,82 @@ impl PowerTask {
         store(&self.out.power, pin);
     }
 
+    /// One step of pause/resume; false while the chain is off for a pause.
+    ///
+    /// Running → Pausing: the gate closes. Pausing → Paused: once every
+    /// mining task is parked, the chain is switched off. Paused → Resuming
+    /// → Running: after at least `PAUSE_MIN_US` off, the regulator faults
+    /// are cleared, the chain is powered and enumerated as at boot (in this
+    /// cycle), the remembered settings are dropped so this cycle applies
+    /// the configured ones, and the gate opens. A failed enumeration
+    /// switches the chain off again and stays paused.
+    fn pause_step(&self, env: &mut impl Env, last: &mut Last) -> bool {
+        if let Some(r) = env.take_mining_request() {
+            last.pause.wish = Some(r);
+        }
+        if env.is_shutdown() {
+            return last.pause.state != MiningState::Paused;
+        }
+        let now = env.now_us();
+        let p = &mut last.pause;
+        match (p.state, p.wish) {
+            (MiningState::Running, Some(Request::Pause)) => {
+                p.wish = None;
+                log!(Warn, TAG, "pausing mining");
+                env.close_mining_gate(true);
+                p.state = MiningState::Pausing;
+                env.set_mining_state(p.state);
+            }
+            (MiningState::Running, Some(Request::Resume)) => p.wish = None,
+            (MiningState::Pausing, _) if env.mining_parked() => {
+                env.pause_board();
+                p.since_us = now;
+                p.state = MiningState::Paused;
+                env.set_mining_state(p.state);
+                log!(Warn, TAG, "mining paused");
+            }
+            (MiningState::Paused, Some(Request::Pause)) => p.wish = None,
+            (MiningState::Paused, Some(Request::Resume))
+                if now.wrapping_sub(p.since_us) >= PAUSE_MIN_US =>
+            {
+                p.wish = None;
+                log!(Warn, TAG, "resuming mining");
+                p.state = MiningState::Resuming;
+                env.set_mining_state(p.state);
+                if env.resume_board() {
+                    last.core_voltage = 0;
+                    last.asic_frequency = 0;
+                    last.vr_frequency = 0;
+                    last.fault = ERROR_NONE;
+                    env.clear_hardware_errors();
+                    env.close_mining_gate(false);
+                    last.pause.state = MiningState::Running;
+                    log!(Warn, TAG, "mining resumed");
+                } else {
+                    log!(Error, TAG, "resume failed, staying paused");
+                    env.pause_board();
+                    last.pause.since_us = now;
+                    last.pause.state = MiningState::Paused;
+                }
+                env.set_mining_state(last.pause.state);
+            }
+            _ => {}
+        }
+        last.pause.state != MiningState::Paused
+    }
+
     /// One cycle under the hardware lock.
     pub fn cycle(&self, env: &mut impl Env) {
         env.lock();
         let mut last = self.last.lock().unwrap_or_else(|e| e.into_inner());
 
+        let powered = self.pause_step(env, &mut last);
         self.apply_asic_settings(env, &mut last);
         if env.is_initialized() {
             env.request_chip_temps();
         }
         self.log_chip_temps(env);
-        self.telemetry(env, &mut last);
+        self.telemetry(env, &mut last, powered);
 
         // the hottest board sensor
         let mut sensors_max = 0.0f32;

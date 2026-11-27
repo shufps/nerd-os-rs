@@ -310,33 +310,42 @@ impl Filters {
 }
 
 /// The error overlay as shown.
-#[derive(Default)]
-struct Overlay {
-    shown: bool,
-    code: u32,
+#[derive(Default, PartialEq)]
+enum Overlay {
+    #[default]
+    Hidden,
+    Error(u32),
+    Paused,
 }
 
 impl Overlay {
     fn show(&mut self, text: &CStr, code: u32) {
         // an error is already shown
-        if self.shown && self.code != 0 {
+        if matches!(*self, Overlay::Error(c) if c != 0) {
             return;
         }
         crate::display::show_error(text, code);
-        self.shown = true;
-        self.code = code;
+        *self = Overlay::Error(code);
+    }
+
+    /// Mining paused (an error goes first).
+    fn paused(&mut self) {
+        if *self == Overlay::Paused {
+            return;
+        }
+        crate::display::show_paused();
+        *self = Overlay::Paused;
     }
 
     /// Only hides an overlay that is shown: hiding every tick reset the
     /// display's shared overlay state, so the found block overlay could not
     /// be dismissed.
     fn hide(&mut self) {
-        if !self.shown {
+        if *self == Overlay::Hidden {
             return;
         }
         crate::display::hide_error();
-        self.shown = false;
-        self.code = 0;
+        *self = Overlay::Hidden;
     }
 }
 
@@ -426,6 +435,8 @@ pub fn run() -> ! {
         let (e, code) = error();
         if e != error::NONE {
             overlay.show(error_text(e), code);
+        } else if crate::mining::pause::state() != crate::mining::pause::State::Running {
+            overlay.paused();
         } else {
             overlay.hide();
         }

@@ -82,6 +82,7 @@ Real-time mining telemetry. Used by the Home page (polled every 2s).
   "system": {
     "uptime": 86400,
     "shutdown": false,
+    "miningState": "running",
     "boardError": 0,
     "overheatTemp": 75,
     "vrOverheatTemp": 80
@@ -424,6 +425,19 @@ Applies a stored profile. **No OTP**: it only selects one of the stored profiles
 ```
 
 **Response**: `{"id": 1, "name": "Quiet"}`; `400` for an unknown id.
+
+---
+
+### Mining pause
+
+#### `POST /api/v2/mining/pause`
+#### `POST /api/v2/mining/resume`
+
+Pause switches the ASICs off (as a shutdown does) while the firmware, the web UI and the pool connections keep running; resume powers the ASICs on and initializes them again as at boot, with the current voltage and frequency settings. It also clears the hardware errors (overheat, voltage regulator faults); a fault that is still there is reported again. **No OTP** (like restart and shutdown, for home automations). A pause does not survive a restart.
+
+The change happens within a few seconds: `miningState` in `GET /api/v2/dashboard` goes `running` → `pausing` → `paused` and `paused` → `resuming` → `running`. The ASICs stay off at least 5 s; an earlier resume waits for that. If the ASICs are not found on resume, they are switched off again and the state stays `paused`.
+
+**Response**: `{"ok": true, "miningState": "running"}` with the state at the time of the request (also when the miner already is paused or running). `409` with `"ok": false` while the opposite change is in progress, and on devices that do not mine (no pool configured, CAN slave).
 
 ---
 

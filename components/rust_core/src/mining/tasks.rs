@@ -59,6 +59,8 @@ fn wait(deadline: Instant) -> bool {
 pub trait JobEnv {
     /// Suspends the task if the board is shut down (overheat etc.).
     fn suspend_if_shutdown(&mut self);
+    /// Blocks while mining is paused (`mining/pause.rs`).
+    fn park_if_paused(&mut self) {}
     fn job_interval_ms(&mut self) -> u32;
     /// The pool to mine for next; None while there is no pool manager or
     /// no ASIC chain.
@@ -132,6 +134,7 @@ impl JobTask {
         let mut deadline = Instant::now() + Duration::from_millis(interval as u64);
         loop {
             env.suspend_if_shutdown();
+            env.park_if_paused();
             if !wait(deadline) {
                 deadline += Duration::from_millis(interval as u64);
                 // behind (the task was busy): one job now, then the period
@@ -173,6 +176,8 @@ const _: () = assert!(core::mem::size_of::<TaskResult>() == 24);
 /// What the result task needs from the rest of the firmware.
 pub trait ResultEnv {
     fn suspend_if_shutdown(&mut self);
+    /// Blocks while mining is paused (`mining/pause.rs`).
+    fn park_if_paused(&mut self) {}
     /// The next response of the chain; None on a timeout.
     fn process_work(&mut self) -> Option<TaskResult>;
     fn set_chip_temp(&mut self, asic_nr: c_int, temp: f32);
@@ -317,6 +322,7 @@ impl ResultTask {
     pub fn run(&mut self, env: &mut impl ResultEnv) -> ! {
         loop {
             env.suspend_if_shutdown();
+            env.park_if_paused();
             if let Some(r) = env.process_work() {
                 self.handle(env, r);
             }

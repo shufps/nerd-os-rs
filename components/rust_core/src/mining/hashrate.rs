@@ -149,6 +149,19 @@ pub fn init(asic_count: usize) {
     with(|m| m.chips = vec![Chip::default(); asic_count]);
 }
 
+/// Mining paused: no hashrate, and the next replies only set the baselines
+/// (the counters restart at 0 when the chain is enumerated again).
+pub fn reset() {
+    with(|m| {
+        let n = m.chips.len();
+        *m = Monitor {
+            chips: vec![Chip::default(); n],
+            external: m.external,
+            ..Monitor::new()
+        };
+    });
+}
+
 /// The CAN slaves' total hashrate (GH/s), set by the CAN master.
 pub fn set_external(ghs: f32) {
     with(|m| m.external = ghs);
@@ -176,6 +189,10 @@ pub fn on_errors(asic: c_int, counter: u32) {
 /// What the measurement loop needs from the firmware.
 pub trait Env {
     fn suspend_if_shutdown(&mut self);
+    /// Blocks while mining is paused; true if it was paused.
+    fn park_if_paused(&mut self) -> bool {
+        false
+    }
     /// Broadcast reset / read of a counter register (the replies come back
     /// through the result task).
     fn reset_counter(&mut self, reg: u8);
@@ -192,6 +209,11 @@ pub fn run(env: &mut impl Env) -> ! {
     let mut next = Instant::now();
     loop {
         env.suspend_if_shutdown();
+        if env.park_if_paused() {
+            // a new chain: count from 0 again
+            env.reset_counter(REG_NONCE_TOTAL_CNT);
+            next = Instant::now();
+        }
         // two read-all bursts must not overlap (the second one truncates the
         // replies of the first): each gets its own settle time
         env.read_counter(REG_NONCE_TOTAL_CNT);

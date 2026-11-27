@@ -79,6 +79,7 @@ mod host {
     pub fn mining_screen() {}
     pub fn show_found_block() {}
     pub fn show_error(_: &CStr, _: u32) {}
+    pub fn show_paused() {}
     pub fn hide_error() {}
     pub fn update(_: i32) {}
     pub fn log(_: &str) {}

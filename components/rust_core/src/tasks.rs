@@ -13,6 +13,7 @@ use std::time::Duration;
 use crate::log::log;
 use crate::mining::asic::driver::api as asic;
 use crate::mining::jobs::BmJob;
+use crate::mining::pause::Task;
 use crate::mining::tasks::TaskResult;
 use crate::mining::tasks::{JobEnv, ResultEnv};
 use crate::pool::manager::api as mgr;
@@ -44,6 +45,9 @@ const JOBS_TAG: &CStr = c"create_jobs_task";
 impl JobEnv for Jobs {
     fn suspend_if_shutdown(&mut self) {
         suspend_if_shutdown(JOBS_TAG);
+    }
+    fn park_if_paused(&mut self) {
+        crate::mining::pause::park(Task::Jobs);
     }
     fn job_interval_ms(&mut self) -> u32 {
         board_info().job_interval_ms as u32
@@ -95,6 +99,9 @@ const RESULT_TAG: &CStr = c"asic_result";
 impl ResultEnv for Results {
     fn suspend_if_shutdown(&mut self) {
         suspend_if_shutdown(RESULT_TAG);
+    }
+    fn park_if_paused(&mut self) {
+        crate::mining::pause::park(Task::Results);
     }
     fn process_work(&mut self) -> Option<TaskResult> {
         let r = asics()?.run(|d, u| d.process_work(u))?;
@@ -262,6 +269,9 @@ impl crate::mining::hashrate::Env for Counters {
     fn suspend_if_shutdown(&mut self) {
         suspend_if_shutdown(HR_TAG);
     }
+    fn park_if_paused(&mut self) -> bool {
+        crate::mining::pause::park(Task::Hashrate)
+    }
     fn reset_counter(&mut self, reg: u8) {
         self.0.run(|d, u| d.reset_counter(u, reg));
     }
@@ -271,6 +281,7 @@ impl crate::mining::hashrate::Env for Counters {
 }
 
 unsafe extern "C" fn hashrate_task(arg: *mut c_void) {
+    crate::mining::pause::register(Task::Hashrate);
     // SAFETY: the board's driver (it lives as long as the board), see
     // hashrate_monitor_start()
     crate::mining::hashrate::run(&mut Counters(&*(arg as *const asic::Handle)))
@@ -291,6 +302,7 @@ pub(crate) mod api {
             board_info().job_interval_ms
         );
         log!(Info, JOBS_TAG, "ASIC Ready!");
+        crate::mining::pause::register(Task::Jobs);
         crate::mining::tasks::JobTask::default().run(&mut Jobs)
     }
 
@@ -300,6 +312,7 @@ pub(crate) mod api {
     /// A FreeRTOS task entry.
     #[allow(non_snake_case)]
     pub unsafe extern "C" fn ASIC_result_task(_: *mut c_void) {
+        crate::mining::pause::register(Task::Results);
         crate::mining::tasks::ResultTask::default().run(&mut Results)
     }
 

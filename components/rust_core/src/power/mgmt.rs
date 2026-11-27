@@ -13,7 +13,8 @@ use crate::config;
 use crate::config::sdkconfig;
 use crate::log::log;
 use crate::power::fan_control::{ChannelConfig, FanController, Fans, MAX_FANS};
-use crate::power::task::{Env, PowerTask, POLL_MS};
+use crate::mining::pause;
+use crate::power::task::{Env, MiningState, PowerTask, Request, POLL_MS};
 
 const TAG: &CStr = c"power_management";
 
@@ -83,6 +84,10 @@ mod sys {
         0.0
     }
     pub fn bapi_shutdown() {}
+    pub fn bapi_pause() {}
+    pub fn bapi_resume() -> bool {
+        false
+    }
     pub fn bapi_invert_fan_polarity() -> bool {
         false
     }
@@ -306,6 +311,41 @@ impl Env for Board {
     }
     fn now_us(&mut self) -> u64 {
         crate::util::cutil::now_us() as u64
+    }
+    fn take_mining_request(&mut self) -> Option<Request> {
+        pause::take_request()
+    }
+    fn set_mining_state(&mut self, s: MiningState) {
+        pause::set_state(s)
+    }
+    fn close_mining_gate(&mut self, closed: bool) {
+        pause::set_closed(closed);
+        if !closed {
+            // a job right away instead of after the job interval
+            crate::mining::tasks::trigger();
+        }
+    }
+    fn mining_parked(&mut self) -> bool {
+        pause::parked()
+    }
+    fn pause_board(&mut self) {
+        sys::bapi_pause();
+        crate::mining::hashrate::reset();
+    }
+    fn resume_board(&mut self) -> bool {
+        sys::bapi_resume()
+    }
+    fn clear_hardware_errors(&mut self) {
+        use crate::system::error;
+        for e in [
+            error::TEMP_FAULT,
+            error::VREG_TEMP_FAULT,
+            error::PSU_FAULT,
+            error::IOUT_OC_FAULT,
+            error::VOUT_FAULT,
+        ] {
+            crate::system::clear_error(e);
+        }
     }
 }
 

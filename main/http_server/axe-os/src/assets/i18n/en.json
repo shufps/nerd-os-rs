@@ -96,7 +96,13 @@
     "BOARD_ERROR_HINT_4": "the voltage regulator switched off because of over-current. Lower frequency/voltage, then restart the miner.",
     "BOARD_ERROR_HINT_5": "the voltage regulator switched off because its output voltage was out of range. Check the core voltage setting, then restart the miner.",
     "BLOCK_FOUND": "Block found!",
-    "BLOCK_DISMISS": "YAY 🥳"
+    "BLOCK_DISMISS": "YAY 🥳",
+    "MINING_PAUSED": "Mining paused",
+    "MINING_PAUSING": "Pausing mining …",
+    "MINING_RESUMING": "Resuming mining …",
+    "MINING_PAUSED_HINT": "the ASICs are switched off, the pools stay connected.",
+    "RESUME": "Resume",
+    "RESUME_FAILED": "Resume failed"
   },
   "PERFORMANCE": {
     "TITLE": "Performance",
@@ -266,6 +272,9 @@
     "SHUTDOWN": "Shutdown",
     "SHUTDOWN_SUCCESS": "System is shutting down",
     "SHUTDOWN_FAILED": "Shutdown failed",
+    "PAUSE_MINING": "Pause mining",
+    "PAUSE_SUCCESS": "Mining is being paused",
+    "PAUSE_FAILED": "Pause failed",
     "LOGS_ALREADY_OPEN_OTHER_TAB": "Logs are already open in another tab."
   },
   "SWARM": {

@@ -96,7 +96,13 @@
     "BOARD_ERROR_HINT_4": "le régulateur de tension s'est coupé à cause d'une surintensité. Baissez la fréquence/la tension, puis redémarrez le mineur.",
     "BOARD_ERROR_HINT_5": "le régulateur de tension s'est coupé car sa tension de sortie était hors plage. Vérifiez le réglage de la tension du cœur, puis redémarrez le mineur.",
     "BLOCK_FOUND": "Bloc trouvé !",
-    "BLOCK_DISMISS": "YAY 🥳"
+    "BLOCK_DISMISS": "YAY 🥳",
+    "MINING_PAUSED": "Minage en pause",
+    "MINING_PAUSING": "Mise en pause du minage …",
+    "MINING_RESUMING": "Reprise du minage …",
+    "MINING_PAUSED_HINT": "les ASIC sont éteints, les pools restent connectés.",
+    "RESUME": "Reprendre",
+    "RESUME_FAILED": "Échec de la reprise"
   },
   "PERFORMANCE": {
     "TITLE": "Performance",
@@ -264,6 +270,9 @@
     "SHUTDOWN": "Arrêt",
     "SHUTDOWN_SUCCESS": "Le système est en cours d’arrêt",
     "SHUTDOWN_FAILED": "Échec de l’arrêt du système",
+    "PAUSE_MINING": "Mettre le minage en pause",
+    "PAUSE_SUCCESS": "Le minage est mis en pause",
+    "PAUSE_FAILED": "Échec de la mise en pause",
     "LOGS_ALREADY_OPEN_OTHER_TAB": "Les journaux sont déjà ouverts dans un autre onglet."
   },
   "SWARM": {

@@ -96,7 +96,13 @@
     "BOARD_ERROR_HINT_4": "der Spannungsregler hat wegen Überstrom abgeschaltet. Senke Frequenz/Spannung und starte den Miner dann neu.",
     "BOARD_ERROR_HINT_5": "der Spannungsregler hat abgeschaltet, weil seine Ausgangsspannung außerhalb des zulässigen Bereichs lag. Prüfe die eingestellte Kernspannung und starte den Miner dann neu.",
     "BLOCK_FOUND": "Block gefunden!",
-    "BLOCK_DISMISS": "YAY 🥳"
+    "BLOCK_DISMISS": "YAY 🥳",
+    "MINING_PAUSED": "Mining pausiert",
+    "MINING_PAUSING": "Mining wird pausiert …",
+    "MINING_RESUMING": "Mining wird fortgesetzt …",
+    "MINING_PAUSED_HINT": "die ASICs sind abgeschaltet, die Pools bleiben verbunden.",
+    "RESUME": "Fortsetzen",
+    "RESUME_FAILED": "Fortsetzen fehlgeschlagen"
   },
   "PERFORMANCE": {
     "TITLE": "Leistung",
@@ -266,6 +272,9 @@
     "SHUTDOWN": "Shutdown",
     "SHUTDOWN_SUCCESS": "System wird heruntergefahren",
     "SHUTDOWN_FAILED": "Shutdown fehlgeschlagen",
+    "PAUSE_MINING": "Mining pausieren",
+    "PAUSE_SUCCESS": "Mining wird pausiert",
+    "PAUSE_FAILED": "Pausieren fehlgeschlagen",
     "LOGS_ALREADY_OPEN_OTHER_TAB": "Logs sind bereits in einem anderen Tab geöffnet."
   },
   "SWARM": {

@@ -96,7 +96,13 @@
     "BOARD_ERROR_HINT_4": "spændingsregulatoren slukkede på grund af overstrøm. Sænk frekvens/spænding, og genstart derefter mineren.",
     "BOARD_ERROR_HINT_5": "spændingsregulatoren slukkede, fordi dens udgangsspænding var uden for området. Tjek indstillingen af kernespændingen, og genstart derefter mineren.",
     "BLOCK_FOUND": "Blok fundet!",
-    "BLOCK_DISMISS": "YAY 🥳"
+    "BLOCK_DISMISS": "YAY 🥳",
+    "MINING_PAUSED": "Mining sat på pause",
+    "MINING_PAUSING": "Mining sættes på pause …",
+    "MINING_RESUMING": "Mining genoptages …",
+    "MINING_PAUSED_HINT": "ASIC'erne er slukket, poolerne forbliver forbundet.",
+    "RESUME": "Genoptag",
+    "RESUME_FAILED": "Genoptagelse mislykkedes"
   },
   "PERFORMANCE": {
     "TITLE": "Ydelse",
@@ -262,6 +268,9 @@
     "SHUTDOWN": "Luk ned",
     "SHUTDOWN_SUCCESS": "Systemet lukker ned",
     "SHUTDOWN_FAILED": "Nedlukning mislykkedes",
+    "PAUSE_MINING": "Sæt mining på pause",
+    "PAUSE_SUCCESS": "Mining sættes på pause",
+    "PAUSE_FAILED": "Pause mislykkedes",
     "LOGS_ALREADY_OPEN_OTHER_TAB": "Logfilerne er allerede åbne i en anden fane."
   },
   "SWARM": {

@@ -96,7 +96,13 @@
     "BOARD_ERROR_HINT_4": "el regulador de voltaje se apagó por sobrecorriente. Baja la frecuencia/el voltaje y reinicia el minero.",
     "BOARD_ERROR_HINT_5": "el regulador de voltaje se apagó porque su voltaje de salida estaba fuera de rango. Revisa el ajuste del voltaje del núcleo y reinicia el minero.",
     "BLOCK_FOUND": "¡Bloque encontrado!",
-    "BLOCK_DISMISS": "YAY 🥳"
+    "BLOCK_DISMISS": "YAY 🥳",
+    "MINING_PAUSED": "Minería en pausa",
+    "MINING_PAUSING": "Pausando la minería …",
+    "MINING_RESUMING": "Reanudando la minería …",
+    "MINING_PAUSED_HINT": "los ASIC están apagados, los pools siguen conectados.",
+    "RESUME": "Reanudar",
+    "RESUME_FAILED": "Error al reanudar"
   },
   "PERFORMANCE": {
     "TITLE": "Rendimiento",
@@ -264,6 +270,9 @@
     "SHUTDOWN": "Apagar",
     "SHUTDOWN_SUCCESS": "El sistema se está apagando",
     "SHUTDOWN_FAILED": "Error al apagar el sistema",
+    "PAUSE_MINING": "Pausar minería",
+    "PAUSE_SUCCESS": "La minería se está pausando",
+    "PAUSE_FAILED": "Error al pausar",
     "LOGS_ALREADY_OPEN_OTHER_TAB": "Los registros ya están abiertos en otra pestaña."
   },
   "SWARM": {

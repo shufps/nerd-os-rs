@@ -87,7 +87,8 @@ Still to test: a real block with its height and the mempool.space link (the test
 
 In every cycle: paused within 3–8 s (Q1373 and NerdQAxe++ 0.1 W, Gaia and Gamma 5 W, NerdAxe 1.1 W, core voltage 0), all chips found again on resume (~8–13 s), the configured voltage and frequency applied, shares accepted right after, the hashrate as before, no board error, no restart. The user checked the web UI banner and the "MINING PAUSED" box on the display.
 
+Resume after a latched regulator fault, on the NerdAxe Gaia: 970 mV / 440 MHz tripped the TPS546 over-current protection after ~90 s (`boardError` 4, core voltage 0). The settings were set back to 940 mV / 300 MHz without a restart, then pause and resume: the fault and the board error were cleared, the chip was found, mining went on at 940 mV / 300 MHz (~2.0 TH/s, no rejects, no restart).
+
 Still to test:
 - the NerdQAxe+ (BM1368 chain) and the rev7 path;
-- a resume after a latched regulator fault (the TPS546 fault clear);
 - pause on a CAN master with active slaves.

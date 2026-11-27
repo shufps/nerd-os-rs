@@ -1565,9 +1565,12 @@ impl Manager {
             }
             seconds += 1;
             if seconds % 30 == 0 {
-                // fed only while the pool answers submits (within an hour)
+                // fed only while the pool answers submits (within an hour),
+                // or while mining is paused on purpose (no shares to submit;
+                // a fault keeps it running, so a stuck miner still resets)
                 let last = self.summary().last_response_us;
-                if last != 0 && now_us().saturating_sub(last) < WATCHDOG_RESPONSE_US {
+                let paused = crate::mining::pause::state() != crate::mining::pause::State::Running;
+                if paused || last != 0 && now_us().saturating_sub(last) < WATCHDOG_RESPONSE_US {
                     // SAFETY: no arguments; feeds the calling task's subscription
                     unsafe { sys::esp_task_wdt_reset() };
                 }

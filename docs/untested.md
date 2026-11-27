@@ -81,12 +81,13 @@ Still to test: a real block with its height and the mempool.space link (the test
 `POST /api/v2/mining/pause` and `/resume` (`mining/pause.rs`, the steps in `power/task.rs`). Tested by Claude over the API with serial logs (2026-11-27):
 - Q1373 (TPS53667): 20 cycles;
 - NerdAxe Gaia (TPS546 + LDO): 10 cycles;
-- NerdAxe (DAC): 10 cycles.
+- NerdAxe (DAC): 10 cycles;
+- NerdQAxe++ (TPS53647, BM1370): 10 cycles;
+- NerdAxe Gamma (TPS546 without LDO): 10 cycles.
 
-In every cycle: paused within 3–8 s (Q1373 0.1 W, Gaia 5 W, NerdAxe 1.1 W, core voltage 0), all chips found again on resume (~8–12 s), the configured voltage and frequency applied, shares accepted right after, the hashrate as before, no board error, no restart. The user checked the web UI banner.
+In every cycle: paused within 3–8 s (Q1373 and NerdQAxe++ 0.1 W, Gaia and Gamma 5 W, NerdAxe 1.1 W, core voltage 0), all chips found again on resume (~8–13 s), the configured voltage and frequency applied, shares accepted right after, the hashrate as before, no board error, no restart. The user checked the web UI banner and the "MINING PAUSED" box on the display.
 
 Still to test:
-- the "MINING PAUSED" box on the display;
-- NerdAxe Gamma (TPS546 without LDO), NerdQAxe+/++ (BM1368/BM1370 chains) and the rev7 path;
+- the NerdQAxe+ (BM1368 chain) and the rev7 path;
 - a resume after a latched regulator fault (the TPS546 fault clear);
 - pause on a CAN master with active slaves.

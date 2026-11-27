@@ -26,34 +26,12 @@ what a test would need. When an entry has been tested, delete it.
 
   Each needs a flash and a comparison with the previous firmware (log of
   the init sequence, `/api/system/info`).
-- **CAN extension detection and slave pin on the NerdQAxe+ family**.
-  Needs the CAN HAT.
 
 ## Power / boards
 
 - **rev7 TPS546 path** (also its detection). Only the NerdAxe path ran on
   hardware (Gamma, Gaia). The rev7 path is covered by differential tests
   only. Needs a NerdQAxe++ rev7 (none available).
-
-## CAN (`src/can/mod.rs`, `src/http/v2/can.rs`)
-
-Tested on the Q1373 as a CAN master without other nodes:
-- the TWAI driver starts;
-- MASTER_BOOT is queued;
-- the status lines appear;
-- the settings commands are queued;
-- the swarm API (nodes JSON, actions, PATCH, DELETE incl. errors) matches the C++ code.
-
-Tested with the user (2026-11-27) with a Q1370 as master and two Q1373 as slaves:
-- slave negotiation (HELLO/ASSIGN, IDs 1 and 2) and the registry in NVS (both slaves known again after a master restart);
-- jobs from the master, the nonce filter on the slaves, their shares submitted by the master, telemetry and config in the swarm API;
-- identify (display blinks), the display settings and restart sent to a slave;
-- "CAN ID: n" on the slaves' displays;
-- bus-off recovery: slaves marked offline when the cable was pulled, back and mining after it was plugged in again.
-
-The voltage command (1010 → 1020 → 1010 mV, the TPS53647 followed) and the fan command (manual 60 % and back to PID) were tested on a slave too.
-
-Still to test: the frequency command applied on a slave.
 
 ## Network (`src/drivers/w5500.rs`, `src/net/network.rs`, PRs N1/N2)
 

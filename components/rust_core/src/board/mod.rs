@@ -1043,6 +1043,40 @@ impl Board {
         );
     }
 
+    /// Mining pause: the chain off as in `shutdown()`, and not initialized
+    /// until `resume()` (no settings applied, no chip temperatures).
+    pub fn pause(&self) {
+        self.shutdown();
+        let count = {
+            let mut s = self.state();
+            s.initialized = false;
+            s.p.asic_count
+        };
+        for i in 0..count {
+            board_core::CHIP_TEMPS.set(i, 0.0);
+        }
+    }
+
+    /// Mining resume: clears the regulator's latched faults and powers and
+    /// enumerates the chain again as at boot (the TPS536x7 bucks are set up
+    /// again by `init_asics()`, which clears their faults too).
+    pub fn resume(&self) -> bool {
+        let id = {
+            let mut s = self.state();
+            s.shutdown = false;
+            s.initialized = false;
+            s.chips_detected = 0;
+            s.id
+        };
+        if is_axe(id) && axe_tps().initialized() {
+            axe_tps().clear_faults(&mut SmBus);
+        }
+        self.with_asic((), |a| a.driver().reset());
+        crate::drivers::serial::set_baud(crate::drivers::serial::BOOT_BAUD);
+        crate::drivers::serial::clear();
+        self.init_asics()
+    }
+
     pub fn set_asic_frequency(&self, mhz: f32) -> bool {
         let l = self.state().limits();
         if !board_core::validate_frequency(mhz, &l) {
@@ -1245,6 +1279,11 @@ impl Board {
     }
 
     pub fn request_buck_telemetry(&self) {
+        // switched off on purpose (shutdown, mining pause): its OFF status
+        // bits are no error
+        if self.state().shutdown {
+            return;
+        }
         match &self.hw().buck {
             Buck::Tps536x7(d) => d.status(&mut SmBus),
             Buck::Rev7(d) => d.print_status(&mut SmBus),
@@ -1573,6 +1612,14 @@ pub mod api {
 
     pub fn board_shutdown() {
         b().shutdown()
+    }
+
+    pub fn board_pause() {
+        b().pause()
+    }
+
+    pub fn board_resume() -> bool {
+        b().resume()
     }
 
     pub fn board_set_voltage(volts: f32) -> bool {

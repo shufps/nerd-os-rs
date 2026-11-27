@@ -951,6 +951,14 @@ pub mod api {
         })
     }
 
+    /// The mining pause box (in the error overlay's place).
+    pub fn show_paused() {
+        with(|d| {
+            d.ui.show_paused(&d.l);
+            d.overlay = true;
+        })
+    }
+
     pub fn hide_error() {
         with(|d| {
             d.ui.hide_error(&d.l);

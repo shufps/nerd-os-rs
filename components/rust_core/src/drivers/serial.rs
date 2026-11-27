@@ -16,6 +16,8 @@ idf_const!(PORT: u32 = uart_port_t_UART_NUM_1, 1);
 const TXD: c_int = 17;
 const RXD: c_int = 18;
 const BUF_SIZE: c_int = 1024;
+/// the chips' rate after a reset (the driver raises it after the enumeration)
+pub const BOOT_BAUD: c_int = 115_200;
 idf_const!(PIN_NO_CHANGE: c_int = UART_PIN_NO_CHANGE, -1);
 idf_const!(DATA_8_BITS: u32 = uart_word_length_t_UART_DATA_8_BITS, 3);
 idf_const!(PARITY_DISABLE: u32 = uart_parity_t_UART_PARITY_DISABLE, 0);
@@ -87,7 +89,7 @@ pub fn init() {
     // the host model has no more fields
     #[allow(clippy::needless_update)]
     let cfg = UartConfig {
-        baud_rate: 115_200,
+        baud_rate: BOOT_BAUD,
         data_bits: DATA_8_BITS,
         parity: PARITY_DISABLE,
         stop_bits: STOP_BITS_1,

@@ -22,6 +22,10 @@
             <button nbButton size="small" (click)="shutdown()" status="warning">
               {{ 'SYSTEM.SHUTDOWN' | translate }}
             </button>
+            &nbsp;
+            <button nbButton size="small" (click)="pauseMining()" status="basic">
+              {{ 'SYSTEM.PAUSE_MINING' | translate }}
+            </button>
           </td>
         </tr>
         <tr>

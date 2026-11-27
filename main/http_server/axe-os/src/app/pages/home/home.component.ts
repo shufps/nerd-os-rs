@@ -1187,6 +1187,32 @@ ngOnInit() {
     this.setTitleMark(!!this.unseenBlock);
   }
 
+  /** a resume request is on its way */
+  public resumeBusy = false;
+
+  /** The banner title of a mining state (translation key). */
+  public miningStateText(state: string): string {
+    switch (state) {
+      case 'pausing': return 'HOME.MINING_PAUSING';
+      case 'resuming': return 'HOME.MINING_RESUMING';
+      default: return 'HOME.MINING_PAUSED';
+    }
+  }
+
+  public resumeMining(): void {
+    this.resumeBusy = true;
+    this.systemService.resumeMining().subscribe({
+      next: () => { this.resumeBusy = false; },
+      error: () => {
+        this.resumeBusy = false;
+        this.toastrService.danger(
+          this.translateService.instant('HOME.RESUME_FAILED'),
+          this.translateService.instant('COMMON.ERROR')
+        );
+      },
+    });
+  }
+
   public dismissBlock(): void {
     if (this.unseenBlock) {
       this.localStorageSet(HomeComponent.BLOCK_SEEN_KEY, HomeComponent.blockId(this.unseenBlock));

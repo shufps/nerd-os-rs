@@ -2502,3 +2502,12 @@ nb-card-header{
 @media (prefers-reduced-motion: reduce) {
   .block-found, .block-found__confetti i { animation: none; }
 }
+
+/* mining paused: the text and the resume button in one row */
+.mining-paused-alert {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+}

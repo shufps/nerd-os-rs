@@ -96,7 +96,13 @@
     "BOARD_ERROR_HINT_4": "稳压器因过流而关闭。请降低频率/电压，然后重启矿机。",
     "BOARD_ERROR_HINT_5": "稳压器因输出电压超出范围而关闭。请检查核心电压设置，然后重启矿机。",
     "BLOCK_FOUND": "找到区块！",
-    "BLOCK_DISMISS": "YAY 🥳"
+    "BLOCK_DISMISS": "YAY 🥳",
+    "MINING_PAUSED": "挖矿已暂停",
+    "MINING_PAUSING": "正在暂停挖矿 …",
+    "MINING_RESUMING": "正在恢复挖矿 …",
+    "MINING_PAUSED_HINT": "ASIC 已关闭，矿池保持连接。",
+    "RESUME": "恢复",
+    "RESUME_FAILED": "恢复失败"
   },
   "PERFORMANCE": {
     "TITLE": "性能",
@@ -262,6 +268,9 @@
     "SHUTDOWN": "关机",
     "SHUTDOWN_SUCCESS": "系统正在关机",
     "SHUTDOWN_FAILED": "关机失败",
+    "PAUSE_MINING": "暂停挖矿",
+    "PAUSE_SUCCESS": "正在暂停挖矿",
+    "PAUSE_FAILED": "暂停失败",
     "LOGS_ALREADY_OPEN_OTHER_TAB": "日志已经在另一个标签页中打开。"
   },
   "SWARM": {

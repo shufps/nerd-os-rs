@@ -9,6 +9,7 @@ pub mod asic;
 pub mod hashrate;
 pub mod history;
 pub mod jobs;
+pub mod pause;
 pub mod tasks;
 
 /// SHA-256. On the device this is mbedTLS, which uses the ESP32 SHA

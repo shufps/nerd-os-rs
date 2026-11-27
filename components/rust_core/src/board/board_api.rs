@@ -77,6 +77,12 @@ pub fn bapi_temperature(i: c_int) -> f32 {
 pub fn bapi_shutdown() {
     b::board_shutdown()
 }
+pub fn bapi_pause() {
+    b::board_pause()
+}
+pub fn bapi_resume() -> bool {
+    b::board_resume()
+}
 pub fn bapi_invert_fan_polarity() -> bool {
     info().fan_invert
 }

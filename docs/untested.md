@@ -39,10 +39,11 @@ Tested with the user on the Q1373 (2026-11-19):
 - ETH cable pulled and plugged back (WiFi fallback and back to ETH);
 - the access point portal with an empty NVS (AP up, captive DNS, WiFi saved through the portal, station connected after the reboot).
 
+Tested with the user on the Q1370 (2026-11-27), WiFi router restarted: beacon timeout, reconnect attempts every ~3.4 s (1 s backoff), connected again after ~52 s (and once more after the router dropped it again), both pools reconnected after ~80 s, no restart.
+
 Tested with the user on the NerdAxe (2026-11-24), after a factory update from GitHub with `keep_config=false` (NVS erased, AP up): the portal screen, the captive portal opening on a phone, the WiFi scan in the portal, the WiFi saved through the portal.
 
 Still to test:
-- the WiFi reconnect backoff after a lost AP;
 - an ETH init failure (cleanup path). Since the soundness fixes it tears down
   in the IDF order (glue, netif, driver, PHY/MAC) and leaks MAC/PHY instead of
   freeing them when the driver refuses to uninstall. Needs a W5500 that fails

@@ -112,6 +112,11 @@ pub fn enable() {
     ENABLED.store(true, Ordering::Release);
 }
 
+/// The mining tasks run (pause and resume possible).
+pub fn enabled() -> bool {
+    ENABLED.load(Ordering::Acquire)
+}
+
 /// A request of the API. Ok also when the miner already is (or gets) there;
 /// the power task acts within a cycle.
 pub fn request(r: Request) -> Result<(), Refused> {

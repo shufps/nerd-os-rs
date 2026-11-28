@@ -85,6 +85,9 @@ mod sys {
     }
     pub fn bapi_shutdown() {}
     pub fn bapi_pause() {}
+    pub fn bapi_vin_range() -> (f32, f32) {
+        (0.0, 0.0)
+    }
     pub fn bapi_resume() -> bool {
         false
     }
@@ -334,6 +337,12 @@ impl Env for Board {
     }
     fn resume_board(&mut self) -> bool {
         sys::bapi_resume()
+    }
+    fn pause_available(&mut self) -> bool {
+        pause::enabled()
+    }
+    fn vin_range(&mut self) -> (f32, f32) {
+        sys::bapi_vin_range()
     }
     fn clear_hardware_errors(&mut self) {
         use crate::system::error;

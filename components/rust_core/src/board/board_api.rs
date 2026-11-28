@@ -77,6 +77,11 @@ pub fn bapi_temperature(i: c_int) -> f32 {
 pub fn bapi_shutdown() {
     b::board_shutdown()
 }
+/// The input voltage range (V).
+pub fn bapi_vin_range() -> (f32, f32) {
+    let i = info();
+    (i.min_vin, i.max_vin)
+}
 pub fn bapi_pause() {
     b::board_pause()
 }

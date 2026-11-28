@@ -25,6 +25,25 @@ const TAG: &CStr = c"power_management";
 pub const POLL_MS: u64 = 2000;
 /// the chain stays off at least this long before a resume
 pub const PAUSE_MIN_US: u64 = 5_000_000;
+/// Input undervoltage recovery: the input must be in range this long before
+/// the automatic resume,
+pub const UV_STABLE_US: u64 = 60_000_000;
+/// at most this many automatic resumes
+pub const UV_MAX_RESUMES: usize = 3;
+/// within this window; more trips leave the fault latched.
+pub const UV_WINDOW_US: u64 = 3_600_000_000;
+
+/// `PSU_FAULT` (`system::error`)
+const ERROR_PSU_FAULT: c_int = 3;
+/// `STATUS_INPUT`: VIN_OV_FAULT, VIN_UV_FAULT, IIN_OC_FAULT
+const INPUT_FAULTS: u32 = 0x94;
+const VIN_UV_FAULT: u32 = 0x10;
+
+/// The fault is an input undervoltage alone (the regulator answers; no input
+/// over-voltage or over-current): the only fault recovered automatically.
+pub fn is_input_undervoltage(error: c_int, status: u32) -> bool {
+    error == ERROR_PSU_FAULT && status & INPUT_FAULTS == VIN_UV_FAULT
+}
 const TELEMETRY_PERIOD_US: u64 = 15_000_000;
 
 pub const ERROR_NONE: c_int = 0;
@@ -77,6 +96,10 @@ pub trait Env {
     fn resume_board(&mut self) -> bool;
     /// The hardware errors (overheat, regulator faults) cleared.
     fn clear_hardware_errors(&mut self);
+    /// Pause and resume are possible (the mining tasks run, not a CAN slave).
+    fn pause_available(&mut self) -> bool;
+    /// The board's input voltage range (V).
+    fn vin_range(&mut self) -> (f32, f32);
 }
 
 /// The values the other tasks read (single-word atomics).
@@ -108,6 +131,18 @@ struct Last {
     /// the regulator fault last logged
     fault: c_int,
     pause: Pause,
+    uv: UvRecovery,
+}
+
+/// The automatic resume after an input undervoltage.
+#[derive(Default)]
+struct UvRecovery {
+    /// paused by the fault, waiting for a stable input
+    waiting: bool,
+    /// since when the input is in range
+    stable_since_us: Option<u64>,
+    /// the times of the automatic resumes within the window
+    resumes_us: Vec<u64>,
 }
 
 /// The pause state machine (a step per cycle).
@@ -258,11 +293,75 @@ impl PowerTask {
             }
             env.set_board_error(error, status);
             env.set_voltage(0.0);
+            if error != last.fault && is_input_undervoltage(error, status) {
+                self.start_uv_recovery(env, last);
+            }
         }
         last.fault = error;
         store(&self.out.voltage, (vin as f64 * 1000.0) as f32);
         store(&self.out.current, (iin as f64 * 1000.0) as f32);
         store(&self.out.power, pin);
+    }
+
+    /// An input undervoltage while mining: pause (the pools disconnect, the
+    /// tasks park) and resume by itself once the input is back. Not after
+    /// `UV_MAX_RESUMES` automatic resumes within `UV_WINDOW_US` (a supply
+    /// that breaks down under load), nor without pause support: then the
+    /// fault stays latched as any other.
+    fn start_uv_recovery(&self, env: &mut impl Env, last: &mut Last) {
+        if last.pause.state != MiningState::Running || !env.pause_available() {
+            return;
+        }
+        let now = env.now_us();
+        let uv = &mut last.uv;
+        uv.resumes_us
+            .retain(|&t| now.wrapping_sub(t) < UV_WINDOW_US);
+        if uv.resumes_us.len() >= UV_MAX_RESUMES {
+            log!(
+                Error,
+                TAG,
+                "input undervoltage: {} automatic resumes within the last hour, the fault stays",
+                uv.resumes_us.len()
+            );
+            return;
+        }
+        log!(
+            Warn,
+            TAG,
+            "input undervoltage: mining paused until the input is stable"
+        );
+        uv.waiting = true;
+        uv.stable_since_us = None;
+        last.pause.wish = Some(Request::Pause);
+    }
+
+    /// Paused by an input undervoltage: the resume once the input voltage
+    /// (of the last telemetry) has been in the board's range for
+    /// `UV_STABLE_US`.
+    fn check_uv_resume(&self, env: &mut impl Env, last: &mut Last, now: u64) {
+        let vin = load(&self.out.voltage) / 1000.0;
+        let (min, max) = env.vin_range();
+        let uv = &mut last.uv;
+        if !(min..=max).contains(&vin) {
+            uv.stable_since_us = None;
+            return;
+        }
+        let since = *uv.stable_since_us.get_or_insert(now);
+        if now.wrapping_sub(since) < UV_STABLE_US {
+            return;
+        }
+        uv.waiting = false;
+        uv.resumes_us.push(now);
+        log!(
+            Warn,
+            TAG,
+            "input stable at {} V for {} s: resuming (automatic resume {}/{} within the hour)",
+            fixed(vin as f64, 2),
+            UV_STABLE_US / 1_000_000,
+            uv.resumes_us.len(),
+            UV_MAX_RESUMES
+        );
+        last.pause.wish = Some(Request::Resume);
     }
 
     /// One step of pause/resume; false while the chain is off for a pause.
@@ -277,11 +376,16 @@ impl PowerTask {
     fn pause_step(&self, env: &mut impl Env, last: &mut Last) -> bool {
         if let Some(r) = env.take_mining_request() {
             last.pause.wish = Some(r);
+            // the user decides now
+            last.uv.waiting = false;
         }
         if env.is_shutdown() {
             return last.pause.state != MiningState::Paused;
         }
         let now = env.now_us();
+        if last.uv.waiting && last.pause.state == MiningState::Paused {
+            self.check_uv_resume(env, last, now);
+        }
         let p = &mut last.pause;
         match (p.state, p.wish) {
             (MiningState::Running, Some(Request::Pause)) => {

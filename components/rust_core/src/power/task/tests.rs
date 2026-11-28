@@ -22,6 +22,8 @@ struct Fake {
     parked: bool,
     resume_ok: bool,
     mining_state: Option<MiningState>,
+    /// pause support missing (a CAN slave)
+    no_pause: bool,
 }
 
 impl Fake {
@@ -141,10 +143,20 @@ impl Env for Fake {
     fn resume_board(&mut self) -> bool {
         self.rec("board resume");
         self.initialized = self.resume_ok;
+        if self.resume_ok {
+            // the resume clears the regulator's latched fault
+            self.fault = (0, 0);
+        }
         self.resume_ok
     }
     fn clear_hardware_errors(&mut self) {
         self.rec("errors cleared");
+    }
+    fn pause_available(&mut self) -> bool {
+        !self.no_pause
+    }
+    fn vin_range(&mut self) -> (f32, f32) {
+        (11.0, 13.0)
     }
 }
 
@@ -410,4 +422,115 @@ fn no_pause_steps_in_shutdown() {
     t.cycle(&mut f);
     assert!(!f.take().contains(&"gate closed".to_string()));
     assert_eq!(f.mining_state, None);
+}
+
+/// VIN_UVF in STATUS_INPUT, as the NerdQAxe++ reported it (#98)
+const VIN_UV: (c_int, u32) = (3, 0x0000_0010);
+
+/// A running miner whose input voltage just dropped (the tasks park at once).
+fn uv_trip(t: &PowerTask) -> Fake {
+    let mut f = running();
+    f.parked = true;
+    f.resume_ok = true;
+    t.cycle(&mut f);
+    f.take();
+    f.fault = VIN_UV;
+    f.power[0] = 10.2;
+    f.now += 2_000_000;
+    t.cycle(&mut f);
+    f
+}
+
+#[test]
+fn input_undervoltage_pauses_and_resumes_once_stable() {
+    assert!(is_input_undervoltage(VIN_UV.0, VIN_UV.1));
+    let t = PowerTask::new(false);
+    let mut f = uv_trip(&t);
+    let l = f.take();
+    assert!(l.contains(&"error 3 00000010".to_string()));
+    // the next cycles pause (the fault counts while the chain is still on)
+    let l = cycles(&t, &mut f, 2, 2_000_000);
+    assert!(l.contains(&"gate closed".to_string()) && l.contains(&"board pause".to_string()));
+    assert_eq!(f.mining_state, Some(MiningState::Paused));
+
+    // the input is back, but drops once more: the 60 s start again
+    f.power[0] = 11.8;
+    assert!(!cycles(&t, &mut f, 20, 2_000_000).contains(&"board resume".to_string()));
+    f.power[0] = 10.9;
+    cycles(&t, &mut f, 1, 2_000_000);
+    f.power[0] = 11.9;
+    let l = cycles(&t, &mut f, 30, 2_000_000);
+    assert!(!l.contains(&"board resume".to_string()), "only 58 s stable");
+    let l = cycles(&t, &mut f, 3, 2_000_000);
+    let i = l.iter().position(|s| s == "board resume").expect("resumed");
+    assert_eq!(l[i + 1..i + 3], ["errors cleared", "gate open"]);
+    assert_eq!(f.mining_state, Some(MiningState::Running));
+}
+
+#[test]
+fn input_undervoltage_gives_up_after_three_resumes_an_hour() {
+    let t = PowerTask::new(false);
+    let mut f = uv_trip(&t);
+    for n in 0..4 {
+        if n > 0 {
+            // tripped again under load
+            f.fault = VIN_UV;
+            cycles(&t, &mut f, 1, 2_000_000);
+        }
+        let l = cycles(&t, &mut f, 2, 2_000_000);
+        if n == 3 {
+            // the fourth trip within the hour stays latched (no pause)
+            assert!(!l.contains(&"gate closed".to_string()));
+            assert_eq!(f.mining_state, Some(MiningState::Running));
+            assert!(l.contains(&"voltage 0".to_string()));
+            break;
+        }
+        assert!(l.contains(&"board pause".to_string()), "trip {n}");
+        f.power[0] = 12.0;
+        let l = cycles(&t, &mut f, 32, 2_000_000);
+        assert!(l.contains(&"board resume".to_string()), "resume {n}");
+    }
+    // an hour after the first resume a trip is recovered again
+    f.now += UV_WINDOW_US;
+    f.fault = (0, 0);
+    cycles(&t, &mut f, 1, 2_000_000);
+    f.fault = VIN_UV;
+    let l = cycles(&t, &mut f, 3, 2_000_000);
+    assert!(l.contains(&"board pause".to_string()));
+}
+
+#[test]
+fn other_faults_stay_latched() {
+    let t = PowerTask::new(false);
+    let mut f = running();
+    f.parked = true;
+    // over-current, input over-voltage, input over-current, no 12 V
+    for fault in [(4, 0x0080_0000), (3, 0x80), (3, 0x14), (3, 0xffff_ffff)] {
+        f.fault = fault;
+        let l = cycles(&t, &mut f, 3, 2_000_000);
+        assert!(!l.contains(&"gate closed".to_string()), "{fault:?}");
+        f.fault = (0, 0);
+        cycles(&t, &mut f, 1, 2_000_000);
+    }
+}
+
+#[test]
+fn no_automatic_resume_after_a_user_request_or_without_pause() {
+    // the user pauses while waiting: stays paused
+    let t = PowerTask::new(false);
+    let mut f = uv_trip(&t);
+    cycles(&t, &mut f, 2, 2_000_000);
+    f.request = Some(Request::Pause);
+    f.power[0] = 12.0;
+    assert!(!cycles(&t, &mut f, 40, 2_000_000).contains(&"board resume".to_string()));
+    assert_eq!(f.mining_state, Some(MiningState::Paused));
+
+    // a CAN slave: latched as before
+    let t = PowerTask::new(false);
+    let mut f = running();
+    f.no_pause = true;
+    t.cycle(&mut f);
+    f.fault = VIN_UV;
+    let l = cycles(&t, &mut f, 3, 2_000_000);
+    assert!(!l.contains(&"gate closed".to_string()));
 }

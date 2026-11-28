@@ -91,6 +91,9 @@ Pool connections (2026-11-28, Q1373 in dual pool mode with ckpool SV1 and blitzp
 
 Resume after a latched regulator fault, on the NerdAxe Gaia: 970 mV / 440 MHz tripped the TPS546 over-current protection after ~90 s (`boardError` 4, core voltage 0). The settings were set back to 940 mV / 300 MHz without a restart, then pause and resume: the fault and the board error were cleared, the chip was found, mining went on at 940 mV / 300 MHz (~2.0 TH/s, no rejects, no restart).
 
+Automatic resume after an input undervoltage (#98): tested on the Q1373 with a VIN_UVF injected by a temporary test build (not committed) after 150 s uptime. The miner paused, both pools disconnected, and after 60 s of a stable input (12.55 V) it resumed by itself ("automatic resume 1/3"): 4/4 chips, both pools reconnected, shares accepted, board error cleared.
+
 Still to test:
+- a real input undervoltage (a short dip of the 12 V supply that the ESP32 survives), and the limit of 3 automatic resumes per hour on hardware (host tests only);
 - the NerdQAxe+ (BM1368 chain) and the rev7 path;
 - pause on a CAN master with active slaves.

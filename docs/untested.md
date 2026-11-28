@@ -101,4 +101,6 @@ The ASIC frequency ramp (`mining/asic/ramp.rs`) runs in its own task with only t
 
 Also tested on the NerdQAxe+ (BM1368: the chip temperature reads over the UART ran alongside the ramps without errors) and the NerdAxe (BM1366): boot, two pause/resume cycles each, lowering voltage and frequency (the voltage after the ramp down) and back (the voltage first).
 
-Still to test: BM1370 (NerdQAxe++, NerdAxe Gamma), the NerdAxe Gaia, and a CAN slave (its frequency comes from the master).
+And on the NerdAxe Gaia (BM1373 with TPS546 + LDO): two pause/resume cycles, 940 mV / 300 MHz lowered to 930 mV / 280 MHz (the voltage after the ramp down) and back (the voltage first).
+
+Still to test: BM1370 (NerdQAxe++, NerdAxe Gamma) and a CAN slave (its frequency comes from the master).

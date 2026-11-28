@@ -19,6 +19,8 @@ use std::net::IpAddr;
 pub const RETRY_DELAY_MS: u32 = 10_000;
 /// How long IPv6 is skipped for a host and port after its connect failed.
 pub const IPV6_SKIP_US: u64 = 5 * 60 * 1_000_000;
+/// The check for the resume while mining is paused.
+pub const PAUSE_POLL_MS: u32 = 1000;
 
 /// The address family of a DNS lookup.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -33,6 +35,8 @@ pub enum Family {
 pub trait Hooks {
     /// Suspends the task while the device is shut down (returns after resume).
     fn suspend_if_shutdown(&mut self);
+    /// Mining is paused: no connection (`mining/pause.rs`).
+    fn paused(&mut self) -> bool;
     fn clear_reconnect(&mut self);
     fn reconnect_requested(&mut self) -> bool;
     /// Loads the current config; the host (empty if none) and port.
@@ -49,14 +53,17 @@ pub trait Hooks {
     fn connect(&mut self, host: &str, ip: &str, port: u16) -> bool;
     fn protocol_loop(&mut self);
     fn count_pool_error(&mut self);
-    /// Marks the task disconnected, closes the transport, tells the manager.
-    fn disconnect(&mut self);
+    /// Marks the task disconnected, closes the transport, tells the manager
+    /// (not for a pause: no failover, and the pool's work is dropped).
+    fn disconnect(&mut self, paused: bool);
     fn delay_ms(&mut self, ms: u32);
 }
 
 /// What one round of the loop did.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Round {
+    /// mining is paused: no connection attempt
+    Paused,
     NoHost,
     Stopped,
     NoNetwork,
@@ -66,6 +73,8 @@ pub enum Round {
     Disconnected {
         reconnect: bool,
     },
+    /// The protocol loop ended for a mining pause (no error, no delay).
+    PauseDisconnected,
 }
 
 /// IPv6 skipped for the host and port whose IPv6 connect failed, so
@@ -98,6 +107,10 @@ fn retry_later(h: &mut impl Hooks, round: Round) -> Round {
 /// rounds.
 pub fn round(h: &mut impl Hooks, skip: &mut Ipv6Skip, tag: &core::ffi::CStr) -> Round {
     h.suspend_if_shutdown();
+    if h.paused() {
+        h.delay_ms(PAUSE_POLL_MS);
+        return Round::Paused;
+    }
     // Clear first, so a reconnect requested while the config is
     // being loaded stays requested.
     h.clear_reconnect();
@@ -177,6 +190,13 @@ pub fn round(h: &mut impl Hooks, skip: &mut Ipv6Skip, tag: &core::ffi::CStr) -> 
 
     h.protocol_loop();
 
+    // a mining pause is no pool error either; the next rounds wait for the
+    // resume
+    if h.paused() {
+        log!(Info, tag, "Mining paused, disconnecting ...");
+        h.disconnect(true);
+        return Round::PauseDisconnected;
+    }
     // a requested reconnect is not a pool error and skips the delay
     let reconnect = h.reconnect_requested();
     if reconnect {
@@ -185,7 +205,7 @@ pub fn round(h: &mut impl Hooks, skip: &mut Ipv6Skip, tag: &core::ffi::CStr) -> 
         h.count_pool_error();
         log!(Error, tag, "Shutdown socket ...");
     }
-    h.disconnect();
+    h.disconnect(false);
     if !reconnect {
         h.delay_ms(RETRY_DELAY_MS);
     }
@@ -218,11 +238,17 @@ mod tests {
         reconnect: bool,
         /// a reconnect arrives while the config loads
         reconnect_during_load: bool,
+        /// paused before the round / while the protocol loop runs
+        paused: bool,
+        pause_in_loop: bool,
         log: Vec<String>,
     }
 
     impl Hooks for Fake {
         fn suspend_if_shutdown(&mut self) {}
+        fn paused(&mut self) -> bool {
+            self.paused
+        }
         fn clear_reconnect(&mut self) {
             self.reconnect = false;
             self.log.push("clear".into());
@@ -262,12 +288,22 @@ mod tests {
         }
         fn protocol_loop(&mut self) {
             self.log.push("protocol".into());
+            if self.pause_in_loop {
+                self.paused = true;
+            }
         }
         fn count_pool_error(&mut self) {
             self.log.push("error".into());
         }
-        fn disconnect(&mut self) {
-            self.log.push("disconnect".into());
+        fn disconnect(&mut self, paused: bool) {
+            self.log.push(
+                if paused {
+                    "disconnect paused"
+                } else {
+                    "disconnect"
+                }
+                .into(),
+            );
         }
         fn delay_ms(&mut self, ms: u32) {
             self.log.push(format!("delay {ms}"));
@@ -367,6 +403,37 @@ mod tests {
                 "error",
                 "disconnect",
                 "delay 10000"
+            ]
+        );
+    }
+
+    #[test]
+    fn paused_waits_without_connecting() {
+        let mut f = Fake {
+            paused: true,
+            ..up()
+        };
+        assert_eq!(round(&mut f, &mut Ipv6Skip::default(), c"t"), Round::Paused);
+        assert_eq!(f.log, ["delay 1000"]);
+    }
+
+    #[test]
+    fn a_pause_disconnects_without_error_and_delay() {
+        let mut f = Fake {
+            pause_in_loop: true,
+            ..up()
+        };
+        assert_eq!(
+            round(&mut f, &mut Ipv6Skip::default(), c"t"),
+            Round::PauseDisconnected
+        );
+        assert_eq!(
+            f.log,
+            [
+                "clear",
+                "connect pool 10.0.0.1 3333",
+                "protocol",
+                "disconnect paused"
             ]
         );
     }

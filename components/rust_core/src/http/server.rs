@@ -402,7 +402,7 @@ pub fn start() -> EspErr {
 
     let mut config = httpd::default_config();
     config.uri_match_fn = Some(httpd::httpd_uri_match_wildcard);
-    config.max_uri_handlers = 56;
+    config.max_uri_handlers = routes::MAX_HANDLERS;
     config.lru_purge_enable = true;
     config.max_open_sockets = 10;
     config.stack_size = 12288;

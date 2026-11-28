@@ -802,6 +802,7 @@ export class HomeComponent implements AfterViewChecked, OnInit, OnDestroy {
         if (!info) return;
         this._info = info;
         this.updateFoundBlock(info);
+        this.poolsPaused = info.system.miningState === 'pausing' || info.system.miningState === 'paused';
         try {
           const flagKey = '__nerdCharts_clearChartHistoryOnce';
           if (this.localStorageGet(flagKey) === '1') {
@@ -1189,6 +1190,9 @@ ngOnInit() {
 
   /** a resume request is on its way */
   public resumeBusy = false;
+
+  /** mining is paused: the pools are disconnected on purpose (not an error) */
+  public poolsPaused = false;
 
   /** The banner title of a mining state (translation key). */
   public miningStateText(state: string): string {

@@ -253,7 +253,7 @@
                   <div class="pool-tile-section pool-tile-section--single" role="group">
                     <ng-container
                       [ngTemplateOutlet]="poolHalf"
-                      [ngTemplateOutletContext]="{ pool: poolLeft, idx: undefined, usingFallback: usingFallback, disconnected: !poolLeft?.connected, blockedReason: poolLeft?.verifyBlocked }">
+                      [ngTemplateOutletContext]="{ pool: poolLeft, idx: undefined, usingFallback: usingFallback, disconnected: !poolLeft?.connected && !poolsPaused, blockedReason: poolLeft?.verifyBlocked }">
                     </ng-container>
                   </div>
                 </ng-container>
@@ -263,14 +263,14 @@
                   <div class="pool-tile-section pool-tile-section--top" role="group">
                     <ng-container
                       [ngTemplateOutlet]="poolHalf"
-                      [ngTemplateOutletContext]="{ pool: poolLeft, idx: 0, usingFallback: usingFallback, disconnected: !poolLeft?.connected, blockedReason: poolLeft?.verifyBlocked }">
+                      [ngTemplateOutletContext]="{ pool: poolLeft, idx: 0, usingFallback: usingFallback, disconnected: !poolLeft?.connected && !poolsPaused, blockedReason: poolLeft?.verifyBlocked }">
                     </ng-container>
                   </div>
 
                   <div class="pool-tile-section pool-tile-section--bottom" role="group">
                     <ng-container
                       [ngTemplateOutlet]="poolHalf"
-                      [ngTemplateOutletContext]="{ pool: poolRight, idx: 1, usingFallback: false, disconnected: !poolRight?.connected, blockedReason: poolRight?.verifyBlocked }">
+                      [ngTemplateOutletContext]="{ pool: poolRight, idx: 1, usingFallback: false, disconnected: !poolRight?.connected && !poolsPaused, blockedReason: poolRight?.verifyBlocked }">
                     </ng-container>
                   </div>
                 </ng-container>
@@ -302,7 +302,12 @@
                        [class.pool-tile-metricbar--disconnected]="disconnected || !!blockedReason"
                        [style.background]="(disconnected || !!blockedReason) ? 'var(--fill-crit-color, var(--color-danger-500))' : null">
 
-                    <ng-container *ngIf="!disconnected && !blockedReason">
+                    <ng-container *ngIf="poolsPaused && !pool?.connected && !blockedReason">
+                      <div class="pool-tile-metricbar__inner pool-tile-metricbar__inner--disconnected">
+                        <div class="pool-tile-metricbar__dc-msg">{{ 'HOME.MINING_PAUSED' | translate }}</div>
+                      </div>
+                    </ng-container>
+                    <ng-container *ngIf="!disconnected && !blockedReason && !(poolsPaused && !pool?.connected)">
                       <div class="pool-tile-metricbar__fill" *ngIf="isDualPool"
                            [style.width.%]="getActiveBalance((idx ?? 0) === 0 ? 0 : 1)"></div>
 

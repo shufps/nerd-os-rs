@@ -429,19 +429,6 @@ Applies a stored profile. **No OTP**: it only selects one of the stored profiles
 
 ---
 
-### Mining pause
-
-#### `POST /api/v2/mining/pause`
-#### `POST /api/v2/mining/resume`
-
-Pause switches the ASICs off (as a shutdown does) while the firmware, the web UI and the pool connections keep running; resume powers the ASICs on and initializes them again as at boot, with the current voltage and frequency settings. It also clears the hardware errors (overheat, voltage regulator faults); a fault that is still there is reported again. **No OTP** (like restart and shutdown, for home automations). A pause does not survive a restart.
-
-The change happens within a few seconds: `miningState` in `GET /api/v2/dashboard` and `GET /api/v2/system` goes `running` → `pausing` → `paused` and `paused` → `resuming` → `running`. The ASICs stay off at least 5 s; an earlier resume waits for that. If the ASICs are not found on resume, they are switched off again and the state stays `paused`.
-
-**Response**: `{"ok": true, "miningState": "running"}` with the state at the time of the request (also when the miner already is paused or running). `409` with `"ok": false` while the opposite change is in progress, and on devices that do not mine (no pool configured, CAN slave).
-
----
-
 ### InfluxDB
 
 #### `GET /api/v2/influx`
@@ -644,14 +631,25 @@ These endpoints remain on v1 for backwards compatibility (Swarm discovery across
 |---|---|---|
 | `GET` | `/api/system/info` | Full system info (used by Swarm page for remote device discovery) |
 | `PATCH` | `/api/system` | Update system settings |
-| `POST` | `/api/system/restart` | Restart device (requires OTP) |
-| `POST` | `/api/system/shutdown` | Shutdown device (requires OTP) |
+| `POST` | `/api/system/restart` | Restart device (no OTP) |
+| `POST` | `/api/system/shutdown` | Shutdown device (no OTP) |
+| `POST` | `/api/system/pause` | Pause mining (no OTP), see below |
+| `POST` | `/api/system/resume` | Resume mining (no OTP), see below |
 | `POST` | `/api/system/reset-stats` | Reset session stats; `?allTime=1` also resets all-time stats (requires OTP), see below |
 | `GET` | `/api/system/coredump` | Download the last panic core dump (diagnostic builds only, requires OTP) |
 | `POST` | `/api/system/OTA` | Upload firmware binary |
 | `POST` | `/api/system/OTAWWW` | Upload web UI binary |
 | `POST` | `/api/system/OTA/github` | One-click GitHub OTA update |
 | `GET` | `/api/system/OTA/github` | Get GitHub OTA update status |
+
+#### `POST /api/system/pause`
+#### `POST /api/system/resume`
+
+Pause switches the ASICs off (as a shutdown does) and disconnects from the pools, while the firmware and the web UI keep running; there is no failover to the other pool for a pause. Resume reconnects to the pools and powers the ASICs on, initializing them again as at boot with the current voltage and frequency settings. It also clears the hardware errors (overheat, voltage regulator faults); a fault that is still there is reported again. **No OTP** (like restart and shutdown, for home automations). A pause does not survive a restart. The paths are the same as on the Bitaxe firmware.
+
+The change happens within a few seconds: `miningState` in `GET /api/v2/dashboard` and `GET /api/v2/system` goes `running` → `pausing` → `paused` and `paused` → `resuming` → `running`. The ASICs stay off at least 5 s; an earlier resume waits for that. If the ASICs are not found on resume, they are switched off again and the state stays `paused`.
+
+**Response**: `{"ok": true, "miningState": "running"}` with the state at the time of the request (also when the miner already is paused or running). `409` with `"ok": false` while the opposite change is in progress, and on devices that do not mine (no pool configured, CAN slave).
 
 #### `POST /api/system/reset-stats`
 

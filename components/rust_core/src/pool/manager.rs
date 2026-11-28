@@ -551,6 +551,9 @@ impl crate::pool::stratum_task::Hooks for Ctx {
             suspend_self();
         }
     }
+    fn paused(&mut self) -> bool {
+        crate::mining::pause::pools_paused()
+    }
     fn clear_reconnect(&mut self) {
         self.t.reconnect.store(false, Release);
     }
@@ -631,12 +634,17 @@ impl crate::pool::stratum_task::Hooks for Ctx {
     fn count_pool_error(&mut self) {
         self.t.pool_errors.fetch_add(1, Relaxed);
     }
-    fn disconnect(&mut self) {
+    fn disconnect(&mut self, paused: bool) {
         // gate new submits before tearing the transport down; the
         // transport's lock covers a submit already inside send()
         self.t.connected.store(false, Release);
         self.t.transport(&self.proto).close();
-        self.m.on_event(self.t.pool, PolicyEvent::Disconnected);
+        if paused {
+            // no failover for a pause; the work is old after it
+            crate::mining::jobs::invalidate(self.t.pool as c_int);
+        } else {
+            self.m.on_event(self.t.pool, PolicyEvent::Disconnected);
+        }
     }
     fn delay_ms(&mut self, ms: u32) {
         delay_ms(ms)
@@ -714,7 +722,9 @@ struct V1Loop<'a> {
 
 impl v1::Hooks for V1Loop<'_> {
     fn stop_requested(&mut self) -> bool {
-        self.t.stop.load(Acquire) || crate::power::mgmt::is_shutdown()
+        self.t.stop.load(Acquire)
+            || crate::power::mgmt::is_shutdown()
+            || crate::mining::pause::pools_paused()
     }
     fn reconnect_requested(&mut self) -> bool {
         self.t.reconnect.load(Acquire)
@@ -761,7 +771,10 @@ struct V2Loop<'a> {
 impl v2::Hooks for V2Loop<'_> {
     fn exit_requested(&mut self) -> bool {
         let t = self.c.t;
-        t.stop.load(Acquire) || t.reconnect.load(Acquire) || crate::power::mgmt::is_shutdown()
+        t.stop.load(Acquire)
+            || t.reconnect.load(Acquire)
+            || crate::power::mgmt::is_shutdown()
+            || crate::mining::pause::pools_paused()
     }
     fn connected(&mut self) {
         let c = self.c;
@@ -1558,8 +1571,10 @@ impl Manager {
             }
             delay_ms(1000);
             let now = now_us();
+            // paused: the pools are disconnected on purpose, no failover
+            let paused = crate::mining::pause::pools_paused();
             for i in 0..2 {
-                if self.task(i).is_some_and(|t| t.timer_fired(now)) {
+                if !paused && self.task(i).is_some_and(|t| t.timer_fired(now)) {
                     self.on_event(i, PolicyEvent::ReconnectTimer);
                 }
             }

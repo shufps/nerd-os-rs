@@ -377,6 +377,7 @@ impl Hooks for Firmware {
 
     fn start_can_slave_tasks(&mut self) {
         use crate::can::api as can;
+        task(crate::tasks::api::freq_ramp_task, c"freq ramp", 4096, 10);
         task(can::can_slave_task, c"can slave", 4096, 10);
         task(can::can_slave_result_task, c"can result", 4096, 10);
         task(can::can_slave_telemetry_task, c"can telem", 4096, 5);
@@ -485,6 +486,7 @@ impl Hooks for Firmware {
 
     fn start_mining_tasks(&mut self) {
         use crate::tasks::api as t;
+        task(t::freq_ramp_task, c"freq ramp", 4096, 10);
         task(t::create_jobs_task, c"stratum miner", 8192, 10);
         task(t::ASIC_result_task, c"asic result", 8192, 15);
         task(t::influx_task, c"influx", 8192, 1);

@@ -579,21 +579,14 @@ impl power::Hw for PowerHw<'_> {
     }
     fn asic_init(
         &mut self,
-        frequency: c_int,
+        // ramped to by the frequency task once the power task applies it
+        _frequency: c_int,
         count: c_int,
         max_difficulty: u32,
         vr_frequency: u32,
     ) -> c_int {
         self.b.with_asic(0, |a| {
-            a.run(|d, u| {
-                d.init(
-                    u,
-                    frequency as u64,
-                    count as u16,
-                    max_difficulty,
-                    vr_frequency,
-                )
-            }) as c_int
+            a.run(|d, u| d.init(u, count as u16, max_difficulty, vr_frequency)) as c_int
         })
     }
     fn asic_max_baud(&mut self) -> c_int {
@@ -1077,6 +1070,8 @@ impl Board {
         self.init_asics()
     }
 
+    /// Starts the ramp to `mhz` (returns at once); false for a frequency out
+    /// of range or without PLL settings.
     pub fn set_asic_frequency(&self, mhz: f32) -> bool {
         let l = self.state().limits();
         if !board_core::validate_frequency(mhz, &l) {
@@ -1089,7 +1084,12 @@ impl Board {
             );
             return false;
         }
-        self.with_asic(false, |a| a.run(|d, u| d.set_frequency(u, mhz)))
+        if crate::mining::asic::pll_settings(mhz).is_none() {
+            return false;
+        }
+        // the ramp runs in its own task (only the UART, no locks held here)
+        crate::mining::asic::ramp::request(mhz);
+        true
     }
 
     pub fn set_vr_frequency(&self, hz: u32) {

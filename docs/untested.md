@@ -94,3 +94,11 @@ Resume after a latched regulator fault, on the NerdAxe Gaia: 970 mV / 440 MHz tr
 Still to test:
 - the NerdQAxe+ (BM1368 chain) and the rev7 path;
 - pause on a CAN master with active slaves.
+
+## Frequency ramp in its own task
+
+The ASIC frequency ramp (`mining/asic/ramp.rs`) runs in its own task with only the UART; the chain's init no longer ramps, and the power task only sets the target, so the fan control and the overheat check keep running during a ramp. A lower core voltage waits until the frequency has come down. Tested by Claude on the Q1373 (2026-11-28): boot and two pause/resume cycles (the init holds the locks ~1–3 s instead of ~8–13 s, the fans followed the rising load during the ramp, the slowest API answer during a resume was 3.1 s), lowering 1010 mV / 425 MHz to 1000 mV / 400 MHz (the voltage after the ramp down) and back (the voltage before the ramp up).
+
+Also tested on the NerdQAxe+ (BM1368: the chip temperature reads over the UART ran alongside the ramps without errors) and the NerdAxe (BM1366): boot, two pause/resume cycles each, lowering voltage and frequency (the voltage after the ramp down) and back (the voltage first).
+
+Still to test: BM1370 (NerdQAxe++, NerdAxe Gamma), the NerdAxe Gaia, and a CAN slave (its frequency comes from the master).

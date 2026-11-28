@@ -287,8 +287,41 @@ unsafe extern "C" fn hashrate_task(arg: *mut c_void) {
     crate::mining::hashrate::run(&mut Counters(&*(arg as *const asic::Handle)))
 }
 
+// ---------------------------------------------------------------------------
+// frequency ramp
+
+struct Ramp;
+const RAMP_TAG: &CStr = c"freq_ramp";
+
+impl crate::mining::asic::ramp::Env for Ramp {
+    fn suspend_if_shutdown(&mut self) {
+        suspend_if_shutdown(RAMP_TAG);
+    }
+    fn park_if_paused(&mut self) -> bool {
+        crate::mining::pause::park(Task::Ramp)
+    }
+    fn current(&mut self) -> Option<f32> {
+        asics().map(|a| a.driver().current_frequency())
+    }
+    fn step(&mut self, mhz: f32) -> bool {
+        asics().is_some_and(|a| a.run(|d, u| d.send_hash_frequency(u, mhz)))
+    }
+    fn sleep_ms(&mut self, ms: u32) {
+        std::thread::sleep(Duration::from_millis(ms as u64));
+    }
+}
+
 pub(crate) mod api {
     use super::*;
+
+    /// The frequency ramp task; never returns.
+    ///
+    /// # Safety
+    /// A FreeRTOS task entry.
+    pub unsafe extern "C" fn freq_ramp_task(_: *mut c_void) {
+        crate::mining::pause::register(Task::Ramp);
+        crate::mining::asic::ramp::run(&mut Ramp)
+    }
 
     /// The job task (`create_jobs_task`); never returns.
     ///

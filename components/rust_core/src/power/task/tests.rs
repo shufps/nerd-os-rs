@@ -22,6 +22,7 @@ struct Fake {
     parked: bool,
     resume_ok: bool,
     mining_state: Option<MiningState>,
+    ramping: bool,
 }
 
 impl Fake {
@@ -61,6 +62,9 @@ impl Env for Fake {
     fn set_asic_frequency(&mut self, mhz: f32) -> bool {
         self.rec(format!("frequency {mhz}"));
         true
+    }
+    fn frequency_ramping(&mut self) -> bool {
+        self.ramping
     }
     fn vr_frequency(&mut self) -> u32 {
         self.vr_hz
@@ -410,4 +414,34 @@ fn no_pause_steps_in_shutdown() {
     t.cycle(&mut f);
     assert!(!f.take().contains(&"gate closed".to_string()));
     assert_eq!(f.mining_state, None);
+}
+
+#[test]
+fn a_lower_voltage_waits_for_the_frequency_ramp() {
+    let t = PowerTask::new(false);
+    let mut f = running();
+    t.cycle(&mut f);
+    f.take();
+    // both lower: the frequency first, the voltage once the ramp is down
+    f.mhz = 500;
+    f.mv = 950;
+    t.cycle(&mut f);
+    let l = f.take();
+    assert!(l.contains(&"frequency 500".to_string()));
+    assert!(!l.iter().any(|s| s.starts_with("voltage")));
+    f.ramping = true;
+    t.cycle(&mut f);
+    assert!(!f.take().iter().any(|s| s.starts_with("voltage")));
+    f.ramping = false;
+    t.cycle(&mut f);
+    assert!(f.take().contains(&"voltage 0.95".to_string()));
+
+    // both higher: the voltage at once (before the frequency ramp)
+    f.mhz = 650;
+    f.mv = 1100;
+    t.cycle(&mut f);
+    let l = f.take();
+    let v = l.iter().position(|s| s == "voltage 1.1").unwrap();
+    let fr = l.iter().position(|s| s == "frequency 650").unwrap();
+    assert!(v < fr);
 }

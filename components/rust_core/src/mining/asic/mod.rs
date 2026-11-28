@@ -9,6 +9,7 @@
 //! * a version rolling frequency of 0 gives no register value.
 
 pub mod driver;
+pub mod ramp;
 
 /// `asic_chip_t` (`asic_driver.h`)
 #[repr(C)]

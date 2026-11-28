@@ -145,6 +145,12 @@ impl Driver {
         self.state().actual_frequency
     }
 
+    /// The hash frequency set last (MHz; the reset frequency after `new()`
+    /// and `reset()`).
+    pub fn current_frequency(&self) -> f32 {
+        self.state().current_frequency
+    }
+
     pub fn send(&self, uart: &mut impl Uart, header: u8, data: &[u8]) {
         uart.send(&encode_frame(header, data));
     }
@@ -348,12 +354,13 @@ impl Driver {
     }
 
     /// Initializes the chain (after the board reset it): enumerates the
-    /// chips, gives them addresses, configures them, ramps to `frequency`
-    /// MHz and enables version rolling. Returns the number of chips found.
+    /// chips, gives them addresses, configures them and enables version
+    /// rolling. Returns the number of chips found. The chips stay at their
+    /// reset frequency: the frequency ramp task takes them to the setting
+    /// (`ramp.rs`), without holding the locks of the init.
     pub fn init(
         &self,
         uart: &mut impl Uart,
-        frequency: u64,
         asic_count: u16,
         difficulty: u32,
         vr_frequency: u32,
@@ -461,7 +468,6 @@ impl Driver {
             _ => {}
         }
 
-        self.set_frequency(uart, frequency as f32);
         self.set_vr_frequency(uart, vr_frequency);
         // enable version rolling
         self.write_all(uart, 0xa4, [0x90, 0x00, 0xff, 0xff]);

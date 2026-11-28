@@ -303,7 +303,8 @@ fn init_sequences_match_reference() {
             let (count, difficulty) = (rng.below(13) as u16, 1 + rng.below(4096) as u32);
             let vr = 10_000 + rng.below(100_000) as u32;
             let c = run(chip, &reads, |d, u| {
-                let n = d.init(u, frequency, count, difficulty, vr);
+                // (no ramp in the init any more: the frequency task ramps)
+                let n = d.init(u, count, difficulty, vr);
                 let baud = d.set_max_baud(u);
                 d.request_chip_temp(u);
                 d.reset_counter(u, 0x8c);

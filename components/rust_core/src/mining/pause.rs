@@ -6,8 +6,9 @@
 //! then open the gate.
 //!
 //! The parked tasks are the ones that use the chain's UART: the job task,
-//! the result task (it would read the replies of the enumeration) and the
-//! hashrate monitor (its counter reads would answer the enumeration too).
+//! the result task (it would read the replies of the enumeration), the
+//! hashrate monitor (its counter reads would answer the enumeration too) and
+//! the frequency ramp.
 
 use std::sync::atomic::{AtomicBool, AtomicU8, Ordering};
 use std::sync::{Condvar, Mutex, MutexGuard};
@@ -66,6 +67,8 @@ pub enum Task {
     Jobs = 1,
     Results = 2,
     Hashrate = 4,
+    /// the frequency ramp (its frames would answer the enumeration too)
+    Ramp = 8,
 }
 
 static STATE: AtomicU8 = AtomicU8::new(State::Running as u8);

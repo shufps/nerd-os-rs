@@ -41,7 +41,11 @@ pub trait Env {
     fn asic_voltage_millis(&mut self) -> u16;
     fn set_voltage(&mut self, volts: f32);
     fn asic_frequency(&mut self) -> u16;
+    /// Starts the ramp to `mhz` (`mining/asic/ramp.rs`, returns at once);
+    /// false without PLL settings.
     fn set_asic_frequency(&mut self, mhz: f32) -> bool;
+    /// The ramp has not reached the requested frequency yet.
+    fn frequency_ramping(&mut self) -> bool;
     fn vr_frequency(&mut self) -> u32;
     fn set_vr_frequency(&mut self, hz: u32);
     fn request_chip_temps(&mut self);
@@ -107,6 +111,8 @@ struct Last {
     telemetry_due: Option<u64>,
     /// the regulator fault last logged
     fault: c_int,
+    /// a lower core voltage waits for the frequency ramp down (logged once)
+    voltage_waits: bool,
     pause: Pause,
 }
 
@@ -177,13 +183,25 @@ impl PowerTask {
         if env.is_shutdown() || !env.is_initialized() {
             return;
         }
+        let mhz = env.asic_frequency();
         let mv = env.asic_voltage_millis();
         if mv != last.core_voltage {
-            log!(Info, TAG, "setting new vcore voltage to {mv}mV");
-            env.set_voltage((mv as f64 / 1000.0) as f32);
-            last.core_voltage = mv;
+            // a higher voltage at once (before the frequency goes up), a
+            // lower one only once the frequency has come down
+            let lowering = last.core_voltage != 0 && mv < last.core_voltage;
+            let frequency_down = last.asic_frequency != 0 && mhz < last.asic_frequency;
+            if lowering && (frequency_down || env.frequency_ramping()) {
+                if !last.voltage_waits {
+                    log!(Info, TAG, "vcore {mv}mV after the frequency ramp");
+                    last.voltage_waits = true;
+                }
+            } else {
+                log!(Info, TAG, "setting new vcore voltage to {mv}mV");
+                env.set_voltage((mv as f64 / 1000.0) as f32);
+                last.core_voltage = mv;
+                last.voltage_waits = false;
+            }
         }
-        let mhz = env.asic_frequency();
         if mhz != last.asic_frequency {
             log!(Info, TAG, "setting new asic frequency to {mhz}MHz");
             if !env.set_asic_frequency(mhz as f32) {
@@ -312,6 +330,7 @@ impl PowerTask {
                     last.asic_frequency = 0;
                     last.vr_frequency = 0;
                     last.fault = ERROR_NONE;
+                    last.voltage_waits = false;
                     env.clear_hardware_errors();
                     env.close_mining_gate(false);
                     last.pause.state = MiningState::Running;

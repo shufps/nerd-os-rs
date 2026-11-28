@@ -256,6 +256,9 @@ impl Env for Board {
     fn set_asic_frequency(&mut self, mhz: f32) -> bool {
         sys::bapi_set_asic_frequency(mhz)
     }
+    fn frequency_ramping(&mut self) -> bool {
+        crate::mining::asic::ramp::ramping()
+    }
     fn vr_frequency(&mut self) -> u32 {
         sys::bapi_vr_frequency()
     }

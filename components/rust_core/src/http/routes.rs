@@ -150,8 +150,12 @@ const API: u16 = CLOSE | NET | CORS | CTX;
 /// Its CORS preflight (no server context).
 const PREFLIGHT: u16 = CLOSE | NET | CORS;
 
+/// The server's handler slots: every route of [`ROUTES`] and [`EXTRA`] must
+/// fit (a route that does not is not registered).
+pub const MAX_HANDLERS: u16 = 60;
+
 /// The routes in registration order.
-pub static ROUTES: [Route; 53] = [
+pub static ROUTES: [Route; 54] = [
     r(c"/recovery", Get, H::Recovery, CLOSE | NET | CTX),
     r(c"/api/system/info", Get, H::SystemInfo, API),
     r(c"/api/system/asic", Get, H::SystemAsic, API),
@@ -222,9 +226,10 @@ pub static ROUTES: [Route; 53] = [
     r(c"/api/v2/profiles/apply", Post, H::ProfileApply, API),
     r(c"/api/v2/profiles/apply", Options, H::Options, PREFLIGHT),
     // no OTP on purpose (home automation)
-    r(c"/api/v2/mining/pause", Post, H::MiningPause, API),
-    r(c"/api/v2/mining/resume", Post, H::MiningResume, API),
-    r(c"/api/v2/mining/*", Options, H::Options, PREFLIGHT),
+    r(c"/api/system/pause", Post, H::MiningPause, API),
+    r(c"/api/system/pause", Options, H::Options, PREFLIGHT),
+    r(c"/api/system/resume", Post, H::MiningResume, API),
+    r(c"/api/system/resume", Options, H::Options, PREFLIGHT),
     r(c"/api/system/OTA", Post, H::Ota, CLOSE | NET | OTP),
     // the web UI can be reinstalled from the recovery page without OTP
     r(
@@ -292,6 +297,11 @@ mod tests {
         // the web UI upload works without OTP in recovery mode only
         let www = ROUTES.iter().find(|r| r.handler == H::OtaWww).unwrap();
         assert!(needs_otp(www, false) && !needs_otp(www, true));
+    }
+
+    #[test]
+    fn all_routes_fit_the_server() {
+        assert!(ROUTES.len() + EXTRA.len() <= MAX_HANDLERS as usize);
     }
 
     #[test]

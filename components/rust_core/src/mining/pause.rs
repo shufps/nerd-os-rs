@@ -96,6 +96,12 @@ pub fn state() -> State {
     State::from_u8(STATE.load(Ordering::Acquire))
 }
 
+/// No pool connections: from the pause request until the resume starts (the
+/// pools reconnect while the chain is initialized).
+pub fn pools_paused() -> bool {
+    matches!(state(), State::Pausing | State::Paused)
+}
+
 /// The power task's current state.
 pub fn set_state(s: State) {
     STATE.store(s as u8, Ordering::Release);

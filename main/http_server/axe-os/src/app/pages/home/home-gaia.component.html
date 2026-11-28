@@ -211,7 +211,7 @@
 
       <!-- GAIA pool render, reused by the dashboard grid below -->
       <ng-template #gaiaPool let-pool="pool" let-idx="idx" let-fallback="fallback">
-        <div class="nerd-pool" [class.nerd-pool--down]="!pool?.connected">
+        <div class="nerd-pool" [class.nerd-pool--down]="!pool?.connected && !poolsPaused">
           <div class="nerd-pool__head">
             <a [href]="getQuickLink(pool?.host, pool?.user)" target="_blank" class="nerd-pool__iconlink">
               <img [src]="poolIconUrl(pool?.host)" class="nerd-pool__icon" alt="pool" (error)="onPoolIconError($event, pool?.host)" />
@@ -254,7 +254,7 @@
             </div>
           </div>
           <ng-template #poolDown>
-            <div class="nerd-pool__down-msg">{{ 'HOME.STRATUM_NOT_CONNECTED' | translate }}</div>
+            <div class="nerd-pool__down-msg">{{ (poolsPaused ? 'HOME.MINING_PAUSED' : 'HOME.STRATUM_NOT_CONNECTED') | translate }}</div>
           </ng-template>
         </div>
       </ng-template>

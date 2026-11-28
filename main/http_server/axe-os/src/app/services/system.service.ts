@@ -290,11 +290,11 @@ export class SystemService {
 
   /** Mining pause/resume (no OTP, as restart/shutdown); 409 if refused. */
   public pauseMining(uri: string = '') {
-    return this.httpClient.post<{ ok: boolean; miningState: string }>(`${uri}/api/v2/mining/pause`, null);
+    return this.httpClient.post<{ ok: boolean; miningState: string }>(`${uri}/api/system/pause`, null);
   }
 
   public resumeMining(uri: string = '') {
-    return this.httpClient.post<{ ok: boolean; miningState: string }>(`${uri}/api/v2/mining/resume`, null);
+    return this.httpClient.post<{ ok: boolean; miningState: string }>(`${uri}/api/system/resume`, null);
   }
 
   public shutdown(uri: string = '', totp?: string) {

@@ -1,4 +1,4 @@
-//! `POST /api/v2/mining/pause` and `POST /api/v2/mining/resume`: the
+//! `POST /api/system/pause` and `POST /api/system/resume`: the
 //! request goes to the power task, which switches the chain within a few
 //! seconds (`mining/pause.rs`); the answer is the state at the time
 //! (`miningState` in `GET /api/v2/dashboard` follows the change). No OTP

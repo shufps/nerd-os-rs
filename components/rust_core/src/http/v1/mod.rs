@@ -1,6 +1,7 @@
 //! The v1 API (`/api/system/...`).
 
 pub mod json;
+pub mod mining;
 pub mod settings;
 pub mod system;
 
@@ -16,6 +17,8 @@ pub fn handler(h: Handler) -> Option<HandlerFn> {
         Handler::SettingsPatch => system::patch,
         Handler::Restart => system::restart,
         Handler::Shutdown => system::shutdown,
+        Handler::MiningPause => mining::pause,
+        Handler::MiningResume => mining::resume,
         _ => return None,
     })
 }

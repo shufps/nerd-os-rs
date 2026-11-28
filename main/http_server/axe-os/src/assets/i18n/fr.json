@@ -273,6 +273,8 @@
     "PAUSE_MINING": "Mettre le minage en pause",
     "PAUSE_SUCCESS": "Le minage est mis en pause",
     "PAUSE_FAILED": "Échec de la mise en pause",
+    "RESUME_MINING": "Reprendre le minage",
+    "RESUME_SUCCESS": "Le minage reprend",
     "LOGS_ALREADY_OPEN_OTHER_TAB": "Les journaux sont déjà ouverts dans un autre onglet."
   },
   "SWARM": {

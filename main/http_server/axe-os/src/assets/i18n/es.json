@@ -273,6 +273,8 @@
     "PAUSE_MINING": "Pausar minería",
     "PAUSE_SUCCESS": "La minería se está pausando",
     "PAUSE_FAILED": "Error al pausar",
+    "RESUME_MINING": "Reanudar minería",
+    "RESUME_SUCCESS": "La minería se está reanudando",
     "LOGS_ALREADY_OPEN_OTHER_TAB": "Los registros ya están abiertos en otra pestaña."
   },
   "SWARM": {

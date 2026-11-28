@@ -44,6 +44,7 @@ Device info, network status and memory. Used by the System page (polled every 5s
   "asicModel": "BM1370",
   "version": "1.2.3",
   "uptimeSeconds": 86400,
+  "miningState": "running",
   "lastResetReason": "RESET_POWERON",
   "network": {
     "hostname": "nerdqaxe",
@@ -435,7 +436,7 @@ Applies a stored profile. **No OTP**: it only selects one of the stored profiles
 
 Pause switches the ASICs off (as a shutdown does) while the firmware, the web UI and the pool connections keep running; resume powers the ASICs on and initializes them again as at boot, with the current voltage and frequency settings. It also clears the hardware errors (overheat, voltage regulator faults); a fault that is still there is reported again. **No OTP** (like restart and shutdown, for home automations). A pause does not survive a restart.
 
-The change happens within a few seconds: `miningState` in `GET /api/v2/dashboard` goes `running` → `pausing` → `paused` and `paused` → `resuming` → `running`. The ASICs stay off at least 5 s; an earlier resume waits for that. If the ASICs are not found on resume, they are switched off again and the state stays `paused`.
+The change happens within a few seconds: `miningState` in `GET /api/v2/dashboard` and `GET /api/v2/system` goes `running` → `pausing` → `paused` and `paused` → `resuming` → `running`. The ASICs stay off at least 5 s; an earlier resume waits for that. If the ASICs are not found on resume, they are switched off again and the state stays `paused`.
 
 **Response**: `{"ok": true, "miningState": "running"}` with the state at the time of the request (also when the miner already is paused or running). `409` with `"ok": false` while the opposite change is in progress, and on devices that do not mine (no pool configured, CAN slave).
 

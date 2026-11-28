@@ -271,6 +271,8 @@
     "PAUSE_MINING": "暂停挖矿",
     "PAUSE_SUCCESS": "正在暂停挖矿",
     "PAUSE_FAILED": "暂停失败",
+    "RESUME_MINING": "恢复挖矿",
+    "RESUME_SUCCESS": "正在恢复挖矿",
     "LOGS_ALREADY_OPEN_OTHER_TAB": "日志已经在另一个标签页中打开。"
   },
   "SWARM": {

@@ -19,6 +19,7 @@ pub struct V2System {
     pub asic_model: Option<CString>,
     pub version: Option<CString>,
     pub uptime_seconds: i64,
+    pub mining_state: crate::mining::pause::State,
     pub last_reset_reason: Option<CString>,
     pub hostname: Option<CString>,
     pub ssid: Option<CString>,
@@ -37,6 +38,7 @@ pub fn v2_system(s: &V2System) -> Json {
         .cstr("asicModel", s.asic_model.as_deref())
         .cstr("version", s.version.as_deref())
         .int("uptimeSeconds", s.uptime_seconds)
+        .cstr("miningState", Some(s.mining_state.name()))
         .cstr("lastResetReason", s.last_reset_reason.as_deref());
     let mut net = Obj::new();
     net.cstr("hostname", s.hostname.as_deref())
@@ -109,6 +111,7 @@ pub(crate) fn system(req: &mut Request) -> EspErr {
         asic_model: Some(b.asic_model.into()),
         version: Some(version),
         uptime_seconds: (crate::util::cutil::now_us() - crate::system::start_us()) / 1_000_000,
+        mining_state: crate::mining::pause::state(),
         last_reset_reason: Some(crate::system::reset_reason().into()),
         hostname: Some(hostname),
         ssid: Some(ssid),

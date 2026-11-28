@@ -147,6 +147,13 @@ export class SystemComponent implements OnDestroy, AfterViewInit {
     this.info$ = interval(5000).pipe(
       startWith(0),
       switchMap(() => this.systemService.getSystemV2()),
+      tap((info) => {
+        // the request is done once the device got there
+        if ((this.miningRequest === 'pause' && info.miningState === 'paused')
+          || (this.miningRequest === 'resume' && info.miningState === 'running')) {
+          this.clearMiningRequest();
+        }
+      }),
       shareReplay({ refCount: true, bufferSize: 1 })
     );
 
@@ -180,6 +187,7 @@ export class SystemComponent implements OnDestroy, AfterViewInit {
    */
   ngOnDestroy(): void {
     window.removeEventListener('pagehide', this.onPageHide);
+    clearTimeout(this.miningRequestTimer);
 
     this.cleanupWebsocket();
     this.lockHeartbeatStop();
@@ -612,18 +620,51 @@ export class SystemComponent implements OnDestroy, AfterViewInit {
       });
   }
 
-  /** Pauses mining (no OTP, as on the device: home automation); the home page offers the resume. */
-  public pauseMining() {
-    this.systemService.pauseMining().subscribe({
+  /** a pause/resume sent and not reflected by the device yet */
+  public miningRequest: 'pause' | 'resume' | null = null;
+  private miningRequestTimer?: ReturnType<typeof setTimeout>;
+
+  /** The pause/resume button for a mining state: label (translation key) and whether it can be clicked. */
+  public miningButton(state?: string): { key: string; disabled: boolean } {
+    if (this.miningRequest === 'pause' || state === 'pausing') {
+      return { key: 'HOME.MINING_PAUSING', disabled: true };
+    }
+    if (this.miningRequest === 'resume' || state === 'resuming') {
+      return { key: 'HOME.MINING_RESUMING', disabled: true };
+    }
+    if (state === 'paused') {
+      return { key: 'SYSTEM.RESUME_MINING', disabled: false };
+    }
+    return { key: 'SYSTEM.PAUSE_MINING', disabled: false };
+  }
+
+  /** Pauses or resumes mining (no OTP, as on the device: home automation). */
+  public toggleMining(state?: string) {
+    const resume = state === 'paused';
+    this.miningRequest = resume ? 'resume' : 'pause';
+    // a resume that fails stays paused: give the button back after a while
+    clearTimeout(this.miningRequestTimer);
+    this.miningRequestTimer = setTimeout(() => this.clearMiningRequest(), 30000);
+    const call = resume ? this.systemService.resumeMining() : this.systemService.pauseMining();
+    call.subscribe({
       next: () => this.toastrService.success(
-        this.translateService.instant('SYSTEM.PAUSE_SUCCESS'),
+        this.translateService.instant(resume ? 'SYSTEM.RESUME_SUCCESS' : 'SYSTEM.PAUSE_SUCCESS'),
         this.translateService.instant('COMMON.SUCCESS')
       ),
-      error: () => this.toastrService.danger(
-        this.translateService.instant('SYSTEM.PAUSE_FAILED'),
-        this.translateService.instant('COMMON.ERROR')
-      ),
+      error: () => {
+        this.clearMiningRequest();
+        this.toastrService.danger(
+          this.translateService.instant(resume ? 'HOME.RESUME_FAILED' : 'SYSTEM.PAUSE_FAILED'),
+          this.translateService.instant('COMMON.ERROR')
+        );
+      },
     });
+  }
+
+  private clearMiningRequest() {
+    clearTimeout(this.miningRequestTimer);
+    this.miningRequest = null;
+    this.cdr.markForCheck();
   }
 
   public downloadCoreDump(deviceModel: string, version: string): void {
